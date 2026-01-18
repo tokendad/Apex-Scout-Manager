@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Girl Scout Cookie Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🍪 Girl Scout Cookie Tracker</h1>
+        </header>
+
+        <main>
+            <!-- Add Sale Form -->
+            <section class="add-sale-section">
+                <h2>Record a Sale</h2>
+                <form id="saleForm">
+                    <div class="form-group">
+                        <label for="cookieType">Cookie Type</label>
+                        <select id="cookieType" required>
+                            <option value="">Select a cookie...</option>
+                            <option value="Thin Mints">Thin Mints® ($6)</option>
+                            <option value="Samoas/Caramel deLites">Samoas® / Caramel deLites® ($6)</option>
+                            <option value="Tagalongs/Peanut Butter Patties">Tagalongs® / Peanut Butter Patties® ($6)</option>
+                            <option value="Trefoils/Shortbread">Trefoils® / Shortbread ($6)</option>
+                            <option value="Do-si-dos/Peanut Butter Sandwich">Do-si-dos® / Peanut Butter Sandwich ($6)</option>
+                            <option value="Lemon-Ups">Lemon-Ups® ($6)</option>
+                            <option value="Lemonades">Lemonades® ($6)</option>
+                            <option value="Adventurefuls">Adventurefuls® ($6)</option>
+                            <option value="Exploremores">Exploremores™ - NEW! ($6)</option>
+                            <option value="Toffee-tastic">Toffee-tastic® (Gluten-Free) ($6)</option>
+                            <option value="Caramel Chocolate Chip">Caramel Chocolate Chip (Gluten-Free) ($6)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="quantity">Quantity (boxes)</label>
+                        <input type="number" id="quantity" min="1" value="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="customerName">Customer Name (optional)</label>
+                        <input type="text" id="customerName" placeholder="e.g., Mrs. Smith">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Sale</button>
+                </form>
+            </section>
+
+            <!-- Summary Section -->
+            <section class="summary-section">
+                <h2>Sales Summary</h2>
+                <div class="summary-card">
+                    <div class="summary-item">
+                        <span class="summary-label">Total Boxes Sold</span>
+                        <span class="summary-value" id="totalBoxes">0</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Total Sales</span>
+                        <span class="summary-value" id="totalSales">0</span>
+                    </div>
+                    <div class="summary-item summary-revenue">
+                        <span class="summary-label">Total Revenue</span>
+                        <span class="summary-value" id="totalRevenue">$0</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sales List -->
+            <section class="sales-list-section">
+                <div class="section-header">
+                    <h2>Recent Sales</h2>
+                    <button id="clearAll" class="btn btn-secondary">Clear All</button>
+                </div>
+                <div id="salesList" class="sales-list">
+                    <p class="empty-message">No sales recorded yet. Add your first sale above!</p>
+                </div>
+            </section>
+
+            <!-- Cookie Breakdown -->
+            <section class="breakdown-section">
+                <h2>Cookie Breakdown</h2>
+                <div id="cookieBreakdown" class="cookie-breakdown">
+                    <p class="empty-message">No data to display yet.</p>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 Girl Scout Cookie Tracker</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
