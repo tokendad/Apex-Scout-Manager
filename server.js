@@ -110,17 +110,21 @@ app.get('/api/health', (req, res) => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-    console.log('SIGTERM received, closing database...');
-    db.close();
-    process.exit(0);
-});
+let isShuttingDown = false;
 
-process.on('SIGINT', () => {
-    console.log('SIGINT received, closing database...');
+function shutdown(signal) {
+    if (isShuttingDown) {
+        return;
+    }
+    isShuttingDown = true;
+    
+    console.log(`${signal} received, closing database...`);
     db.close();
-    process.exit(0);
-});
+    process.exitCode = 0;
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`GSCTracker server running on port ${PORT}`);

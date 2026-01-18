@@ -67,7 +67,7 @@ async function handleAddSale(e) {
     const sale = {
         cookieType,
         quantity,
-        customerName: customerName || 'Walk-in Customer',
+        customerName,
         date: new Date().toISOString()
     };
     
