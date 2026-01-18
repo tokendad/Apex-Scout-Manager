@@ -9,9 +9,6 @@ const PRICE_PER_BOX = 6;
 // Sales data array
 let sales = [];
 
-// Current active screen
-let currentScreen = 'individual';
-
 // DOM Elements
 const saleForm = document.getElementById('saleForm');
 const cookieTypeInput = document.getElementById('cookieType');
@@ -67,8 +64,6 @@ function switchScreen(screenName) {
     if (activeScreen) {
         activeScreen.classList.add('active');
     }
-    
-    currentScreen = screenName;
 }
 
 // Setup event listeners

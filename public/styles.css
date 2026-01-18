@@ -76,7 +76,7 @@ header h1 {
     cursor: pointer;
     transition: all 0.2s ease;
     color: var(--text-color);
-    -webkit-tap-highlight-color: transparent;
+    -webkit-tap-highlight-color: rgba(30, 123, 60, 0.1);
     min-height: 60px;
 }
 
@@ -179,8 +179,8 @@ section h2 {
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s;
-    /* Prevent tap highlight on mobile */
-    -webkit-tap-highlight-color: transparent;
+    /* Subtle tap highlight for mobile accessibility */
+    -webkit-tap-highlight-color: rgba(30, 123, 60, 0.1);
     /* Minimum touch target size for mobile */
     min-height: 48px;
 }
@@ -298,7 +298,7 @@ section h2 {
     font-size: 0.875rem;
     cursor: pointer;
     min-height: 40px;
-    -webkit-tap-highlight-color: transparent;
+    -webkit-tap-highlight-color: rgba(220, 53, 69, 0.1);
 }
 
 .btn-delete:active {
