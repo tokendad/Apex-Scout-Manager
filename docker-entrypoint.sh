@@ -13,14 +13,18 @@ echo "  TZ: ${TZ:-UTC}"
 
 # Set timezone if specified (validate to prevent path traversal)
 if [ -n "$TZ" ]; then
-    # Remove any path traversal attempts and validate format (only allow safe characters)
-    CLEAN_TZ=$(echo "$TZ" | sed 's/\.\.//g' | sed 's/[^a-zA-Z0-9_\/]//g')
+    # Remove any path traversal attempts and validate format (allow safe timezone characters)
+    CLEAN_TZ=$(echo "$TZ" | sed 's/\.\.//g' | sed 's/[^a-zA-Z0-9_\/+-]//g')
     if [ -f "/usr/share/zoneinfo/$CLEAN_TZ" ]; then
         ln -snf /usr/share/zoneinfo/$CLEAN_TZ /etc/localtime
         echo $CLEAN_TZ > /etc/timezone
         echo "Timezone set to: $CLEAN_TZ"
     else
-        echo "Warning: Invalid timezone '$CLEAN_TZ', using default (UTC)"
+        if [ "$TZ" != "$CLEAN_TZ" ]; then
+            echo "Warning: Timezone '$TZ' was sanitized to '$CLEAN_TZ' but is still invalid, using default (UTC)"
+        else
+            echo "Warning: Invalid timezone '$TZ', using default (UTC)"
+        fi
     fi
 fi
 
