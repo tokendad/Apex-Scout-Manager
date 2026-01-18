@@ -57,11 +57,7 @@ jobs:
             rm server.pid
           fi
 
-      - name: Delete old screenshots
-        run: |
-          # Remove old screenshots from the screenshots directory
-          # Keep only the newly generated ones
-          find screenshots -type f -name "*.png" -mmin +5 -delete
+
 
       - name: Commit and push screenshots
         run: |
