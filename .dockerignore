@@ -3,7 +3,7 @@
 .gitignore
 .github
 
-# Documentation
+# Documentation (excluded to reduce image size; can be accessed from repo)
 README.md
 docker_compose.md
 

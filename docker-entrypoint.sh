@@ -11,10 +11,17 @@ echo "  PGID: $PGID"
 echo "  UMASK: $UMASK"
 echo "  TZ: ${TZ:-UTC}"
 
-# Set timezone if specified
+# Set timezone if specified (validate to prevent path traversal)
 if [ -n "$TZ" ]; then
-    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime
-    echo $TZ > /etc/timezone
+    # Remove any path traversal attempts and validate format
+    CLEAN_TZ=$(echo "$TZ" | sed 's/\.\.//g' | sed 's/[^a-zA-Z0-9_\/+-]//g')
+    if [ -f "/usr/share/zoneinfo/$CLEAN_TZ" ]; then
+        ln -snf /usr/share/zoneinfo/$CLEAN_TZ /etc/localtime
+        echo $CLEAN_TZ > /etc/timezone
+        echo "Timezone set to: $CLEAN_TZ"
+    else
+        echo "Warning: Invalid timezone '$TZ', using default (UTC)"
+    fi
 fi
 
 # Update nginx user/group IDs if different from defaults
@@ -34,9 +41,12 @@ fi
 # Set umask
 umask $UMASK
 
-# Fix permissions for nginx directories
-chown -R nginx:nginx /var/cache/nginx /var/log/nginx /etc/nginx/conf.d
-chown -R nginx:nginx /usr/share/nginx/html
+# Fix permissions for nginx directories (only if needed to improve startup performance)
+if [ "$(stat -c '%u' /var/cache/nginx 2>/dev/null)" != "$PUID" ]; then
+    echo "Fixing permissions for nginx directories..."
+    chown -R nginx:nginx /var/cache/nginx /var/log/nginx /etc/nginx/conf.d
+    chown -R nginx:nginx /usr/share/nginx/html
+fi
 
 # Execute the main command
 exec "$@"
