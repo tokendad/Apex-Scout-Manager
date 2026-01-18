@@ -88,12 +88,11 @@ section h2 {
 .form-group select {
     width: 100%;
     padding: 0.875rem;
-    font-size: 1rem;
     border: 2px solid var(--border-color);
     border-radius: 8px;
     background-color: white;
     transition: border-color 0.2s;
-    /* Prevent zoom on iOS */
+    /* Prevent automatic zoom on focus in iOS Safari - 16px minimum */
     font-size: 16px;
 }
 
@@ -352,12 +351,6 @@ footer {
     /* iOS Safari specific styles */
     body {
         -webkit-text-size-adjust: 100%;
-    }
-
-    .form-group input,
-    .form-group select {
-        /* Prevent zoom on focus in iOS */
-        font-size: 16px;
     }
 }
 

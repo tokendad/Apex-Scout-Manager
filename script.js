@@ -220,7 +220,9 @@ function showFeedback(message) {
     setTimeout(() => {
         feedback.style.animation = 'slideUp 0.3s ease-out';
         setTimeout(() => {
-            document.body.removeChild(feedback);
+            if (document.body.contains(feedback)) {
+                feedback.remove();
+            }
         }, 300);
     }, 2000);
 }
