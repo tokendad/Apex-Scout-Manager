@@ -51,6 +51,72 @@ header h1 {
     font-weight: 600;
 }
 
+/* Top Navigation Bar */
+.top-nav {
+    display: flex;
+    justify-content: space-around;
+    background: var(--card-background);
+    border-bottom: 2px solid var(--border-color);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 0.5rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-color);
+    -webkit-tap-highlight-color: transparent;
+    min-height: 60px;
+}
+
+.nav-item:active {
+    background-color: var(--background-color);
+}
+
+.nav-item.active {
+    color: var(--primary-color);
+    border-bottom: 3px solid var(--primary-color);
+    background-color: rgba(30, 123, 60, 0.05);
+}
+
+.nav-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.nav-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Screen Management */
+.screen {
+    display: none;
+}
+
+.screen.active {
+    display: block;
+}
+
+/* Placeholder Messages */
+.placeholder-message {
+    text-align: center;
+    color: #666;
+    padding: 3rem 1rem;
+    font-size: 1rem;
+    line-height: 1.8;
+}
+
 /* Main Content */
 main {
     flex: 1;
@@ -292,6 +358,19 @@ footer {
         font-size: 2rem;
     }
 
+    .nav-item {
+        padding: 1rem;
+        min-height: 70px;
+    }
+
+    .nav-icon {
+        font-size: 1.75rem;
+    }
+
+    .nav-label {
+        font-size: 0.875rem;
+    }
+
     main {
         padding: 2rem;
     }
@@ -343,6 +422,11 @@ footer {
 
     .btn-delete:hover {
         opacity: 0.9;
+    }
+
+    .nav-item:hover:not(.active) {
+        background-color: var(--background-color);
+        color: var(--primary-color);
     }
 }
 

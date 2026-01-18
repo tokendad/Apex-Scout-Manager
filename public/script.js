@@ -9,6 +9,9 @@ const PRICE_PER_BOX = 6;
 // Sales data array
 let sales = [];
 
+// Current active screen
+let currentScreen = 'individual';
+
 // DOM Elements
 const saleForm = document.getElementById('saleForm');
 const cookieTypeInput = document.getElementById('cookieType');
@@ -23,11 +26,51 @@ const clearAllButton = document.getElementById('clearAll');
 
 // Initialize app
 async function init() {
+    setupNavigation();
     await loadSales();
     renderSales();
     updateSummary();
     updateBreakdown();
     setupEventListeners();
+}
+
+// Setup navigation
+function setupNavigation() {
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const screen = item.getAttribute('data-screen');
+            switchScreen(screen);
+        });
+    });
+    
+    // Set initial screen to individual sales
+    switchScreen('individual');
+}
+
+// Switch between screens
+function switchScreen(screenName) {
+    // Update active nav item
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.getAttribute('data-screen') === screenName) {
+            item.classList.add('active');
+        }
+    });
+    
+    // Update active screen
+    document.querySelectorAll('.screen').forEach(screen => {
+        screen.classList.remove('active');
+        screen.style.display = 'none';
+    });
+    
+    const activeScreen = document.getElementById(`${screenName}Screen`);
+    if (activeScreen) {
+        activeScreen.classList.add('active');
+        activeScreen.style.display = 'block';
+    }
+    
+    currentScreen = screenName;
 }
 
 // Setup event listeners

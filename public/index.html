@@ -14,9 +14,37 @@
             <h1>🍪 Girl Scout Cookie Tracker</h1>
         </header>
 
+        <!-- Top Navigation Bar -->
+        <nav class="top-nav">
+            <button class="nav-item active" data-screen="profile" aria-label="Girl Scout Profile">
+                <span class="nav-icon">👧</span>
+                <span class="nav-label">Profile</span>
+            </button>
+            <button class="nav-item" data-screen="individual" aria-label="Individual Sales">
+                <span class="nav-icon">🍪</span>
+                <span class="nav-label">Individual</span>
+            </button>
+            <button class="nav-item" data-screen="events" aria-label="Event Sales">
+                <span class="nav-icon">📅</span>
+                <span class="nav-label">Events</span>
+            </button>
+        </nav>
+
         <main>
-            <!-- Add Sale Form -->
-            <section class="add-sale-section">
+            <!-- Girl Scout Profile Screen -->
+            <div id="profileScreen" class="screen" style="display: none;">
+                <section class="profile-section">
+                    <h2>Girl Scout Profile</h2>
+                    <div class="profile-content">
+                        <p class="placeholder-message">Profile features coming soon! This will include Girl Scout information, goals, and QR code.</p>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Individual Sales Screen -->
+            <div id="individualScreen" class="screen">
+                <!-- Add Sale Form -->
+                <section class="add-sale-section">
                 <h2>Record a Sale</h2>
                 <form id="saleForm">
                     <div class="form-group">
@@ -85,6 +113,17 @@
                     <p class="empty-message">No data to display yet.</p>
                 </div>
             </section>
+            </div>
+
+            <!-- Event Sales Screen -->
+            <div id="eventsScreen" class="screen" style="display: none;">
+                <section class="events-section">
+                    <h2>Event Sales</h2>
+                    <div class="events-content">
+                        <p class="placeholder-message">Event sales features coming soon! This will include event tracking, case management, and donation tracking.</p>
+                    </div>
+                </section>
+            </div>
         </main>
 
         <footer>
