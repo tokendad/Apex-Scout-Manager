@@ -13,6 +13,14 @@ A mobile-responsive web application for tracking Girl Scout Cookie sales. Design
 - 🌓 **Dark Mode Support**: Automatically adapts to system dark mode preference
 - ✨ **Touch-Optimized**: Large touch targets and smooth mobile interactions
 
+## Screenshots
+
+### Desktop View
+![Desktop view with sales data](screenshots/desktop-with-data.png)
+
+### Mobile View
+![Mobile responsive view](screenshots/mobile-view.png)
+
 ## Cookie Types Included (2026 Season)
 
 **Classic Cookies:**
