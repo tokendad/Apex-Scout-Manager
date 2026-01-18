@@ -11,6 +11,6 @@ services:
       - PUID=1000
       - PGID=1000
       - UMASK=022
-      - TZ=America/New_York
+      - TZ=UTC
     volumes:
       - ./data:/data
