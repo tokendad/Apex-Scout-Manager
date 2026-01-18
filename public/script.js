@@ -61,13 +61,11 @@ function switchScreen(screenName) {
     // Update active screen
     document.querySelectorAll('.screen').forEach(screen => {
         screen.classList.remove('active');
-        screen.style.display = 'none';
     });
     
     const activeScreen = document.getElementById(`${screenName}Screen`);
     if (activeScreen) {
         activeScreen.classList.add('active');
-        activeScreen.style.display = 'block';
     }
     
     currentScreen = screenName;
