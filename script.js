@@ -181,6 +181,18 @@ async function handleUpdateQrCode() {
         return;
     }
     
+    // Validate URL format
+    try {
+        const urlObj = new URL(qrCodeUrl);
+        if (urlObj.protocol !== 'https:' && urlObj.protocol !== 'http:') {
+            alert('Please enter a valid HTTP or HTTPS URL');
+            return;
+        }
+    } catch (error) {
+        alert('Please enter a valid URL');
+        return;
+    }
+    
     try {
         const response = await fetch(`${API_BASE_URL}/profile`, {
             method: 'PUT',
@@ -202,10 +214,27 @@ async function handleUpdateQrCode() {
 
 // Generate QR code using external service
 function generateQrCode(url) {
-    // Use a QR code API service
-    const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
-    qrCodeImage.src = qrCodeApiUrl;
-    qrCodeDisplay.style.display = 'block';
+    // Validate URL before generating QR code
+    try {
+        new URL(url);
+        // Use a QR code API service with proper encoding
+        const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
+        
+        // Add error handling for image loading
+        qrCodeImage.onerror = () => {
+            qrCodeDisplay.style.display = 'none';
+            console.error('Failed to generate QR code');
+        };
+        
+        qrCodeImage.onload = () => {
+            qrCodeDisplay.style.display = 'block';
+        };
+        
+        qrCodeImage.src = qrCodeApiUrl;
+    } catch (error) {
+        console.error('Invalid URL for QR code:', error);
+        qrCodeDisplay.style.display = 'none';
+    }
 }
 
 // Handle set goal

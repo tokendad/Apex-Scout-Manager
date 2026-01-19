@@ -56,6 +56,15 @@ try {
 
         INSERT OR IGNORE INTO profile (id, goalBoxes, goalAmount) VALUES (1, 0, 0);
     `);
+    
+    // Migration: Add saleType column to existing sales table if it doesn't exist
+    const tableInfo = db.prepare("PRAGMA table_info(sales)").all();
+    const hasSaleType = tableInfo.some(col => col.name === 'saleType');
+    if (!hasSaleType) {
+        db.exec(`ALTER TABLE sales ADD COLUMN saleType TEXT DEFAULT 'individual'`);
+        logger.info('Migration: Added saleType column to sales table');
+    }
+    
     logger.info('Database tables initialized');
 } catch (error) {
     logger.error('Failed to create database tables', { error: error.message, stack: error.stack });
