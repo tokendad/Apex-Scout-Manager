@@ -6,6 +6,9 @@ const API_BASE_URL = '/api';
 // Price per box (can be adjusted)
 const PRICE_PER_BOX = 6;
 
+// Maximum photo file size in bytes (5MB)
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+
 // Data arrays
 let sales = [];
 let donations = [];
@@ -141,9 +144,9 @@ async function handlePhotoUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
     
-    // Check file size (limit to 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-        alert('Photo size must be less than 5MB');
+    // Check file size
+    if (file.size > MAX_PHOTO_SIZE) {
+        alert(`Photo size must be less than ${MAX_PHOTO_SIZE / (1024 * 1024)}MB`);
         return;
     }
     
