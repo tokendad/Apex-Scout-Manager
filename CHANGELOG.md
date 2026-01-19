@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fix YAML syntax errors in changelog workflow ([#17](https://github.com/tokendad/GSCTracker/pull/17))
+  - Resolved issues from 21 consecutive failed workflow runs between PR #7 (which created the workflow) and PR #17
+  - Fixed YAML parsing errors: changed `'on':` to `on:` and corrected heredoc indentation in multiline script
+  - All 21 failures showed 0 jobs executed due to GitHub Actions being unable to parse the workflow file
+  - Root cause: Heredoc content at column 0 while surrounding bash script was indented to column 10, causing YAML parser to fail with "could not find expected ':'"
+  - Solution: Indented heredoc content to maintain YAML validity and added `sed` command to normalize output file
 
 ### Security
 
