@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- Document 21 failed workflow runs in changelog ([#18](https://github.com/tokendad/GSCTracker/pull/18))
 
 ### Deprecated
 
