@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+- Fix YAML syntax errors in changelog workflow ([#17](https://github.com/tokendad/GSCTracker/pull/17))
 
 ### Security
 
