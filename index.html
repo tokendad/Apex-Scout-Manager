@@ -15,6 +15,55 @@
         </header>
 
         <main>
+            <!-- Profile Section -->
+            <section class="profile-section">
+                <h2>Girl Scout Profile</h2>
+                <div class="profile-content">
+                    <div class="profile-photo-container">
+                        <img id="profilePhoto" src="" alt="Profile Photo" class="profile-photo" style="display:none;">
+                        <div id="profilePhotoPlaceholder" class="profile-photo-placeholder">📸</div>
+                        <input type="file" id="photoInput" accept="image/*" style="display:none;">
+                        <button id="uploadPhotoBtn" class="btn btn-secondary">Upload Photo</button>
+                    </div>
+                    <div class="profile-info">
+                        <div class="form-group">
+                            <label for="qrCodeUrl">Store QR Code URL</label>
+                            <input type="url" id="qrCodeUrl" placeholder="https://digitalcookie.girlscouts.org/...">
+                        </div>
+                        <div class="qr-code-display" id="qrCodeDisplay" style="display:none;">
+                            <img id="qrCodeImage" src="" alt="Store QR Code">
+                        </div>
+                        <button id="updateQrBtn" class="btn btn-secondary">Update QR Code</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Goal Section -->
+            <section class="goal-section">
+                <h2>Sales Goal</h2>
+                <div class="goal-inputs">
+                    <div class="form-group">
+                        <label for="goalBoxes">Goal (boxes)</label>
+                        <input type="number" id="goalBoxes" min="0" value="0" placeholder="e.g., 120">
+                        <small>Note: 12 boxes = 1 case</small>
+                    </div>
+                    <button id="setGoalBtn" class="btn btn-secondary">Set Goal</button>
+                </div>
+                <div class="goal-display">
+                    <div class="goal-item">
+                        <span class="goal-label">Goal</span>
+                        <span class="goal-value" id="goalBoxesDisplay">0 boxes ($0)</span>
+                    </div>
+                    <div class="goal-item">
+                        <span class="goal-label">Progress</span>
+                        <span class="goal-value" id="goalProgress">0%</span>
+                    </div>
+                    <div class="goal-progress-bar">
+                        <div class="goal-progress-fill" id="goalProgressFill"></div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Add Sale Form -->
             <section class="add-sale-section">
                 <h2>Record a Sale</h2>
@@ -44,6 +93,13 @@
                         <label for="customerName">Customer Name (optional)</label>
                         <input type="text" id="customerName" placeholder="e.g., Mrs. Smith">
                     </div>
+                    <div class="form-group">
+                        <label for="saleType">Sale Type</label>
+                        <select id="saleType">
+                            <option value="individual">Individual Sale</option>
+                            <option value="event">Event Sale</option>
+                        </select>
+                    </div>
                     <button type="submit" class="btn btn-primary">Add Sale</button>
                 </form>
             </section>
@@ -57,13 +113,42 @@
                         <span class="summary-value" id="totalBoxes">0</span>
                     </div>
                     <div class="summary-item">
-                        <span class="summary-label">Total Sales</span>
-                        <span class="summary-value" id="totalSales">0</span>
+                        <span class="summary-label">Individual Sales</span>
+                        <span class="summary-value" id="individualSales">0 boxes</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Event Sales</span>
+                        <span class="summary-value" id="eventSales">0 boxes</span>
                     </div>
                     <div class="summary-item summary-revenue">
                         <span class="summary-label">Total Revenue</span>
                         <span class="summary-value" id="totalRevenue">$0</span>
                     </div>
+                </div>
+            </section>
+
+            <!-- Donations Section -->
+            <section class="donations-section">
+                <h2>Donations</h2>
+                <form id="donationForm">
+                    <div class="form-group">
+                        <label for="donationAmount">Amount ($)</label>
+                        <input type="number" id="donationAmount" min="0.01" step="0.01" placeholder="e.g., 25.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="donorName">Donor Name (optional)</label>
+                        <input type="text" id="donorName" placeholder="e.g., Mr. Johnson">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Donation</button>
+                </form>
+                <div class="donations-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">Total Donations</span>
+                        <span class="summary-value" id="totalDonations">$0</span>
+                    </div>
+                </div>
+                <div id="donationsList" class="donations-list">
+                    <p class="empty-message">No donations recorded yet.</p>
                 </div>
             </section>
 

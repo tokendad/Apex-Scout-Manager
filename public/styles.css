@@ -3,7 +3,6 @@
 /* CSS Variables for consistent theming */
 :root {
     --primary-color: #1e7b3c;
-    --primary-color-light: rgba(30, 123, 60, 0.05);
     --secondary-color: #f8b500;
     --background-color: #f5f5f5;
     --card-background: #ffffff;
@@ -50,72 +49,6 @@ header {
 header h1 {
     font-size: 1.5rem;
     font-weight: 600;
-}
-
-/* Top Navigation Bar */
-.top-nav {
-    display: flex;
-    justify-content: space-around;
-    background: var(--card-background);
-    border-bottom: 2px solid var(--border-color);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-}
-
-.nav-item {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 0.75rem 0.5rem;
-    background: none;
-    border: none;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    color: var(--text-color);
-    -webkit-tap-highlight-color: rgba(30, 123, 60, 0.1);
-    min-height: 60px;
-}
-
-.nav-item:active {
-    background-color: var(--background-color);
-}
-
-.nav-item.active {
-    color: var(--primary-color);
-    border-bottom: 3px solid var(--primary-color);
-    background-color: var(--primary-color-light);
-}
-
-.nav-icon {
-    font-size: 1.5rem;
-    margin-bottom: 0.25rem;
-}
-
-.nav-label {
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-/* Screen Management */
-.screen {
-    display: none;
-}
-
-.screen.active {
-    display: block;
-}
-
-/* Placeholder Messages */
-.placeholder-message {
-    text-align: center;
-    color: #666;
-    padding: 3rem 1rem;
-    font-size: 1rem;
-    line-height: 1.8;
 }
 
 /* Main Content */
@@ -179,8 +112,8 @@ section h2 {
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s;
-    /* Subtle tap highlight for mobile accessibility */
-    -webkit-tap-highlight-color: rgba(30, 123, 60, 0.1);
+    /* Prevent tap highlight on mobile */
+    -webkit-tap-highlight-color: transparent;
     /* Minimum touch target size for mobile */
     min-height: 48px;
 }
@@ -298,7 +231,7 @@ section h2 {
     font-size: 0.875rem;
     cursor: pointer;
     min-height: 40px;
-    -webkit-tap-highlight-color: rgba(220, 53, 69, 0.1);
+    -webkit-tap-highlight-color: transparent;
 }
 
 .btn-delete:active {
@@ -335,6 +268,170 @@ section h2 {
     font-size: 0.875rem;
 }
 
+/* Profile Section */
+.profile-section .profile-content {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+.profile-photo-container {
+    text-align: center;
+}
+
+.profile-photo,
+.profile-photo-placeholder {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin: 0 auto 1rem;
+    display: block;
+}
+
+.profile-photo-placeholder {
+    background: linear-gradient(135deg, var(--primary-color), #15562a);
+    color: white;
+    font-size: 4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.qr-code-display {
+    text-align: center;
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--background-color);
+    border-radius: 8px;
+}
+
+.qr-code-display img {
+    max-width: 200px;
+    height: auto;
+}
+
+/* Goal Section */
+.goal-inputs {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1rem;
+    align-items: end;
+    margin-bottom: 1.5rem;
+}
+
+.goal-inputs small {
+    display: block;
+    color: #666;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.goal-display {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.goal-item {
+    background: var(--background-color);
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.goal-label {
+    display: block;
+    font-size: 0.875rem;
+    color: #666;
+    margin-bottom: 0.5rem;
+}
+
+.goal-value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.goal-progress-bar {
+    grid-column: 1 / -1;
+    background: var(--background-color);
+    border-radius: 20px;
+    height: 30px;
+    overflow: hidden;
+    position: relative;
+}
+
+.goal-progress-fill {
+    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    height: 100%;
+    width: 0%;
+    transition: width 0.5s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+/* Sale Type Badge */
+.sale-type-badge {
+    display: inline-block;
+    background-color: var(--secondary-color);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+}
+
+/* Donations Section */
+.donations-summary {
+    margin: 1rem 0;
+}
+
+.donations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.donation-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: var(--background-color);
+    border-radius: 8px;
+    border-left: 4px solid var(--secondary-color);
+}
+
+.donation-info {
+    flex: 1;
+}
+
+.donation-amount {
+    font-weight: 600;
+    font-size: 1.25rem;
+    color: var(--secondary-color);
+    margin-bottom: 0.25rem;
+}
+
+.donation-details {
+    font-size: 0.875rem;
+    color: #666;
+}
+
+.donation-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
 /* Empty Messages */
 .empty-message {
     text-align: center;
@@ -359,19 +456,6 @@ footer {
         font-size: 2rem;
     }
 
-    .nav-item {
-        padding: 1rem;
-        min-height: 70px;
-    }
-
-    .nav-icon {
-        font-size: 1.75rem;
-    }
-
-    .nav-label {
-        font-size: 0.875rem;
-    }
-
     main {
         padding: 2rem;
     }
@@ -385,7 +469,7 @@ footer {
     }
 
     .summary-card {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         gap: 1.5rem;
     }
 
@@ -400,6 +484,11 @@ footer {
     .sale-item {
         padding: 1.25rem;
     }
+
+    .profile-content {
+        grid-template-columns: auto 1fr;
+        align-items: start;
+    }
 }
 
 /* Desktop Styles */
@@ -409,7 +498,7 @@ footer {
     }
 
     .summary-card {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
     }
 
     .summary-revenue {
@@ -423,11 +512,6 @@ footer {
 
     .btn-delete:hover {
         opacity: 0.9;
-    }
-
-    .nav-item:hover:not(.active) {
-        background-color: var(--background-color);
-        color: var(--primary-color);
     }
 }
 
