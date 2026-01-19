@@ -8,9 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- SQLite database storage with Node.js/Express REST API backend ([#8](https://github.com/tokendad/GSCTracker/pull/8))
+- Screenshot directory with automated UI change capture workflow ([#10](https://github.com/tokendad/GSCTracker/pull/10))
+- Persistent top bar navigation with three screens (Profile, Individual Sales, Events) ([#14](https://github.com/tokendad/GSCTracker/pull/14))
+- Comprehensive error logging with Winston, daily rotation, and colored output ([#16](https://github.com/tokendad/GSCTracker/pull/16))
 
 ### Changed
-- Document 21 failed workflow runs in changelog ([#18](https://github.com/tokendad/GSCTracker/pull/18))
 
 ### Deprecated
 
