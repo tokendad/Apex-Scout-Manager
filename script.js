@@ -6,27 +6,60 @@ const API_BASE_URL = '/api';
 // Price per box (can be adjusted)
 const PRICE_PER_BOX = 6;
 
-// Sales data array
+// Maximum photo file size in bytes (5MB)
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+
+// Data arrays
 let sales = [];
+let donations = [];
+let profile = null;
 
 // DOM Elements
 const saleForm = document.getElementById('saleForm');
 const cookieTypeInput = document.getElementById('cookieType');
 const quantityInput = document.getElementById('quantity');
 const customerNameInput = document.getElementById('customerName');
+const saleTypeInput = document.getElementById('saleType');
 const salesList = document.getElementById('salesList');
 const totalBoxesElement = document.getElementById('totalBoxes');
-const totalSalesElement = document.getElementById('totalSales');
+const individualSalesElement = document.getElementById('individualSales');
+const eventSalesElement = document.getElementById('eventSales');
 const totalRevenueElement = document.getElementById('totalRevenue');
 const cookieBreakdownElement = document.getElementById('cookieBreakdown');
 const clearAllButton = document.getElementById('clearAll');
 
+// Profile elements
+const photoInput = document.getElementById('photoInput');
+const uploadPhotoBtn = document.getElementById('uploadPhotoBtn');
+const profilePhoto = document.getElementById('profilePhoto');
+const profilePhotoPlaceholder = document.getElementById('profilePhotoPlaceholder');
+const qrCodeUrlInput = document.getElementById('qrCodeUrl');
+const updateQrBtn = document.getElementById('updateQrBtn');
+const qrCodeDisplay = document.getElementById('qrCodeDisplay');
+const qrCodeImage = document.getElementById('qrCodeImage');
+
+// Goal elements
+const goalBoxesInput = document.getElementById('goalBoxes');
+const setGoalBtn = document.getElementById('setGoalBtn');
+const goalBoxesDisplay = document.getElementById('goalBoxesDisplay');
+const goalProgress = document.getElementById('goalProgress');
+const goalProgressFill = document.getElementById('goalProgressFill');
+
+// Donation elements
+const donationForm = document.getElementById('donationForm');
+const donationAmountInput = document.getElementById('donationAmount');
+const donorNameInput = document.getElementById('donorName');
+const donationsList = document.getElementById('donationsList');
+const totalDonationsElement = document.getElementById('totalDonations');
+
 // Initialize app
 async function init() {
-    await loadSales();
+    await Promise.all([loadSales(), loadDonations(), loadProfile()]);
     renderSales();
+    renderDonations();
     updateSummary();
     updateBreakdown();
+    updateGoalDisplay();
     setupEventListeners();
 }
 
@@ -34,6 +67,17 @@ async function init() {
 function setupEventListeners() {
     saleForm.addEventListener('submit', handleAddSale);
     clearAllButton.addEventListener('click', handleClearAll);
+    
+    // Profile listeners
+    uploadPhotoBtn.addEventListener('click', () => photoInput.click());
+    photoInput.addEventListener('change', handlePhotoUpload);
+    updateQrBtn.addEventListener('click', handleUpdateQrCode);
+    
+    // Goal listeners
+    setGoalBtn.addEventListener('click', handleSetGoal);
+    
+    // Donation listeners
+    donationForm.addEventListener('submit', handleAddDonation);
 }
 
 // Load sales from API
@@ -51,6 +95,196 @@ async function loadSales() {
     }
 }
 
+// Load donations from API
+async function loadDonations() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/donations`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch donations');
+        }
+        donations = await response.json();
+    } catch (error) {
+        console.error('Error loading donations:', error);
+        donations = [];
+    }
+}
+
+// Load profile from API
+async function loadProfile() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/profile`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch profile');
+        }
+        profile = await response.json();
+        
+        // Update UI with profile data
+        if (profile.photoData) {
+            profilePhoto.src = profile.photoData;
+            profilePhoto.style.display = 'block';
+            profilePhotoPlaceholder.style.display = 'none';
+        }
+        
+        if (profile.qrCodeUrl) {
+            qrCodeUrlInput.value = profile.qrCodeUrl;
+            generateQrCode(profile.qrCodeUrl);
+        }
+        
+        if (profile.goalBoxes) {
+            goalBoxesInput.value = profile.goalBoxes;
+        }
+    } catch (error) {
+        console.error('Error loading profile:', error);
+        profile = { id: 1, photoData: null, qrCodeUrl: null, goalBoxes: 0, goalAmount: 0 };
+    }
+}
+
+// Handle photo upload
+async function handlePhotoUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Check file size
+    if (file.size > MAX_PHOTO_SIZE) {
+        alert(`Photo size must be less than ${MAX_PHOTO_SIZE / (1024 * 1024)}MB`);
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+        const photoData = event.target.result;
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/profile`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ photoData })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to upload photo');
+            }
+            
+            await loadProfile();
+            showFeedback('Profile photo updated!');
+        } catch (error) {
+            console.error('Error uploading photo:', error);
+            alert('Error uploading photo. Please try again.');
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+// Handle QR code update
+async function handleUpdateQrCode() {
+    const qrCodeUrl = qrCodeUrlInput.value.trim();
+    
+    if (!qrCodeUrl) {
+        alert('Please enter a QR code URL');
+        return;
+    }
+    
+    // Validate URL format
+    try {
+        const urlObj = new URL(qrCodeUrl);
+        if (urlObj.protocol !== 'https:' && urlObj.protocol !== 'http:') {
+            alert('Please enter a valid HTTP or HTTPS URL');
+            return;
+        }
+    } catch (error) {
+        alert('Please enter a valid URL');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/profile`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ qrCodeUrl })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to update QR code');
+        }
+        
+        await loadProfile();
+        showFeedback('QR code updated!');
+    } catch (error) {
+        console.error('Error updating QR code:', error);
+        alert('Error updating QR code. Please try again.');
+    }
+}
+
+// Generate QR code using external service
+function generateQrCode(url) {
+    // Validate URL before generating QR code
+    try {
+        new URL(url);
+        // Use a QR code API service with proper encoding
+        const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
+        
+        // Add error handling for image loading
+        qrCodeImage.onerror = () => {
+            qrCodeDisplay.style.display = 'none';
+            console.error('Failed to generate QR code');
+        };
+        
+        qrCodeImage.onload = () => {
+            qrCodeDisplay.style.display = 'block';
+        };
+        
+        qrCodeImage.src = qrCodeApiUrl;
+    } catch (error) {
+        console.error('Invalid URL for QR code:', error);
+        qrCodeDisplay.style.display = 'none';
+    }
+}
+
+// Handle set goal
+async function handleSetGoal() {
+    const goalBoxes = parseInt(goalBoxesInput.value) || 0;
+    const goalAmount = goalBoxes * PRICE_PER_BOX;
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/profile`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ goalBoxes, goalAmount })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to set goal');
+        }
+        
+        await loadProfile();
+        updateGoalDisplay();
+        showFeedback('Goal updated!');
+    } catch (error) {
+        console.error('Error setting goal:', error);
+        alert('Error setting goal. Please try again.');
+    }
+}
+
+// Update goal display
+function updateGoalDisplay() {
+    if (!profile) return;
+    
+    const goalBoxes = profile.goalBoxes || 0;
+    const goalAmount = profile.goalAmount || 0;
+    const totalBoxes = sales.reduce((sum, sale) => sum + sale.quantity, 0);
+    
+    goalBoxesDisplay.textContent = `${goalBoxes} boxes ($${goalAmount})`;
+    
+    if (goalBoxes > 0) {
+        const progress = Math.min((totalBoxes / goalBoxes) * 100, 100);
+        goalProgress.textContent = `${progress.toFixed(1)}%`;
+        goalProgressFill.style.width = `${progress}%`;
+    } else {
+        goalProgress.textContent = '0%';
+        goalProgressFill.style.width = '0%';
+    }
+}
+
 // Handle add sale form submission
 async function handleAddSale(e) {
     e.preventDefault();
@@ -58,6 +292,7 @@ async function handleAddSale(e) {
     const cookieType = cookieTypeInput.value;
     const quantity = parseInt(quantityInput.value);
     const customerName = customerNameInput.value.trim();
+    const saleType = saleTypeInput.value;
     
     if (!cookieType || quantity < 1) {
         alert('Please fill in all required fields.');
@@ -68,6 +303,7 @@ async function handleAddSale(e) {
         cookieType,
         quantity,
         customerName,
+        saleType,
         date: new Date().toISOString()
     };
     
@@ -88,6 +324,7 @@ async function handleAddSale(e) {
         renderSales();
         updateSummary();
         updateBreakdown();
+        updateGoalDisplay();
         
         // Reset form
         saleForm.reset();
@@ -116,6 +353,7 @@ async function handleDeleteSale(id) {
             renderSales();
             updateSummary();
             updateBreakdown();
+            updateGoalDisplay();
             showFeedback('Sale deleted.');
         } catch (error) {
             console.error('Error deleting sale:', error);
@@ -145,10 +383,77 @@ async function handleClearAll() {
             renderSales();
             updateSummary();
             updateBreakdown();
+            updateGoalDisplay();
             showFeedback('All sales cleared.');
         } catch (error) {
             console.error('Error clearing sales:', error);
             alert('Error clearing sales. Please try again.');
+        }
+    }
+}
+
+// Handle add donation
+async function handleAddDonation(e) {
+    e.preventDefault();
+    
+    const amount = parseFloat(donationAmountInput.value);
+    const donorName = donorNameInput.value.trim();
+    
+    if (!amount || amount <= 0) {
+        alert('Please enter a valid donation amount.');
+        return;
+    }
+    
+    const donation = {
+        amount,
+        donorName,
+        date: new Date().toISOString()
+    };
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/donations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(donation)
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to add donation');
+        }
+        
+        await loadDonations();
+        renderDonations();
+        updateSummary();
+        
+        // Reset form
+        donationForm.reset();
+        
+        showFeedback('Donation added successfully!');
+    } catch (error) {
+        console.error('Error adding donation:', error);
+        alert('Error adding donation. Please try again.');
+    }
+}
+
+// Handle delete donation
+async function handleDeleteDonation(id) {
+    if (confirm('Are you sure you want to delete this donation?')) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/donations/${id}`, {
+                method: 'DELETE'
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to delete donation');
+            }
+            
+            await loadDonations();
+            renderDonations();
+            updateSummary();
+            showFeedback('Donation deleted.');
+        } catch (error) {
+            console.error('Error deleting donation:', error);
+            alert('Error deleting donation. Please try again.');
         }
     }
 }
@@ -169,10 +474,12 @@ function renderSales() {
             minute: '2-digit'
         });
         
+        const saleTypeBadge = sale.saleType === 'event' ? '<span class="sale-type-badge">Event</span>' : '';
+        
         return `
             <div class="sale-item">
                 <div class="sale-info">
-                    <div class="sale-cookie">${sale.cookieType}</div>
+                    <div class="sale-cookie">${sale.cookieType} ${saleTypeBadge}</div>
                     <div class="sale-details">
                         ${sale.quantity} box${sale.quantity > 1 ? 'es' : ''} • ${sale.customerName} • ${formattedDate}
                     </div>
@@ -185,15 +492,51 @@ function renderSales() {
     }).join('');
 }
 
+// Render donations list
+function renderDonations() {
+    if (donations.length === 0) {
+        donationsList.innerHTML = '<p class="empty-message">No donations recorded yet.</p>';
+        return;
+    }
+    
+    donationsList.innerHTML = donations.map(donation => {
+        const date = new Date(donation.date);
+        const formattedDate = date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        return `
+            <div class="donation-item">
+                <div class="donation-info">
+                    <div class="donation-amount">$${donation.amount.toFixed(2)}</div>
+                    <div class="donation-details">
+                        ${donation.donorName} • ${formattedDate}
+                    </div>
+                </div>
+                <div class="donation-actions">
+                    <button class="btn-delete" onclick="handleDeleteDonation(${donation.id})">Delete</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
 // Update summary statistics
 function updateSummary() {
     const totalBoxes = sales.reduce((sum, sale) => sum + sale.quantity, 0);
-    const totalSalesCount = sales.length;
+    const individualBoxes = sales.filter(s => s.saleType === 'individual').reduce((sum, sale) => sum + sale.quantity, 0);
+    const eventBoxes = sales.filter(s => s.saleType === 'event').reduce((sum, sale) => sum + sale.quantity, 0);
     const totalRevenue = totalBoxes * PRICE_PER_BOX;
+    const totalDonationAmount = donations.reduce((sum, donation) => sum + donation.amount, 0);
     
     totalBoxesElement.textContent = totalBoxes;
-    totalSalesElement.textContent = totalSalesCount;
+    individualSalesElement.textContent = `${individualBoxes} boxes`;
+    eventSalesElement.textContent = `${eventBoxes} boxes`;
     totalRevenueElement.textContent = `$${totalRevenue}`;
+    totalDonationsElement.textContent = `$${totalDonationAmount.toFixed(2)}`;
 }
 
 // Update cookie breakdown

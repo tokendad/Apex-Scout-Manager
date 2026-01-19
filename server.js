@@ -27,7 +27,7 @@ try {
     process.exit(1);
 }
 
-// Create sales table if it doesn't exist
+// Create tables if they don't exist
 try {
     db.exec(`
         CREATE TABLE IF NOT EXISTS sales (
@@ -35,9 +35,36 @@ try {
             cookieType TEXT NOT NULL,
             quantity INTEGER NOT NULL,
             customerName TEXT NOT NULL,
+            date TEXT NOT NULL,
+            saleType TEXT DEFAULT 'individual'
+        );
+
+        CREATE TABLE IF NOT EXISTS profile (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            photoData TEXT,
+            qrCodeUrl TEXT,
+            goalBoxes INTEGER DEFAULT 0,
+            goalAmount REAL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS donations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            amount REAL NOT NULL,
+            donorName TEXT NOT NULL,
             date TEXT NOT NULL
-        )
+        );
+
+        INSERT OR IGNORE INTO profile (id, goalBoxes, goalAmount) VALUES (1, 0, 0);
     `);
+    
+    // Migration: Add saleType column to existing sales table if it doesn't exist
+    const tableInfo = db.prepare("PRAGMA table_info(sales)").all();
+    const hasSaleType = tableInfo.some(col => col.name === 'saleType');
+    if (!hasSaleType) {
+        db.exec(`ALTER TABLE sales ADD COLUMN saleType TEXT DEFAULT 'individual'`);
+        logger.info('Migration: Added saleType column to sales table');
+    }
+    
     logger.info('Database tables initialized');
 } catch (error) {
     logger.error('Failed to create database tables', { error: error.message, stack: error.stack });
@@ -93,7 +120,7 @@ app.get('/api/sales', (req, res) => {
 // Add a new sale
 app.post('/api/sales', (req, res) => {
     try {
-        const { cookieType, quantity, customerName, date } = req.body;
+        const { cookieType, quantity, customerName, date, saleType } = req.body;
         
         if (!cookieType || !quantity || quantity < 1) {
             logger.warn('Invalid sale data received', { cookieType, quantity });
@@ -103,17 +130,20 @@ app.post('/api/sales', (req, res) => {
         // Validate and sanitize customerName
         const sanitizedCustomerName = (customerName && customerName.trim()) || 'Walk-in Customer';
         
+        // Validate saleType (individual or event)
+        const validSaleType = (saleType === 'event') ? 'event' : 'individual';
+        
         // Validate and use current date if not provided or invalid
         let saleDate = date;
         if (!saleDate || isNaN(new Date(saleDate).getTime())) {
             saleDate = new Date().toISOString();
         }
         
-        const stmt = db.prepare('INSERT INTO sales (cookieType, quantity, customerName, date) VALUES (?, ?, ?, ?)');
-        const result = stmt.run(cookieType, quantity, sanitizedCustomerName, saleDate);
+        const stmt = db.prepare('INSERT INTO sales (cookieType, quantity, customerName, date, saleType) VALUES (?, ?, ?, ?, ?)');
+        const result = stmt.run(cookieType, quantity, sanitizedCustomerName, saleDate, validSaleType);
         
         const newSale = db.prepare('SELECT * FROM sales WHERE id = ?').get(result.lastInsertRowid);
-        logger.info('Sale added successfully', { saleId: newSale.id, cookieType, quantity });
+        logger.info('Sale added successfully', { saleId: newSale.id, cookieType, quantity, saleType: validSaleType });
         res.status(201).json(newSale);
     } catch (error) {
         // Log error without sensitive request body data
@@ -151,6 +181,107 @@ app.delete('/api/sales', (req, res) => {
     } catch (error) {
         logger.error('Error clearing sales', { error: error.message, stack: error.stack });
         res.status(500).json({ error: 'Failed to clear sales' });
+    }
+});
+
+// Get profile
+app.get('/api/profile', (req, res) => {
+    try {
+        const profile = db.prepare('SELECT * FROM profile WHERE id = 1').get();
+        res.json(profile || { id: 1, photoData: null, qrCodeUrl: null, goalBoxes: 0, goalAmount: 0 });
+    } catch (error) {
+        logger.error('Error fetching profile', { error: error.message, stack: error.stack });
+        res.status(500).json({ error: 'Failed to fetch profile' });
+    }
+});
+
+// Update profile
+app.put('/api/profile', (req, res) => {
+    try {
+        const { photoData, qrCodeUrl, goalBoxes, goalAmount } = req.body;
+        
+        // Validate goalBoxes and goalAmount
+        const validGoalBoxes = (typeof goalBoxes === 'number' && goalBoxes >= 0) ? goalBoxes : 0;
+        const validGoalAmount = (typeof goalAmount === 'number' && goalAmount >= 0) ? goalAmount : 0;
+        
+        const stmt = db.prepare(`
+            UPDATE profile 
+            SET photoData = COALESCE(?, photoData),
+                qrCodeUrl = COALESCE(?, qrCodeUrl),
+                goalBoxes = ?,
+                goalAmount = ?
+            WHERE id = 1
+        `);
+        stmt.run(photoData, qrCodeUrl, validGoalBoxes, validGoalAmount);
+        
+        const updatedProfile = db.prepare('SELECT * FROM profile WHERE id = 1').get();
+        logger.info('Profile updated successfully');
+        res.json(updatedProfile);
+    } catch (error) {
+        logger.error('Error updating profile', { error: error.message, stack: error.stack });
+        res.status(500).json({ error: 'Failed to update profile' });
+    }
+});
+
+// Get all donations
+app.get('/api/donations', (req, res) => {
+    try {
+        const donations = db.prepare('SELECT * FROM donations ORDER BY id DESC').all();
+        res.json(donations);
+    } catch (error) {
+        logger.error('Error fetching donations', { error: error.message, stack: error.stack });
+        res.status(500).json({ error: 'Failed to fetch donations' });
+    }
+});
+
+// Add a new donation
+app.post('/api/donations', (req, res) => {
+    try {
+        const { amount, donorName, date } = req.body;
+        
+        if (!amount || amount <= 0) {
+            logger.warn('Invalid donation data received', { amount });
+            return res.status(400).json({ error: 'Invalid donation data' });
+        }
+        
+        // Validate and sanitize donorName
+        const sanitizedDonorName = (donorName && donorName.trim()) || 'Anonymous';
+        
+        // Validate and use current date if not provided or invalid
+        let donationDate = date;
+        if (!donationDate || isNaN(new Date(donationDate).getTime())) {
+            donationDate = new Date().toISOString();
+        }
+        
+        const stmt = db.prepare('INSERT INTO donations (amount, donorName, date) VALUES (?, ?, ?)');
+        const result = stmt.run(amount, sanitizedDonorName, donationDate);
+        
+        const newDonation = db.prepare('SELECT * FROM donations WHERE id = ?').get(result.lastInsertRowid);
+        logger.info('Donation added successfully', { donationId: newDonation.id, amount });
+        res.status(201).json(newDonation);
+    } catch (error) {
+        logger.error('Error adding donation', { error: error.message, stack: error.stack });
+        res.status(500).json({ error: 'Failed to add donation' });
+    }
+});
+
+// Delete a donation
+app.delete('/api/donations/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        const stmt = db.prepare('DELETE FROM donations WHERE id = ?');
+        const result = stmt.run(id);
+        
+        if (result.changes === 0) {
+            logger.warn('Attempted to delete non-existent donation', { donationId: id });
+            return res.status(404).json({ error: 'Donation not found' });
+        }
+        
+        logger.info('Donation deleted successfully', { donationId: id });
+        res.json({ message: 'Donation deleted successfully' });
+    } catch (error) {
+        logger.error('Error deleting donation', { error: error.message, stack: error.stack, donationId: req.params.id });
+        res.status(500).json({ error: 'Failed to delete donation' });
     }
 });
 
