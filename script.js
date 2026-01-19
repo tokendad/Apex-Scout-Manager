@@ -613,7 +613,7 @@ function renderEvents() {
         // Calculate total initial and remaining inventory in boxes
         const totalInitial = event.initialBoxes + (event.initialCases * BOXES_PER_CASE);
         const totalRemaining = event.remainingBoxes + (event.remainingCases * BOXES_PER_CASE);
-        const totalSold = totalInitial - totalRemaining;
+        const totalSold = Math.max(0, totalInitial - totalRemaining); // Prevent negative values
         const revenue = totalSold * PRICE_PER_BOX;
         
         return `
@@ -644,11 +644,19 @@ function renderEvents() {
                     ` : ''}
                 </div>
                 <div class="event-actions">
-                    <button class="btn-delete" onclick="handleDeleteEvent(${event.id})">Delete</button>
+                    <button class="btn-delete" data-event-id="${event.id}">Delete</button>
                 </div>
             </div>
         `;
     }).join('');
+    
+    // Add event listeners for delete buttons
+    document.querySelectorAll('.events-list .btn-delete').forEach(button => {
+        button.addEventListener('click', () => {
+            const eventId = button.getAttribute('data-event-id');
+            handleDeleteEvent(eventId);
+        });
+    });
 }
 
 // Render sales list
