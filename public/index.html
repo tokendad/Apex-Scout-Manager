@@ -187,6 +187,54 @@
                 </div>
             </section>
 
+            <!-- Event Sales Section -->
+            <section class="event-sales-section">
+                <h2>Event Sales</h2>
+                <form id="eventForm">
+                    <div class="form-group">
+                        <label for="eventName">Event Name</label>
+                        <input type="text" id="eventName" placeholder="e.g., Walmart Cookie Booth" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="eventDate">Event Date</label>
+                        <input type="datetime-local" id="eventDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="eventDescription">Description (optional)</label>
+                        <textarea id="eventDescription" placeholder="Brief description of the event" rows="2"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="initialBoxes">Initial Boxes</label>
+                            <input type="number" id="initialBoxes" min="0" value="0" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="initialCases">Initial Cases</label>
+                            <input type="number" id="initialCases" min="0" value="0" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="remainingBoxes">Remaining Boxes</label>
+                            <input type="number" id="remainingBoxes" min="0" value="0" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="remainingCases">Remaining Cases</label>
+                            <input type="number" id="remainingCases" min="0" value="0" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="eventDonations">Donations Received ($)</label>
+                        <input type="number" id="eventDonations" min="0" step="0.01" value="0" placeholder="0.00">
+                        <small>Donations are tracked separately from sales</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Event</button>
+                </form>
+                <div id="eventsList" class="events-list">
+                    <p class="empty-message">No events recorded yet.</p>
+                </div>
+            </section>
+
             <!-- Sales List -->
             <section class="sales-list-section">
                 <div class="section-header">
