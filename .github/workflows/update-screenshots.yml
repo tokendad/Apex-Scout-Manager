@@ -47,7 +47,7 @@ jobs:
 
       - name: Capture screenshots
         run: |
-          node .github/scripts/capture-screenshots.js
+          npm run capture-screenshots
 
       - name: Stop server
         if: always()
