@@ -90,6 +90,7 @@ For the best mobile experience:
 - **Database**: SQLite (better-sqlite3) for persistent data storage
 - **Frontend**: Pure HTML/CSS/JavaScript
 - **API**: RESTful endpoints for CRUD operations
+- **Logging**: Winston with daily rotation and colored output (see [LOGGING.md](LOGGING.md))
 - **Responsive Design**: Uses CSS Grid, Flexbox, and media queries
 - **Cross-Browser Compatible**: Works on all modern browsers
 - **Viewport Optimized**: Proper meta tags for mobile rendering
@@ -104,6 +105,16 @@ For the best mobile experience:
 ## Data Storage
 
 All data is stored in a SQLite database (`gsctracker.db`) in the `/data` directory. The database is persistent across container restarts when using the Docker volume mount. The application uses a Node.js backend with Express to serve the web interface and provide REST API endpoints for data operations.
+
+## Logging
+
+GSCTracker includes comprehensive error logging with:
+- Colored console output (green for info, yellow for warnings, red for errors)
+- Automatic daily log rotation
+- 7-day log retention
+- Separate error log files
+
+Logs are stored in `/data/logs/` and are included in the Docker volume mount. For more details, see [LOGGING.md](LOGGING.md).
 
 ## Changelog
 
