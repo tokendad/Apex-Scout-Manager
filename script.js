@@ -20,6 +20,7 @@ function convertToBoxes(sale) {
 // Data arrays
 let sales = [];
 let donations = [];
+let events = [];
 let profile = null;
 
 // DOM Elements
@@ -66,11 +67,24 @@ const donorNameInput = document.getElementById('donorName');
 const donationsList = document.getElementById('donationsList');
 const totalDonationsElement = document.getElementById('totalDonations');
 
+// Event elements
+const eventForm = document.getElementById('eventForm');
+const eventNameInput = document.getElementById('eventName');
+const eventDateInput = document.getElementById('eventDate');
+const eventDescriptionInput = document.getElementById('eventDescription');
+const initialBoxesInput = document.getElementById('initialBoxes');
+const initialCasesInput = document.getElementById('initialCases');
+const remainingBoxesInput = document.getElementById('remainingBoxes');
+const remainingCasesInput = document.getElementById('remainingCases');
+const eventDonationsInput = document.getElementById('eventDonations');
+const eventsList = document.getElementById('eventsList');
+
 // Initialize app
 async function init() {
-    await Promise.all([loadSales(), loadDonations(), loadProfile()]);
+    await Promise.all([loadSales(), loadDonations(), loadEvents(), loadProfile()]);
     renderSales();
     renderDonations();
+    renderEvents();
     updateSummary();
     updateBreakdown();
     updateGoalDisplay();
@@ -92,6 +106,9 @@ function setupEventListeners() {
     
     // Donation listeners
     donationForm.addEventListener('submit', handleAddDonation);
+    
+    // Event listeners
+    eventForm.addEventListener('submit', handleAddEvent);
 }
 
 // Load sales from API
@@ -120,6 +137,20 @@ async function loadDonations() {
     } catch (error) {
         console.error('Error loading donations:', error);
         donations = [];
+    }
+}
+
+// Load events from API
+async function loadEvents() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/events`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch events');
+        }
+        events = await response.json();
+    } catch (error) {
+        console.error('Error loading events:', error);
+        events = [];
     }
 }
 
@@ -483,6 +514,141 @@ async function handleDeleteDonation(id) {
             alert('Error deleting donation. Please try again.');
         }
     }
+}
+
+// Handle add event
+async function handleAddEvent(e) {
+    e.preventDefault();
+    
+    const eventName = eventNameInput.value.trim();
+    const eventDate = eventDateInput.value;
+    const description = eventDescriptionInput.value.trim();
+    const initialBoxes = parseInt(initialBoxesInput.value) || 0;
+    const initialCases = parseInt(initialCasesInput.value) || 0;
+    const remainingBoxes = parseInt(remainingBoxesInput.value) || 0;
+    const remainingCases = parseInt(remainingCasesInput.value) || 0;
+    const donationsReceived = parseFloat(eventDonationsInput.value) || 0;
+    
+    if (!eventName || !eventDate) {
+        alert('Please enter event name and date.');
+        return;
+    }
+    
+    const event = {
+        eventName,
+        eventDate: new Date(eventDate).toISOString(),
+        description,
+        initialBoxes,
+        initialCases,
+        remainingBoxes,
+        remainingCases,
+        donationsReceived
+    };
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/events`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(event)
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to add event');
+        }
+        
+        await loadEvents();
+        renderEvents();
+        updateSummary();
+        
+        // Reset form
+        eventForm.reset();
+        
+        showFeedback('Event saved successfully!');
+    } catch (error) {
+        console.error('Error adding event:', error);
+        alert('Error adding event. Please try again.');
+    }
+}
+
+// Handle delete event
+async function handleDeleteEvent(id) {
+    if (confirm('Are you sure you want to delete this event?')) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/events/${id}`, {
+                method: 'DELETE'
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to delete event');
+            }
+            
+            await loadEvents();
+            renderEvents();
+            updateSummary();
+            showFeedback('Event deleted.');
+        } catch (error) {
+            console.error('Error deleting event:', error);
+            alert('Error deleting event. Please try again.');
+        }
+    }
+}
+
+// Render events list
+function renderEvents() {
+    if (events.length === 0) {
+        eventsList.innerHTML = '<p class="empty-message">No events recorded yet.</p>';
+        return;
+    }
+    
+    eventsList.innerHTML = events.map(event => {
+        const date = new Date(event.eventDate);
+        const formattedDate = date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        // Calculate total initial and remaining inventory in boxes
+        const totalInitial = event.initialBoxes + (event.initialCases * BOXES_PER_CASE);
+        const totalRemaining = event.remainingBoxes + (event.remainingCases * BOXES_PER_CASE);
+        const totalSold = totalInitial - totalRemaining;
+        const revenue = totalSold * PRICE_PER_BOX;
+        
+        return `
+            <div class="event-item">
+                <div class="event-header">
+                    <div class="event-name">${event.eventName}</div>
+                    <div class="event-date">${formattedDate}</div>
+                </div>
+                ${event.description ? `<div class="event-description">${event.description}</div>` : ''}
+                <div class="event-stats">
+                    <div class="event-stat">
+                        <span class="stat-label">Initial:</span>
+                        <span class="stat-value">${totalInitial} boxes (${event.initialCases} cases, ${event.initialBoxes} boxes)</span>
+                    </div>
+                    <div class="event-stat">
+                        <span class="stat-label">Remaining:</span>
+                        <span class="stat-value">${totalRemaining} boxes (${event.remainingCases} cases, ${event.remainingBoxes} boxes)</span>
+                    </div>
+                    <div class="event-stat highlight">
+                        <span class="stat-label">Total Sold:</span>
+                        <span class="stat-value">${totalSold} boxes ($${revenue})</span>
+                    </div>
+                    ${event.donationsReceived > 0 ? `
+                    <div class="event-stat">
+                        <span class="stat-label">Donations:</span>
+                        <span class="stat-value">$${event.donationsReceived.toFixed(2)}</span>
+                    </div>
+                    ` : ''}
+                </div>
+                <div class="event-actions">
+                    <button class="btn-delete" onclick="handleDeleteEvent(${event.id})">Delete</button>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 // Render sales list

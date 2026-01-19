@@ -60,6 +60,18 @@ try {
             date TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            eventName TEXT NOT NULL,
+            eventDate TEXT NOT NULL,
+            description TEXT,
+            initialBoxes INTEGER DEFAULT 0,
+            initialCases INTEGER DEFAULT 0,
+            remainingBoxes INTEGER DEFAULT 0,
+            remainingCases INTEGER DEFAULT 0,
+            donationsReceived REAL DEFAULT 0
+        );
+
         INSERT OR IGNORE INTO profile (id, goalBoxes, goalAmount) VALUES (1, 0, 0);
     `);
     
@@ -337,6 +349,164 @@ app.delete('/api/donations/:id', (req, res) => {
     } catch (error) {
         logger.error('Error deleting donation', { error: error.message, stack: error.stack, donationId: req.params.id });
         res.status(500).json({ error: 'Failed to delete donation' });
+    }
+});
+
+// Get all events
+app.get('/api/events', (req, res) => {
+    try {
+        const events = db.prepare('SELECT * FROM events ORDER BY eventDate DESC').all();
+        res.json(events);
+    } catch (error) {
+        logger.error('Error fetching events', { error: error.message, stack: error.stack });
+        res.status(500).json({ error: 'Failed to fetch events' });
+    }
+});
+
+// Add a new event
+app.post('/api/events', (req, res) => {
+    try {
+        const { 
+            eventName, 
+            eventDate, 
+            description,
+            initialBoxes,
+            initialCases,
+            remainingBoxes,
+            remainingCases,
+            donationsReceived
+        } = req.body;
+        
+        if (!eventName || !eventDate) {
+            logger.warn('Invalid event data received', { eventName, eventDate });
+            return res.status(400).json({ error: 'Event name and date are required' });
+        }
+        
+        // Validate and sanitize eventName
+        const sanitizedEventName = eventName.trim();
+        
+        // Validate and use current date if not provided or invalid
+        let validEventDate = eventDate;
+        if (!validEventDate || isNaN(new Date(validEventDate).getTime())) {
+            validEventDate = new Date().toISOString();
+        }
+        
+        // Validate numeric fields
+        const validInitialBoxes = (typeof initialBoxes === 'number' && initialBoxes >= 0) ? initialBoxes : 0;
+        const validInitialCases = (typeof initialCases === 'number' && initialCases >= 0) ? initialCases : 0;
+        const validRemainingBoxes = (typeof remainingBoxes === 'number' && remainingBoxes >= 0) ? remainingBoxes : 0;
+        const validRemainingCases = (typeof remainingCases === 'number' && remainingCases >= 0) ? remainingCases : 0;
+        const validDonationsReceived = (typeof donationsReceived === 'number' && donationsReceived >= 0) ? donationsReceived : 0;
+        const sanitizedDescription = (description && description.trim()) || null;
+        
+        const stmt = db.prepare(`
+            INSERT INTO events (
+                eventName, eventDate, description,
+                initialBoxes, initialCases, remainingBoxes, remainingCases,
+                donationsReceived
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const result = stmt.run(
+            sanitizedEventName, validEventDate, sanitizedDescription,
+            validInitialBoxes, validInitialCases, validRemainingBoxes, validRemainingCases,
+            validDonationsReceived
+        );
+        
+        const newEvent = db.prepare('SELECT * FROM events WHERE id = ?').get(result.lastInsertRowid);
+        logger.info('Event added successfully', { eventId: newEvent.id, eventName: sanitizedEventName });
+        res.status(201).json(newEvent);
+    } catch (error) {
+        logger.error('Error adding event', { error: error.message, stack: error.stack });
+        res.status(500).json({ error: 'Failed to add event' });
+    }
+});
+
+// Update an event
+app.put('/api/events/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        const { 
+            eventName, 
+            eventDate, 
+            description,
+            initialBoxes,
+            initialCases,
+            remainingBoxes,
+            remainingCases,
+            donationsReceived
+        } = req.body;
+        
+        if (!eventName || !eventDate) {
+            logger.warn('Invalid event data received', { eventName, eventDate });
+            return res.status(400).json({ error: 'Event name and date are required' });
+        }
+        
+        // Validate and sanitize eventName
+        const sanitizedEventName = eventName.trim();
+        
+        // Validate and use current date if not provided or invalid
+        let validEventDate = eventDate;
+        if (!validEventDate || isNaN(new Date(validEventDate).getTime())) {
+            validEventDate = new Date().toISOString();
+        }
+        
+        // Validate numeric fields
+        const validInitialBoxes = (typeof initialBoxes === 'number' && initialBoxes >= 0) ? initialBoxes : 0;
+        const validInitialCases = (typeof initialCases === 'number' && initialCases >= 0) ? initialCases : 0;
+        const validRemainingBoxes = (typeof remainingBoxes === 'number' && remainingBoxes >= 0) ? remainingBoxes : 0;
+        const validRemainingCases = (typeof remainingCases === 'number' && remainingCases >= 0) ? remainingCases : 0;
+        const validDonationsReceived = (typeof donationsReceived === 'number' && donationsReceived >= 0) ? donationsReceived : 0;
+        const sanitizedDescription = (description && description.trim()) || null;
+        
+        const stmt = db.prepare(`
+            UPDATE events 
+            SET eventName = ?,
+                eventDate = ?,
+                description = ?,
+                initialBoxes = ?,
+                initialCases = ?,
+                remainingBoxes = ?,
+                remainingCases = ?,
+                donationsReceived = ?
+            WHERE id = ?
+        `);
+        const result = stmt.run(
+            sanitizedEventName, validEventDate, sanitizedDescription,
+            validInitialBoxes, validInitialCases, validRemainingBoxes, validRemainingCases,
+            validDonationsReceived, id
+        );
+        
+        if (result.changes === 0) {
+            logger.warn('Attempted to update non-existent event', { eventId: id });
+            return res.status(404).json({ error: 'Event not found' });
+        }
+        
+        const updatedEvent = db.prepare('SELECT * FROM events WHERE id = ?').get(id);
+        logger.info('Event updated successfully', { eventId: id });
+        res.json(updatedEvent);
+    } catch (error) {
+        logger.error('Error updating event', { error: error.message, stack: error.stack, eventId: req.params.id });
+        res.status(500).json({ error: 'Failed to update event' });
+    }
+});
+
+// Delete an event
+app.delete('/api/events/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        const stmt = db.prepare('DELETE FROM events WHERE id = ?');
+        const result = stmt.run(id);
+        
+        if (result.changes === 0) {
+            logger.warn('Attempted to delete non-existent event', { eventId: id });
+            return res.status(404).json({ error: 'Event not found' });
+        }
+        
+        logger.info('Event deleted successfully', { eventId: id });
+        res.json({ message: 'Event deleted successfully' });
+    } catch (error) {
+        logger.error('Error deleting event', { error: error.message, stack: error.stack, eventId: req.params.id });
+        res.status(500).json({ error: 'Failed to delete event' });
     }
 });
 
