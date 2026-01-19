@@ -217,6 +217,13 @@ section h2 {
     color: #666;
 }
 
+.sale-additional-details {
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 0.5rem;
+    line-height: 1.5;
+}
+
 .sale-actions {
     display: flex;
     gap: 0.5rem;

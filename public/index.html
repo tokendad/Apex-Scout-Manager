@@ -86,12 +86,47 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="quantity">Quantity (boxes)</label>
+                        <label for="quantity">Quantity</label>
                         <input type="number" id="quantity" min="1" value="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="unitType">Unit Type</label>
+                        <select id="unitType">
+                            <option value="box">Boxes</option>
+                            <option value="case">Cases (12 boxes)</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="customerName">Customer Name (optional)</label>
                         <input type="text" id="customerName" placeholder="e.g., Mrs. Smith">
+                    </div>
+                    <div class="form-group">
+                        <label for="customerAddress">Customer Address (optional)</label>
+                        <input type="text" id="customerAddress" placeholder="e.g., 123 Main St">
+                    </div>
+                    <div class="form-group">
+                        <label for="customerPhone">Customer Phone (optional)</label>
+                        <input type="tel" id="customerPhone" placeholder="e.g., (555) 123-4567">
+                    </div>
+                    <div class="form-group">
+                        <label for="amountCollected">Amount Collected ($)</label>
+                        <input type="number" id="amountCollected" min="0" step="0.01" value="0" placeholder="e.g., 36.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="amountDue">Amount Due ($)</label>
+                        <input type="number" id="amountDue" min="0" step="0.01" value="0" placeholder="e.g., 0.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="paymentMethod">Payment Method</label>
+                        <select id="paymentMethod">
+                            <option value="">Select payment method...</option>
+                            <option value="cash">Cash</option>
+                            <option value="check">Check</option>
+                            <option value="venmo">Venmo</option>
+                            <option value="zelle">Zelle</option>
+                            <option value="paypal">PayPal</option>
+                            <option value="other">Other</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="saleType">Sale Type</label>

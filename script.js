@@ -6,8 +6,16 @@ const API_BASE_URL = '/api';
 // Price per box (can be adjusted)
 const PRICE_PER_BOX = 6;
 
+// Boxes per case (standard Girl Scout Cookie case)
+const BOXES_PER_CASE = 12;
+
 // Maximum photo file size in bytes (5MB)
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+
+// Helper function to convert sale quantity to boxes
+function convertToBoxes(sale) {
+    return sale.unitType === 'case' ? sale.quantity * BOXES_PER_CASE : sale.quantity;
+}
 
 // Data arrays
 let sales = [];
@@ -20,6 +28,12 @@ const cookieTypeInput = document.getElementById('cookieType');
 const quantityInput = document.getElementById('quantity');
 const customerNameInput = document.getElementById('customerName');
 const saleTypeInput = document.getElementById('saleType');
+const customerAddressInput = document.getElementById('customerAddress');
+const customerPhoneInput = document.getElementById('customerPhone');
+const unitTypeInput = document.getElementById('unitType');
+const amountCollectedInput = document.getElementById('amountCollected');
+const amountDueInput = document.getElementById('amountDue');
+const paymentMethodInput = document.getElementById('paymentMethod');
 const salesList = document.getElementById('salesList');
 const totalBoxesElement = document.getElementById('totalBoxes');
 const individualSalesElement = document.getElementById('individualSales');
@@ -271,7 +285,8 @@ function updateGoalDisplay() {
     
     const goalBoxes = profile.goalBoxes || 0;
     const goalAmount = profile.goalAmount || 0;
-    const totalBoxes = sales.reduce((sum, sale) => sum + sale.quantity, 0);
+    // Calculate total boxes (converting cases to boxes where needed)
+    const totalBoxes = sales.reduce((sum, sale) => sum + convertToBoxes(sale), 0);
     
     goalBoxesDisplay.textContent = `${goalBoxes} boxes ($${goalAmount})`;
     
@@ -293,6 +308,12 @@ async function handleAddSale(e) {
     const quantity = parseInt(quantityInput.value);
     const customerName = customerNameInput.value.trim();
     const saleType = saleTypeInput.value;
+    const customerAddress = customerAddressInput.value.trim();
+    const customerPhone = customerPhoneInput.value.trim();
+    const unitType = unitTypeInput.value;
+    const amountCollected = parseFloat(amountCollectedInput.value) || 0;
+    const amountDue = parseFloat(amountDueInput.value) || 0;
+    const paymentMethod = paymentMethodInput.value;
     
     if (!cookieType || quantity < 1) {
         alert('Please fill in all required fields.');
@@ -304,6 +325,12 @@ async function handleAddSale(e) {
         quantity,
         customerName,
         saleType,
+        customerAddress,
+        customerPhone,
+        unitType,
+        amountCollected,
+        amountDue,
+        paymentMethod,
         date: new Date().toISOString()
     };
     
@@ -476,13 +503,41 @@ function renderSales() {
         
         const saleTypeBadge = sale.saleType === 'event' ? '<span class="sale-type-badge">Event</span>' : '';
         
+        // Format unit type display
+        const unitDisplay = sale.unitType === 'case' ? `${sale.quantity} case${sale.quantity > 1 ? 's' : ''} (${sale.quantity * BOXES_PER_CASE} boxes)` : `${sale.quantity} box${sale.quantity > 1 ? 'es' : ''}`;
+        
+        // Build additional details
+        let additionalDetails = [];
+        if (sale.customerAddress) {
+            additionalDetails.push(`📍 ${sale.customerAddress}`);
+        }
+        if (sale.customerPhone) {
+            additionalDetails.push(`📞 ${sale.customerPhone}`);
+        }
+        if (sale.amountCollected > 0 || sale.amountDue > 0) {
+            const collectedDisplay = sale.amountCollected > 0 ? `Collected: $${sale.amountCollected.toFixed(2)}` : '';
+            const dueDisplay = sale.amountDue > 0 ? `Due: $${sale.amountDue.toFixed(2)}` : '';
+            const paymentInfo = [collectedDisplay, dueDisplay].filter(x => x).join(' • ');
+            if (paymentInfo) {
+                additionalDetails.push(`💵 ${paymentInfo}`);
+            }
+        }
+        if (sale.paymentMethod) {
+            additionalDetails.push(`Payment: ${sale.paymentMethod}`);
+        }
+        
+        const additionalDetailsHtml = additionalDetails.length > 0 
+            ? `<div class="sale-additional-details">${additionalDetails.join(' • ')}</div>` 
+            : '';
+        
         return `
             <div class="sale-item">
                 <div class="sale-info">
                     <div class="sale-cookie">${sale.cookieType} ${saleTypeBadge}</div>
                     <div class="sale-details">
-                        ${sale.quantity} box${sale.quantity > 1 ? 'es' : ''} • ${sale.customerName} • ${formattedDate}
+                        ${unitDisplay} • ${sale.customerName} • ${formattedDate}
                     </div>
+                    ${additionalDetailsHtml}
                 </div>
                 <div class="sale-actions">
                     <button class="btn-delete" onclick="handleDeleteSale(${sale.id})">Delete</button>
@@ -526,9 +581,13 @@ function renderDonations() {
 
 // Update summary statistics
 function updateSummary() {
-    const totalBoxes = sales.reduce((sum, sale) => sum + sale.quantity, 0);
-    const individualBoxes = sales.filter(s => s.saleType === 'individual').reduce((sum, sale) => sum + sale.quantity, 0);
-    const eventBoxes = sales.filter(s => s.saleType === 'event').reduce((sum, sale) => sum + sale.quantity, 0);
+    // Calculate total boxes (converting cases to boxes where needed)
+    const totalBoxes = sales.reduce((sum, sale) => sum + convertToBoxes(sale), 0);
+    
+    const individualBoxes = sales.filter(s => s.saleType === 'individual').reduce((sum, sale) => sum + convertToBoxes(sale), 0);
+    
+    const eventBoxes = sales.filter(s => s.saleType === 'event').reduce((sum, sale) => sum + convertToBoxes(sale), 0);
+    
     const totalRevenue = totalBoxes * PRICE_PER_BOX;
     const totalDonationAmount = donations.reduce((sum, donation) => sum + donation.amount, 0);
     
@@ -546,13 +605,14 @@ function updateBreakdown() {
         return;
     }
     
-    // Calculate totals by cookie type
+    // Calculate totals by cookie type (converting cases to boxes)
     const breakdown = {};
     sales.forEach(sale => {
+        const boxes = convertToBoxes(sale);
         if (breakdown[sale.cookieType]) {
-            breakdown[sale.cookieType] += sale.quantity;
+            breakdown[sale.cookieType] += boxes;
         } else {
-            breakdown[sale.cookieType] = sale.quantity;
+            breakdown[sale.cookieType] = boxes;
         }
     });
     

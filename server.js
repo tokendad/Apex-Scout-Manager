@@ -36,7 +36,13 @@ try {
             quantity INTEGER NOT NULL,
             customerName TEXT NOT NULL,
             date TEXT NOT NULL,
-            saleType TEXT DEFAULT 'individual'
+            saleType TEXT DEFAULT 'individual',
+            customerAddress TEXT,
+            customerPhone TEXT,
+            unitType TEXT DEFAULT 'box',
+            amountCollected REAL DEFAULT 0,
+            amountDue REAL DEFAULT 0,
+            paymentMethod TEXT
         );
 
         CREATE TABLE IF NOT EXISTS profile (
@@ -63,6 +69,25 @@ try {
     if (!hasSaleType) {
         db.exec(`ALTER TABLE sales ADD COLUMN saleType TEXT DEFAULT 'individual'`);
         logger.info('Migration: Added saleType column to sales table');
+    }
+    
+    // Migration: Add new individual sales columns if they don't exist
+    const columnsToAdd = [
+        { name: 'customerAddress', type: 'TEXT', default: null },
+        { name: 'customerPhone', type: 'TEXT', default: null },
+        { name: 'unitType', type: 'TEXT', default: "'box'" },
+        { name: 'amountCollected', type: 'REAL', default: '0' },
+        { name: 'amountDue', type: 'REAL', default: '0' },
+        { name: 'paymentMethod', type: 'TEXT', default: null }
+    ];
+    
+    for (const column of columnsToAdd) {
+        const hasColumn = tableInfo.some(col => col.name === column.name);
+        if (!hasColumn) {
+            const defaultClause = column.default ? ` DEFAULT ${column.default}` : '';
+            db.exec(`ALTER TABLE sales ADD COLUMN ${column.name} ${column.type}${defaultClause}`);
+            logger.info(`Migration: Added ${column.name} column to sales table`);
+        }
     }
     
     logger.info('Database tables initialized');
@@ -120,7 +145,19 @@ app.get('/api/sales', (req, res) => {
 // Add a new sale
 app.post('/api/sales', (req, res) => {
     try {
-        const { cookieType, quantity, customerName, date, saleType } = req.body;
+        const { 
+            cookieType, 
+            quantity, 
+            customerName, 
+            date, 
+            saleType,
+            customerAddress,
+            customerPhone,
+            unitType,
+            amountCollected,
+            amountDue,
+            paymentMethod
+        } = req.body;
         
         if (!cookieType || !quantity || quantity < 1) {
             logger.warn('Invalid sale data received', { cookieType, quantity });
@@ -139,8 +176,26 @@ app.post('/api/sales', (req, res) => {
             saleDate = new Date().toISOString();
         }
         
-        const stmt = db.prepare('INSERT INTO sales (cookieType, quantity, customerName, date, saleType) VALUES (?, ?, ?, ?, ?)');
-        const result = stmt.run(cookieType, quantity, sanitizedCustomerName, saleDate, validSaleType);
+        // Validate and sanitize new fields
+        const sanitizedCustomerAddress = (customerAddress && customerAddress.trim()) || null;
+        const sanitizedCustomerPhone = (customerPhone && customerPhone.trim()) || null;
+        const validUnitType = (unitType === 'case') ? 'case' : 'box';
+        const validAmountCollected = (typeof amountCollected === 'number' && amountCollected >= 0) ? amountCollected : 0;
+        const validAmountDue = (typeof amountDue === 'number' && amountDue >= 0) ? amountDue : 0;
+        const validPaymentMethod = paymentMethod || null;
+        
+        const stmt = db.prepare(`
+            INSERT INTO sales (
+                cookieType, quantity, customerName, date, saleType,
+                customerAddress, customerPhone, unitType, 
+                amountCollected, amountDue, paymentMethod
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const result = stmt.run(
+            cookieType, quantity, sanitizedCustomerName, saleDate, validSaleType,
+            sanitizedCustomerAddress, sanitizedCustomerPhone, validUnitType,
+            validAmountCollected, validAmountDue, validPaymentMethod
+        );
         
         const newSale = db.prepare('SELECT * FROM sales WHERE id = ?').get(result.lastInsertRowid);
         logger.info('Sale added successfully', { saleId: newSale.id, cookieType, quantity, saleType: validSaleType });
