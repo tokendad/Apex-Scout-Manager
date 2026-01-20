@@ -1001,11 +1001,15 @@ function renderSales() {
                 orderType: sale.orderType || 'Manual',
                 orderStatus: sale.orderStatus || 'Pending',
                 items: [],
-                totalBoxes: 0
+                totalBoxes: 0,
+                totalDue: 0,
+                totalCollected: 0
             };
         }
         orders[key].items.push(sale);
         orders[key].totalBoxes += convertToBoxes(sale);
+        orders[key].totalDue += sale.amountDue || 0;
+        orders[key].totalCollected += sale.amountCollected || 0;
 
         // If any item has Shipped status, mark the whole order as shipped
         if (sale.orderType && sale.orderType.toLowerCase().includes('shipped')) {
@@ -1045,10 +1049,30 @@ function renderSales() {
 
         // Check if order is shipped or delivered
         const isShipped = order.orderType && order.orderType.toLowerCase().includes('shipped');
+        const isInPerson = order.orderType && order.orderType.toLowerCase().includes('in-person');
         const isComplete = order.orderStatus === 'Shipped' || order.orderStatus === 'Delivered' || isShipped;
+        const hasOutstandingPayment = order.totalDue > 0;
+
+        // Determine status class for row coloring
+        // Priority: Awaiting Payment (red) > Complete (green) > Shipped (yellow) > In-Person (blue)
+        let statusClass = '';
+        if (hasOutstandingPayment && !isComplete) {
+            statusClass = 'status-awaiting-payment';
+        } else if (isComplete) {
+            statusClass = 'status-complete';
+        } else if (isShipped) {
+            statusClass = 'status-shipped';
+        } else if (isInPerson) {
+            statusClass = 'status-in-person';
+        }
+
+        // Determine button text and state
+        const buttonText = isComplete ? 'Completed' : 'Mark Complete';
+        const buttonClass = isComplete ? 'btn-complete-done' : 'btn-complete';
+        const buttonDisabled = isShipped ? 'disabled title="Shipped orders are automatically complete"' : '';
 
         html += `
-            <tr class="${isComplete ? 'order-complete' : ''}" data-order-key="${order.key}">
+            <tr class="${statusClass}" data-order-key="${order.key}">
                 <td class="customer-name">
                     <a href="#" onclick="showOrderDetails('${order.key}'); return false;">${order.customerName}</a>
                 </td>
@@ -1056,10 +1080,11 @@ function renderSales() {
                 <td>${formattedDate}</td>
                 <td>${order.orderType}</td>
                 <td>
-                    <input type="checkbox"
-                        ${isComplete ? 'checked' : ''}
-                        ${isShipped ? 'disabled title="Shipped orders are automatically complete"' : ''}
-                        onchange="handleOrderComplete('${order.key}', this.checked)">
+                    <button class="btn-order-status ${buttonClass}"
+                        ${buttonDisabled}
+                        onclick="handleOrderComplete('${order.key}', ${!isComplete})">
+                        ${buttonText}
+                    </button>
                 </td>
             </tr>
         `;
@@ -1068,6 +1093,12 @@ function renderSales() {
     html += `
                 </tbody>
             </table>
+        </div>
+        <div class="status-legend">
+            <span class="legend-item"><span class="legend-color status-complete"></span> Complete</span>
+            <span class="legend-item"><span class="legend-color status-shipped"></span> Shipped</span>
+            <span class="legend-item"><span class="legend-color status-in-person"></span> In-Person</span>
+            <span class="legend-item"><span class="legend-color status-awaiting-payment"></span> Awaiting Payment</span>
         </div>
     `;
 
@@ -1166,7 +1197,8 @@ function showOrderDetails(orderKey) {
                         </div>
                     </div>
                     <div class="detail-actions">
-                        <button class="btn btn-secondary" onclick="deleteOrder('${orderKey}')">Delete Order</button>
+                        ${isManualOrder(firstSale) ? `<button class="btn btn-secondary" onclick="showEditOrderForm('${orderKey}')">Edit Order</button>` : ''}
+                        <button class="btn btn-secondary btn-danger-text" onclick="deleteOrder('${orderKey}')">Delete Order</button>
                         <button class="btn btn-primary" onclick="saveOrderPayment('${orderKey}')">Save Changes</button>
                     </div>
                 </div>
@@ -1179,6 +1211,242 @@ function showOrderDetails(orderKey) {
     detailsDiv.id = 'orderDetailsContainer';
     detailsDiv.innerHTML = detailsHtml;
     document.body.appendChild(detailsDiv);
+}
+
+// Check if order is a manual order (not from Digital Cookie scrape)
+function isManualOrder(sale) {
+    // Scraped orders have orderType like "Website", "Shipped", "In-Person delivery"
+    // and typically have an orderNumber from Digital Cookie
+    const scrapedOrderTypes = ['website', 'shipped', 'in-person delivery', 'in-person'];
+    const orderType = (sale.orderType || '').toLowerCase();
+
+    // If it has a Digital Cookie style order number (8+ digits), it's scraped
+    const hasScrapedOrderNumber = sale.orderNumber && /^\d{8,}$/.test(sale.orderNumber);
+
+    // It's manual if: no orderType, orderType is 'Manual', or doesn't match scraped patterns
+    const isManual = !orderType || orderType === 'manual' ||
+        (!scrapedOrderTypes.some(t => orderType.includes(t)) && !hasScrapedOrderNumber);
+
+    return isManual;
+}
+
+// Show edit order form
+function showEditOrderForm(orderKey) {
+    const orderSales = sales.filter(s => getOrderKey(s) === orderKey);
+    if (orderSales.length === 0) return;
+
+    const firstSale = orderSales[0];
+
+    // Build cookie entries for editing
+    const cookieEntries = {};
+    orderSales.forEach(sale => {
+        const boxes = convertToBoxes(sale);
+        cookieEntries[sale.cookieType] = {
+            quantity: boxes,
+            saleId: sale.id
+        };
+    });
+
+    // Build cookie edit rows
+    let cookieEditHtml = '';
+    Object.entries(cookieEntries).forEach(([cookieType, data]) => {
+        cookieEditHtml += `
+            <div class="edit-cookie-row" data-sale-id="${data.saleId}">
+                <span class="edit-cookie-name">${cookieType}</span>
+                <input type="number" class="edit-cookie-qty" value="${data.quantity}" min="0" data-original="${data.quantity}">
+                <button class="btn-remove-cookie" onclick="markCookieForRemoval(this)" title="Remove">&times;</button>
+            </div>
+        `;
+    });
+
+    const editFormHtml = `
+        <div class="order-details-overlay" onclick="closeEditOrderForm()">
+            <div class="order-details-modal edit-order-modal" onclick="event.stopPropagation()">
+                <div class="order-details-header">
+                    <h3>Edit Order</h3>
+                    <button class="btn-close" onclick="closeEditOrderForm()">&times;</button>
+                </div>
+                <div class="order-details-content">
+                    <div class="detail-section">
+                        <h4>Customer Information</h4>
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="editCustomerName" value="${firstSale.customerName || ''}" placeholder="Customer Name">
+                        </div>
+                        <div class="form-group">
+                            <label>Address</label>
+                            <input type="text" id="editCustomerAddress" value="${firstSale.customerAddress || ''}" placeholder="Address">
+                        </div>
+                        <div class="form-group">
+                            <label>Phone</label>
+                            <input type="tel" id="editCustomerPhone" value="${firstSale.customerPhone || ''}" placeholder="Phone">
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="editCustomerEmail" value="${firstSale.customerEmail || ''}" placeholder="Email">
+                        </div>
+                    </div>
+                    <div class="detail-section">
+                        <h4>Order Information</h4>
+                        <div class="form-group">
+                            <label>Order Status</label>
+                            <select id="editOrderStatus">
+                                <option value="Pending" ${firstSale.orderStatus === 'Pending' ? 'selected' : ''}>Pending</option>
+                                <option value="Delivered" ${firstSale.orderStatus === 'Delivered' ? 'selected' : ''}>Delivered</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Payment Method</label>
+                            <select id="editPaymentMethod">
+                                <option value="" ${!firstSale.paymentMethod ? 'selected' : ''}>Not specified</option>
+                                <option value="cash" ${firstSale.paymentMethod === 'cash' ? 'selected' : ''}>Cash</option>
+                                <option value="check" ${firstSale.paymentMethod === 'check' ? 'selected' : ''}>Check</option>
+                                <option value="venmo" ${firstSale.paymentMethod === 'venmo' ? 'selected' : ''}>Venmo</option>
+                                <option value="paypal" ${firstSale.paymentMethod === 'paypal' ? 'selected' : ''}>PayPal</option>
+                                <option value="online" ${firstSale.paymentMethod === 'online' ? 'selected' : ''}>Online</option>
+                                <option value="other" ${firstSale.paymentMethod === 'other' ? 'selected' : ''}>Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="detail-section">
+                        <h4>Cookies</h4>
+                        <div class="edit-cookies-list" id="editCookiesList">
+                            ${cookieEditHtml}
+                        </div>
+                        <p class="edit-note">Set quantity to 0 or click &times; to remove a cookie type.</p>
+                    </div>
+                    <div class="detail-section">
+                        <h4>Payment</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Amount Collected</label>
+                                <input type="number" id="editAmountCollected" value="${orderSales.reduce((sum, s) => sum + (s.amountCollected || 0), 0).toFixed(2)}" min="0" step="0.01">
+                            </div>
+                            <div class="form-group">
+                                <label>Amount Due</label>
+                                <input type="number" id="editAmountDue" value="${orderSales.reduce((sum, s) => sum + (s.amountDue || 0), 0).toFixed(2)}" min="0" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-actions">
+                        <button class="btn btn-secondary" onclick="closeEditOrderForm()">Cancel</button>
+                        <button class="btn btn-primary" onclick="saveOrderEdits('${orderKey}')">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Close current order details and show edit form
+    closeOrderDetails();
+
+    const editDiv = document.createElement('div');
+    editDiv.id = 'editOrderContainer';
+    editDiv.innerHTML = editFormHtml;
+    document.body.appendChild(editDiv);
+}
+
+// Mark cookie row for removal
+function markCookieForRemoval(button) {
+    const row = button.closest('.edit-cookie-row');
+    row.classList.toggle('marked-for-removal');
+    if (row.classList.contains('marked-for-removal')) {
+        row.querySelector('.edit-cookie-qty').value = 0;
+    }
+}
+
+// Close edit order form
+function closeEditOrderForm() {
+    const container = document.getElementById('editOrderContainer');
+    if (container) {
+        container.remove();
+    }
+}
+
+// Save order edits
+async function saveOrderEdits(orderKey) {
+    const orderSales = sales.filter(s => getOrderKey(s) === orderKey);
+    if (orderSales.length === 0) return;
+
+    // Gather form values
+    const customerName = document.getElementById('editCustomerName').value.trim();
+    const customerAddress = document.getElementById('editCustomerAddress').value.trim();
+    const customerPhone = document.getElementById('editCustomerPhone').value.trim();
+    const customerEmail = document.getElementById('editCustomerEmail').value.trim();
+    const orderStatus = document.getElementById('editOrderStatus').value;
+    const paymentMethod = document.getElementById('editPaymentMethod').value;
+    const amountCollected = parseFloat(document.getElementById('editAmountCollected').value) || 0;
+    const amountDue = parseFloat(document.getElementById('editAmountDue').value) || 0;
+
+    // Get cookie quantities
+    const cookieRows = document.querySelectorAll('.edit-cookie-row');
+    const cookieUpdates = [];
+    cookieRows.forEach(row => {
+        const saleId = row.dataset.saleId;
+        const qty = parseInt(row.querySelector('.edit-cookie-qty').value) || 0;
+        const isRemoved = row.classList.contains('marked-for-removal') || qty === 0;
+        cookieUpdates.push({ saleId, qty, isRemoved });
+    });
+
+    try {
+        // Update each sale in the order
+        const updatePromises = [];
+
+        // First sale gets the payment amounts
+        const firstSaleId = orderSales[0].id;
+
+        for (let i = 0; i < orderSales.length; i++) {
+            const sale = orderSales[i];
+            const cookieUpdate = cookieUpdates.find(u => u.saleId == sale.id);
+
+            if (cookieUpdate && cookieUpdate.isRemoved) {
+                // Delete this sale entry
+                updatePromises.push(
+                    fetch(`${API_BASE_URL}/sales/${sale.id}`, { method: 'DELETE' })
+                );
+            } else {
+                // Update this sale entry
+                const updateData = {
+                    customerName,
+                    customerAddress,
+                    customerPhone,
+                    customerEmail,
+                    orderStatus,
+                    paymentMethod: paymentMethod || null
+                };
+
+                // Update quantity if changed
+                if (cookieUpdate) {
+                    updateData.quantity = cookieUpdate.qty;
+                }
+
+                // First sale gets payment amounts
+                if (sale.id === firstSaleId) {
+                    updateData.amountCollected = amountCollected;
+                    updateData.amountDue = amountDue;
+                }
+
+                updatePromises.push(
+                    fetch(`${API_BASE_URL}/sales/${sale.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updateData)
+                    })
+                );
+            }
+        }
+
+        await Promise.all(updatePromises);
+
+        // Reload and re-render
+        await loadSales();
+        renderSales();
+        closeEditOrderForm();
+        showFeedback('Order updated successfully!');
+    } catch (error) {
+        console.error('Error saving order edits:', error);
+        alert('Failed to save changes. Please try again.');
+    }
 }
 
 // Save order payment changes
@@ -1230,9 +1498,17 @@ function closeOrderDetails() {
 }
 
 // Handle order complete checkbox change
-async function handleOrderComplete(orderKey, isChecked) {
+async function handleOrderComplete(orderKey, markAsComplete) {
     const orderSales = sales.filter(s => getOrderKey(s) === orderKey);
-    const newStatus = isChecked ? 'Delivered' : 'Pending';
+    const newStatus = markAsComplete ? 'Delivered' : 'Pending';
+
+    // Find and disable the button while processing
+    const row = document.querySelector(`tr[data-order-key="${orderKey}"]`);
+    const button = row?.querySelector('.btn-order-status');
+    if (button) {
+        button.disabled = true;
+        button.textContent = 'Updating...';
+    }
 
     try {
         // Update all sales in this order
@@ -1253,7 +1529,7 @@ async function handleOrderComplete(orderKey, isChecked) {
     } catch (error) {
         console.error('Error updating order status:', error);
         alert('Failed to update order status. Please try again.');
-        // Reload to reset checkbox state
+        // Reload to reset button state
         await loadSales();
         renderSales();
     }
@@ -1616,7 +1892,6 @@ function setupImport() {
 
 // Digital Cookie Sync Management
 function setupDigitalCookieSync() {
-    const storeUrlInput = document.getElementById('digitalCookieStoreUrl');
     const emailInput = document.getElementById('digitalCookieEmail');
     const passwordInput = document.getElementById('digitalCookiePassword');
     const testConnectionBtn = document.getElementById('testConnectionBtn');
@@ -1629,9 +1904,6 @@ function setupDigitalCookieSync() {
     // Load existing settings from profile
     function loadSyncSettings() {
         if (profile) {
-            if (profile.digitalCookieStoreUrl) {
-                storeUrlInput.value = profile.digitalCookieStoreUrl;
-            }
             if (profile.digitalCookieEmail) {
                 emailInput.value = profile.digitalCookieEmail;
             }
@@ -1651,39 +1923,23 @@ function setupDigitalCookieSync() {
     // Update sync button state based on credentials
     function updateSyncButtonState() {
         const hasCredentials = emailInput.value && passwordInput.value;
-        const hasUrl = storeUrlInput.value;
-        syncNowBtn.disabled = !(hasCredentials || (profile && profile.digitalCookieEmail)) || !hasUrl;
+        syncNowBtn.disabled = !(hasCredentials || (profile && profile.digitalCookieEmail));
     }
 
     // Load settings when profile is loaded
     loadSyncSettings();
 
     // Update button state when inputs change
-    storeUrlInput.addEventListener('input', updateSyncButtonState);
     emailInput.addEventListener('input', updateSyncButtonState);
     passwordInput.addEventListener('input', updateSyncButtonState);
 
     // Save credentials
     saveCredentialsBtn.addEventListener('click', async () => {
-        const storeUrl = storeUrlInput.value.trim();
         const email = emailInput.value.trim();
         const password = passwordInput.value;
 
-        if (!storeUrl) {
-            showFeedback('Please enter your Digital Cookie orders page URL', true);
-            return;
-        }
-
         if (!email) {
             showFeedback('Please enter your email', true);
-            return;
-        }
-
-        try {
-            // Validate URL format
-            new URL(storeUrl);
-        } catch {
-            showFeedback('Please enter a valid URL', true);
             return;
         }
 
@@ -1692,7 +1948,6 @@ function setupDigitalCookieSync() {
 
         try {
             const updateData = {
-                digitalCookieStoreUrl: storeUrl,
                 digitalCookieEmail: email
             };
 

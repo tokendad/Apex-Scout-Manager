@@ -224,3 +224,6 @@ docs/gemini_prompt.md
 docs/instructions.md
 docs/DIGITAL_COOKIE_SCRAPER_IMPROVEMENTS.md
 docs/CLAUDE.md
+
+# Local Docker config (use docker-compose.yml.example as template)
+docker-compose.yml

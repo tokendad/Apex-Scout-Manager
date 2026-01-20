@@ -5,7 +5,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
-const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 const logger = require('./logger');
 const DigitalCookieScraper = require('./services/digitalCookieScraper');
 
@@ -672,17 +672,59 @@ app.delete('/api/events/:id', (req, res) => {
 });
 
 // Import sales from XLSX file
-app.post('/api/import', upload.single('file'), (req, res) => {
+app.post('/api/import', upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
             logger.warn('No file uploaded for import');
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
-        const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(sheet);
+        // Use ExcelJS to read the workbook
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(req.file.buffer);
+
+        const worksheet = workbook.worksheets[0];
+        if (!worksheet) {
+            logger.warn('Empty XLSX file uploaded');
+            return res.status(400).json({ error: 'No data found in file' });
+        }
+
+        // Convert worksheet to array of objects
+        const data = [];
+        const headers = [];
+
+        worksheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) {
+                // First row is headers
+                row.eachCell((cell, colNumber) => {
+                    headers[colNumber] = cell.value?.toString() || '';
+                });
+            } else {
+                // Data rows
+                const rowData = {};
+                row.eachCell((cell, colNumber) => {
+                    const header = headers[colNumber];
+                    if (header) {
+                        // Handle different cell value types
+                        let value = cell.value;
+                        if (value && typeof value === 'object') {
+                            // Handle rich text, dates, etc.
+                            if (value.richText) {
+                                value = value.richText.map(rt => rt.text).join('');
+                            } else if (value instanceof Date) {
+                                value = value;
+                            } else if (value.result !== undefined) {
+                                value = value.result;
+                            }
+                        }
+                        rowData[header] = value;
+                    }
+                });
+                if (Object.keys(rowData).length > 0) {
+                    data.push(rowData);
+                }
+            }
+        });
 
         if (data.length === 0) {
             logger.warn('Empty XLSX file uploaded');
@@ -714,7 +756,6 @@ app.post('/api/import', upload.single('file'), (req, res) => {
         `);
 
         let importedCount = 0;
-        let skippedCount = 0;
 
         // Use a transaction for better performance
         const importTransaction = db.transaction((rows) => {
@@ -729,10 +770,12 @@ app.post('/api/import', upload.single('file'), (req, res) => {
                 const customerPhone = row['Customer Phone'] || '';
                 const customerEmail = row['Customer Email'] || '';
 
-                // Convert Excel date serial to ISO string
+                // Convert date to ISO string
                 let dateStr = new Date().toISOString();
                 if (orderDate) {
-                    if (typeof orderDate === 'number') {
+                    if (orderDate instanceof Date) {
+                        dateStr = orderDate.toISOString();
+                    } else if (typeof orderDate === 'number') {
                         // Excel date serial number
                         const excelEpoch = new Date(1899, 11, 30);
                         const jsDate = new Date(excelEpoch.getTime() + orderDate * 24 * 60 * 60 * 1000);
@@ -897,13 +940,12 @@ app.post('/api/scrape/test', async (req, res) => {
 // Digital Cookie Scrape - Get sync status
 app.get('/api/scrape/status', (req, res) => {
     try {
-        const profile = db.prepare('SELECT lastSyncTime, digitalCookieEmail, digitalCookieStoreUrl FROM profile WHERE id = 1').get();
+        const profile = db.prepare('SELECT lastSyncTime, digitalCookieEmail FROM profile WHERE id = 1').get();
         const importHistory = db.prepare('SELECT COUNT(*) as count FROM import_history WHERE source = ?').get('scrape');
 
         res.json({
             lastSyncTime: profile?.lastSyncTime || null,
             hasCredentials: !!(profile?.digitalCookieEmail),
-            hasStoreUrl: !!(profile?.digitalCookieStoreUrl),
             totalImported: importHistory?.count || 0
         });
     } catch (error) {
@@ -916,29 +958,25 @@ app.get('/api/scrape/status', (req, res) => {
 app.post('/api/scrape', async (req, res) => {
     const scraper = new DigitalCookieScraper();
     try {
-        // Get credentials and store URL from profile
-        const profile = db.prepare('SELECT digitalCookieEmail, digitalCookiePassword, digitalCookieStoreUrl FROM profile WHERE id = 1').get();
+        // Get credentials from profile
+        const profile = db.prepare('SELECT digitalCookieEmail, digitalCookiePassword FROM profile WHERE id = 1').get();
 
         if (!profile || !profile.digitalCookieEmail || !profile.digitalCookiePassword) {
             return res.status(400).json({ error: 'Digital Cookie credentials not configured' });
-        }
-
-        if (!profile.digitalCookieStoreUrl) {
-            return res.status(400).json({ error: 'Digital Cookie store URL not configured' });
         }
 
         logger.info('Starting Digital Cookie sync');
 
         await scraper.init();
 
-        // Login
+        // Login (this also extracts the scout username automatically)
         const loginSuccess = await scraper.login(profile.digitalCookieEmail, profile.digitalCookiePassword);
         if (!loginSuccess) {
             return res.status(401).json({ error: 'Login failed - check your credentials' });
         }
 
-        // Scrape orders
-        const orders = await scraper.scrapeOrders(profile.digitalCookieStoreUrl);
+        // Scrape orders (URL is constructed automatically from username)
+        const orders = await scraper.scrapeOrders();
 
         // Process orders
         let salesImported = 0;
@@ -996,47 +1034,76 @@ app.post('/api/scrape', async (req, res) => {
                     donationsImported++;
                 } else {
                     // Insert as sale
-                    // Determine payment status from scraped data
-                    // isPaid is true if order is in "Completed" table or has payment method
-                    const isPaid = order.isPaid || order.isCompleted || false;
-                    const amountCollected = isPaid ? totalAmount : 0;
-                    const amountDue = isPaid ? 0 : totalAmount;
+                    // All Digital Cookie online orders are pre-paid through the platform
+                    // Mark them as paid regardless of scraped status
+                    const isPaid = true; // Online orders are always paid
+                    const amountCollected = totalAmount;
+                    const amountDue = 0;
 
-                    // Use payment method from order, or default to 'online' if paid
-                    let paymentMethod = order.paymentMethod || null;
-                    if (isPaid && !paymentMethod) {
-                        paymentMethod = 'online';
-                    }
+                    // Payment method is 'online' for Digital Cookie orders
+                    const paymentMethod = order.paymentMethod || 'online';
 
                     // Map order type: "In-Person delivery" or "Shipped"
                     const orderType = order.orderType || 'Website';
 
                     // Map order status: "Shipped", "Delivered", "Approved for Delivery", "Pending"
-                    // If isCompleted (Delivered status), mark as completed
                     let orderStatus = order.orderStatus || 'Pending';
                     if (order.isCompleted && !orderStatus.toLowerCase().includes('deliver')) {
                         orderStatus = 'Delivered';
                     }
 
-                    // Insert a generic cookie entry for the order
-                    insertSale.run(
-                        'Assorted',         // cookieType - we may not have detailed breakdown
-                        totalBoxes,         // quantity (pkgs = boxes)
-                        order.customerName || 'Digital Cookie Customer',
-                        order.customerAddress || null,
-                        order.customerPhone || null,
-                        order.customerEmail || null,
-                        orderDate,
-                        'individual',       // saleType
-                        'box',              // unitType
-                        order.orderNumber,
-                        orderType,          // orderType: "In-Person delivery", "Shipped", or "Website"
-                        orderStatus,        // orderStatus: "Shipped", "Delivered", "Approved for Delivery", "Pending"
-                        amountCollected,
-                        amountDue,
-                        paymentMethod
-                    );
-                    salesImported++;
+                    const customerName = order.customerName || 'Digital Cookie Customer';
+                    const customerAddress = order.customerAddress || null;
+                    const customerPhone = order.customerPhone || null;
+                    const customerEmail = order.customerEmail || null;
+
+                    // Check if we have individual cookie details
+                    if (order.cookies && order.cookies.length > 0) {
+                        // Insert one entry per cookie type
+                        for (const cookie of order.cookies) {
+                            const cookieQty = cookie.quantity || 1;
+                            const cookieAmount = cookieQty * PRICE_PER_BOX;
+
+                            insertSale.run(
+                                cookie.name,        // Individual cookie type
+                                cookieQty,          // quantity for this cookie type
+                                customerName,
+                                customerAddress,
+                                customerPhone,
+                                customerEmail,
+                                orderDate,
+                                'individual',       // saleType
+                                'box',              // unitType
+                                order.orderNumber,
+                                orderType,
+                                orderStatus,
+                                cookieAmount,       // amountCollected for this cookie
+                                0,                  // amountDue (paid)
+                                paymentMethod
+                            );
+                            salesImported++;
+                        }
+                    } else {
+                        // Fallback: Insert as single "Assorted" entry if no cookie details
+                        insertSale.run(
+                            'Assorted',         // cookieType - no detailed breakdown available
+                            totalBoxes,         // quantity (pkgs = boxes)
+                            customerName,
+                            customerAddress,
+                            customerPhone,
+                            customerEmail,
+                            orderDate,
+                            'individual',       // saleType
+                            'box',              // unitType
+                            order.orderNumber,
+                            orderType,
+                            orderStatus,
+                            amountCollected,
+                            amountDue,
+                            paymentMethod
+                        );
+                        salesImported++;
+                    }
                 }
 
                 // Record in import history

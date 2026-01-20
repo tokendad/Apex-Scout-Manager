@@ -418,15 +418,14 @@
 
                     <!-- Profile & Store Settings -->
                     <div class="settings-group">
+                        <h3>Profile & Store</h3>
+                        <input type="file" id="photoInput" accept="image/*" style="display:none;">
+                        <button id="uploadPhotoBtn" class="btn btn-secondary">Upload Profile Photo</button>
                         <div class="form-group">
                             <label for="qrCodeUrl">Store URL: Your Digital Cookie store link for customers to order online</label>
                             <input type="url" id="qrCodeUrl" placeholder="https://digitalcookie.girlscouts.org/...">
                         </div>
-                        <div class="form-row">
-                            <button id="updateQrBtn" class="btn btn-secondary">Update Store QR</button>
-                            <input type="file" id="photoInput" accept="image/*" style="display:none;">
-                            <button id="uploadPhotoBtn" class="btn btn-secondary">Upload Photo</button>
-                        </div>
+                        <button id="updateQrBtn" class="btn btn-secondary">Update Store QR</button>
                     </div>
 
                     <!-- Payment Methods -->
@@ -495,13 +494,6 @@
                         <h3>Digital Cookie Sync</h3>
                         <div class="import-section">
                             <p class="import-description">Automatically import orders from your Digital Cookie store by connecting your account.</p>
-
-                            <div class="form-group">
-                                <label for="digitalCookieStoreUrl">Orders Page URL</label>
-                                <input type="url" id="digitalCookieStoreUrl" class="form-input"
-                                    placeholder="https://digitalcookie.girlscouts.org/scout/username/cookieOrdersPage">
-                                <small class="form-hint">Your Digital Cookie orders page URL</small>
-                            </div>
 
                             <div class="form-group">
                                 <label for="digitalCookieEmail">Email</label>

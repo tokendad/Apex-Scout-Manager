@@ -16,6 +16,8 @@ class DigitalCookieScraper {
         this.page = null;
         this.baseUrl = 'https://digitalcookie.girlscouts.org';
         this.loginUrl = 'https://digitalcookie.girlscouts.org/login';
+        this.maxParallelTabs = 3; // Number of parallel tabs for detail scraping
+        this.scoutUsername = null; // Extracted after login
     }
 
     /**
@@ -190,7 +192,16 @@ class DigitalCookieScraper {
             const loginSuccessful = !finalUrl.includes('/login');
 
             if (loginSuccessful) {
-                logger.info('Digital Cookie login successful');
+                // Extract scout username from URL (pattern: /scout/{username}/...)
+                const usernameMatch = finalUrl.match(/\/scout\/([^\/]+)/);
+                if (usernameMatch) {
+                    this.scoutUsername = usernameMatch[1];
+                    logger.info('Digital Cookie login successful', { username: this.scoutUsername });
+                } else {
+                    // Try to find username from page content or navigate to find it
+                    logger.info('Digital Cookie login successful, searching for username...');
+                    await this.extractUsername();
+                }
             } else {
                 // Check for error messages
                 const errorMessage = await this.page.evaluate(() => {
@@ -247,35 +258,90 @@ class DigitalCookieScraper {
     }
 
     /**
+     * Extract username by navigating to a known page pattern
+     */
+    async extractUsername() {
+        try {
+            // Look for links containing /scout/ pattern in the current page
+            const username = await this.page.evaluate(() => {
+                const links = document.querySelectorAll('a[href*="/scout/"]');
+                for (const link of links) {
+                    const href = link.getAttribute('href');
+                    const match = href.match(/\/scout\/([^\/]+)/);
+                    if (match && match[1] && !match[1].includes('login')) {
+                        return match[1];
+                    }
+                }
+                // Also check current URL
+                const urlMatch = window.location.href.match(/\/scout\/([^\/]+)/);
+                if (urlMatch) return urlMatch[1];
+                return null;
+            });
+
+            if (username) {
+                this.scoutUsername = username;
+                logger.info('Extracted scout username', { username });
+            } else {
+                logger.warn('Could not extract scout username from page');
+            }
+        } catch (error) {
+            logger.error('Error extracting username', { error: error.message });
+        }
+    }
+
+    /**
+     * Get the orders page URL for the logged-in scout
+     * @returns {string} - Orders page URL
+     */
+    getOrdersPageUrl() {
+        if (!this.scoutUsername) {
+            throw new Error('Scout username not available. Please login first.');
+        }
+        return `${this.baseUrl}/scout/${this.scoutUsername}/cookieOrdersPage`;
+    }
+
+    /**
+     * Get the order detail URL for a specific order
+     * @param {string} orderNumber - The order number
+     * @returns {string} - Order detail URL
+     */
+    getOrderDetailUrl(orderNumber) {
+        if (!this.scoutUsername) {
+            throw new Error('Scout username not available. Please login first.');
+        }
+        return `${this.baseUrl}/scout/${this.scoutUsername}/cookieorderdetail/${orderNumber}`;
+    }
+
+    /**
      * Scrape orders from the orders page
      * Digital Cookie has two main tables:
      * 1. "Orders to deliver" - pending delivery orders
      * 2. "Completed Digital Cookie Online Orders" - completed/paid orders
      *
-     * @param {string} storeUrl - URL to the orders page (cookieOrdersPage)
      * @returns {Object[]} - Array of order objects
      */
-    async scrapeOrders(storeUrl) {
+    async scrapeOrders() {
         try {
-            logger.info('Navigating to orders page', { url: storeUrl });
+            if (!this.scoutUsername) {
+                throw new Error('Scout username not available. Please login first.');
+            }
+
+            const ordersPageUrl = this.getOrdersPageUrl();
+            logger.info('Navigating to orders page', { url: ordersPageUrl });
 
             // Navigate to orders page
-            await this.page.goto(storeUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+            await this.page.goto(ordersPageUrl, { waitUntil: 'networkidle2', timeout: 30000 });
 
-            // Wait for page content to load
-            await new Promise(r => setTimeout(r, 3000));
+            // Wait for page content to load (reduced from 3000ms)
+            await new Promise(r => setTimeout(r, 1500));
 
-            // Take debug screenshot
-            await this.takeScreenshot('/tmp/orders-page-debug.png');
-
-            // Extract orders from the page
-            const orders = await this.page.evaluate(() => {
+            // Extract basic order info from the page tables
+            const basicOrders = await this.page.evaluate(() => {
                 const extractedOrders = [];
 
                 // Helper to parse a date string
                 const parseDate = (dateStr) => {
                     if (!dateStr) return null;
-                    // Handle formats like "1/18/2026" or "12/10/2025"
                     return dateStr.trim();
                 };
 
@@ -289,23 +355,9 @@ class DigitalCookieScraper {
                 // Find all tables on the page
                 const tables = document.querySelectorAll('table');
 
-                // Track which section we're in based on preceding headers
-                let currentSection = 'unknown';
-
-                // Look for section headers to understand context
-                const allHeaders = document.querySelectorAll('h1, h2, h3, h4, h5, h6, .section-header, [class*="header"], [class*="title"]');
-                const headerTexts = Array.from(allHeaders).map(h => ({
-                    text: h.textContent.trim().toLowerCase(),
-                    element: h
-                }));
-
                 tables.forEach((table, tableIndex) => {
                     // Try to determine which section this table belongs to
-                    // by looking at text before the table
                     let tableSection = 'orders_to_deliver'; // default
-
-                    // Check the page text for section indicators
-                    const pageText = document.body.innerText.toLowerCase();
 
                     // Get table's preceding text/headers
                     let prevElement = table.previousElementSibling;
@@ -346,11 +398,9 @@ class DigitalCookieScraper {
                         if (rowIndex === 0 && row.querySelector('th')) return;
 
                         const cells = row.querySelectorAll('td');
-                        if (cells.length < 3) return; // Skip rows with too few cells
+                        if (cells.length < 3) return;
 
                         const rowText = row.textContent.trim();
-
-                        // Skip empty or info rows
                         if (rowText.includes('no orders') || rowText.includes('at this time')) return;
 
                         const order = {
@@ -360,16 +410,17 @@ class DigitalCookieScraper {
                             customerPhone: null,
                             customerAddress: null,
                             orderDate: null,
-                            orderType: null,        // "In-Person delivery" or "Shipped"
-                            orderStatus: null,      // "Shipped", "Delivered", "Approved for Delivery"
-                            paymentMethod: null,    // How it was paid
+                            orderType: null,
+                            orderStatus: null,
+                            paymentMethod: null,
                             cookies: [],
-                            totalBoxes: 0,          // "pkgs" = boxes
+                            totalBoxes: 0,
                             isPaid: false,
                             isCompleted: false,
                             isDonation: false,
-                            isWebsiteOrder: true,   // All Digital Cookie orders are website orders
-                            tableSection: tableSection
+                            isWebsiteOrder: true,
+                            tableSection: tableSection,
+                            detailLink: null
                         };
 
                         // Parse cells based on headers or position
@@ -377,7 +428,6 @@ class DigitalCookieScraper {
                             const cellText = cell.textContent.trim();
                             const header = headers[cellIndex] || '';
 
-                            // Match by header name
                             if (header.includes('cookie') && header.includes('pkg')) {
                                 order.totalBoxes = extractNumber(cellText);
                             } else if (header.includes('deliver to') || header.includes('name') || header.includes('customer')) {
@@ -386,8 +436,6 @@ class DigitalCookieScraper {
                                 order.customerAddress = cellText;
                             } else if (header.includes('date') && !header.includes('initial')) {
                                 order.orderDate = parseDate(cellText);
-                            } else if (header.includes('initial order')) {
-                                // This indicates if it was an initial order
                             } else if (header.includes('payment') || header.includes('paid')) {
                                 order.paymentMethod = cellText;
                                 if (cellText && cellText.toLowerCase() !== 'unpaid') {
@@ -402,20 +450,25 @@ class DigitalCookieScraper {
                                 order.orderType = cellText;
                             }
 
-                            // Also check for order number in links or data attributes
+                            // Check for order number and detail links
                             const links = cell.querySelectorAll('a');
                             links.forEach(link => {
                                 const href = link.getAttribute('href') || '';
                                 const onclick = link.getAttribute('onclick') || '';
 
-                                // Extract order ID from URLs like /order/123456
+                                // Extract order ID from URLs
                                 const orderMatch = href.match(/order[\/=](\d+)/i) || onclick.match(/order[^\d]*(\d+)/i);
                                 if (orderMatch && !order.orderNumber) {
                                     order.orderNumber = orderMatch[1];
                                 }
+
+                                // Capture detail page link
+                                if (href && (href.includes('order') || href.includes('detail'))) {
+                                    order.detailLink = href.startsWith('http') ? href : null;
+                                }
                             });
 
-                            // Check for order number in cell text (9-digit numbers)
+                            // Check for order number in cell text
                             if (!order.orderNumber) {
                                 const orderNumMatch = cellText.match(/^(\d{8,12})$/);
                                 if (orderNumMatch) {
@@ -424,34 +477,23 @@ class DigitalCookieScraper {
                             }
                         });
 
-                        // If no headers, try positional parsing based on Digital Cookie structure
-                        // Typical structure: [checkbox], Order#, Boxes, Name, Address, Date, [Status/Action]
+                        // Positional parsing fallback
                         if (headers.length === 0 || !order.customerName) {
                             const cellTexts = Array.from(cells).map(c => c.textContent.trim());
 
                             cellTexts.forEach((text, idx) => {
-                                // Order number (8-12 digit number)
                                 if (/^\d{8,12}$/.test(text) && !order.orderNumber) {
                                     order.orderNumber = text;
-                                }
-                                // Box count (small number, usually 1-50)
-                                else if (/^\d{1,3}$/.test(text) && !order.totalBoxes) {
+                                } else if (/^\d{1,3}$/.test(text) && !order.totalBoxes) {
                                     const num = parseInt(text, 10);
                                     if (num > 0 && num < 100) {
                                         order.totalBoxes = num;
                                     }
-                                }
-                                // Date (contains /)
-                                else if (/\d{1,2}\/\d{1,2}\/\d{2,4}/.test(text) && !order.orderDate) {
+                                } else if (/\d{1,2}\/\d{1,2}\/\d{2,4}/.test(text) && !order.orderDate) {
                                     order.orderDate = text;
-                                }
-                                // Address (contains comma or street indicators)
-                                else if ((text.includes(',') || /\d+\s+\w+\s+(rd|st|ave|dr|ln|way|blvd)/i.test(text)) && !order.customerAddress) {
+                                } else if ((text.includes(',') || /\d+\s+\w+\s+(rd|st|ave|dr|ln|way|blvd)/i.test(text)) && !order.customerAddress) {
                                     order.customerAddress = text;
-                                }
-                                // Name (text without special patterns, not too short, not "VIEW" or similar)
-                                else if (text.length > 2 && text.length < 50 && /^[A-Za-z\s\-']+$/.test(text) && !order.customerName) {
-                                    // Skip common action words that aren't names
+                                } else if (text.length > 2 && text.length < 50 && /^[A-Za-z\s\-']+$/.test(text) && !order.customerName) {
                                     const skipWords = ['view', 'edit', 'delete', 'approve', 'decline', 'select', 'order', 'delivered'];
                                     if (!skipWords.includes(text.toLowerCase())) {
                                         order.customerName = text;
@@ -460,18 +502,16 @@ class DigitalCookieScraper {
                             });
                         }
 
-                        // Determine payment status from table section
+                        // Set flags based on section
                         if (tableSection === 'completed') {
                             order.isPaid = true;
                             order.isCompleted = true;
                         }
 
-                        // Check for donation indicators
                         if (rowText.toLowerCase().includes('donate') || rowText.toLowerCase().includes('donation')) {
                             order.isDonation = true;
                         }
 
-                        // Determine order type from content
                         if (rowText.toLowerCase().includes('shipped') || rowText.toLowerCase().includes('ship')) {
                             order.orderType = 'Shipped';
                             if (rowText.toLowerCase().includes('shipped')) {
@@ -481,7 +521,6 @@ class DigitalCookieScraper {
                             order.orderType = 'In-Person delivery';
                         }
 
-                        // Determine order status from content
                         if (!order.orderStatus) {
                             if (rowText.toLowerCase().includes('delivered')) {
                                 order.orderStatus = 'Delivered';
@@ -493,9 +532,7 @@ class DigitalCookieScraper {
                             }
                         }
 
-                        // Only add if we have meaningful data
                         if (order.orderNumber || order.customerName) {
-                            // Check for duplicates
                             const exists = extractedOrders.some(o =>
                                 o.orderNumber === order.orderNumber &&
                                 o.customerName === order.customerName &&
@@ -508,7 +545,6 @@ class DigitalCookieScraper {
                     });
                 });
 
-                // Return extracted orders with debug info
                 return {
                     orders: extractedOrders,
                     debug: {
@@ -518,30 +554,289 @@ class DigitalCookieScraper {
                 };
             });
 
-            // Extract orders and debug info
-            const result = orders;
-            const extractedOrders = result.orders || [];
+            const extractedOrders = basicOrders.orders || [];
+            logger.info('Initial order extraction complete', {
+                orderCount: extractedOrders.length,
+                tablesFound: basicOrders.debug?.tablesFound || 0
+            });
 
-            // Log detailed info about each order for debugging
+            // Filter orders that need detail scraping (have order numbers)
+            const ordersNeedingDetails = extractedOrders.filter(o => o.orderNumber);
+
+            if (ordersNeedingDetails.length > 0) {
+                logger.info('Fetching order details in parallel', {
+                    orderCount: ordersNeedingDetails.length,
+                    parallelTabs: this.maxParallelTabs
+                });
+
+                // Process orders in parallel batches using multiple tabs
+                await this.scrapeOrderDetailsParallel(ordersNeedingDetails);
+            }
+
+            // Log final results
             logger.info('Scraped orders from Digital Cookie', {
-                tablesFound: result.debug?.tablesFound || 0,
                 orderCount: extractedOrders.length,
                 paidOrders: extractedOrders.filter(o => o.isPaid).length,
                 completedOrders: extractedOrders.filter(o => o.isCompleted).length,
-                totalBoxes: extractedOrders.reduce((sum, o) => sum + (o.totalBoxes || 0), 0),
-                orderDetails: extractedOrders.map(o => ({
-                    name: o.customerName,
-                    boxes: o.totalBoxes,
-                    date: o.orderDate,
-                    section: o.tableSection,
-                    orderNum: o.orderNumber
-                }))
+                ordersWithCookies: extractedOrders.filter(o => o.cookies && o.cookies.length > 0).length,
+                totalBoxes: extractedOrders.reduce((sum, o) => sum + (o.totalBoxes || 0), 0)
             });
 
             return extractedOrders;
         } catch (error) {
             logger.error('Failed to scrape orders', { error: error.message });
             throw error;
+        }
+    }
+
+    /**
+     * Process order details in parallel using multiple browser tabs
+     * @param {Object[]} orders - Array of order objects to update with details
+     */
+    async scrapeOrderDetailsParallel(orders) {
+        // Process in batches to avoid overwhelming the server
+        const batchSize = this.maxParallelTabs;
+
+        for (let i = 0; i < orders.length; i += batchSize) {
+            const batch = orders.slice(i, i + batchSize);
+            const startTime = Date.now();
+
+            logger.info(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(orders.length / batchSize)}`, {
+                batchSize: batch.length,
+                progress: `${i + 1}-${Math.min(i + batchSize, orders.length)} of ${orders.length}`
+            });
+
+            // Process batch in parallel
+            const detailPromises = batch.map(order =>
+                this.scrapeOrderDetailInNewTab(order.orderNumber)
+                    .then(details => ({ order, details }))
+                    .catch(err => {
+                        logger.debug('Failed to get details for order', { orderNumber: order.orderNumber, error: err.message });
+                        return { order, details: null };
+                    })
+            );
+
+            const results = await Promise.all(detailPromises);
+
+            // Merge results into orders
+            for (const { order, details } of results) {
+                if (details) {
+                    if (details.cookies && details.cookies.length > 0) {
+                        order.cookies = details.cookies;
+                    }
+                    if (details.customerPhone) order.customerPhone = details.customerPhone;
+                    if (details.customerEmail) order.customerEmail = details.customerEmail;
+                    if (details.customerAddress) order.customerAddress = details.customerAddress;
+                    if (details.customerName && !order.customerName) order.customerName = details.customerName;
+                }
+            }
+
+            const elapsed = Date.now() - startTime;
+            logger.info(`Batch completed in ${elapsed}ms`, {
+                ordersWithCookies: results.filter(r => r.details?.cookies?.length > 0).length
+            });
+
+            // Small delay between batches to be respectful to the server
+            if (i + batchSize < orders.length) {
+                await new Promise(r => setTimeout(r, 500));
+            }
+        }
+    }
+
+    /**
+     * Scrape order details in a new browser tab (for parallel processing)
+     * @param {string} orderNumber - The order number to look up
+     * @returns {Object|null} - Order details with cookies array
+     */
+    async scrapeOrderDetailInNewTab(orderNumber) {
+        let newPage = null;
+        try {
+            // Create a new tab
+            newPage = await this.browser.newPage();
+            await newPage.setViewport({ width: 1280, height: 800 });
+
+            // Copy cookies from main page to maintain session
+            const cookies = await this.page.cookies();
+            await newPage.setCookie(...cookies);
+
+            // Use the direct URL pattern (fastest)
+            const directUrl = this.getOrderDetailUrl(orderNumber);
+
+            let pageLoaded = false;
+            try {
+                const response = await newPage.goto(directUrl, { waitUntil: 'networkidle2', timeout: 8000 });
+                if (response && response.status() === 200) {
+                    const pageContent = await newPage.content();
+                    // Verify we're on a valid detail page
+                    if (!pageContent.toLowerCase().includes('login') &&
+                        !pageContent.includes('not found') &&
+                        !pageContent.includes('error')) {
+                        pageLoaded = true;
+                        logger.debug('Direct URL loaded successfully', { orderNumber });
+                    }
+                }
+            } catch (err) {
+                logger.debug('Direct URL failed, will try fallback', { orderNumber, error: err.message });
+            }
+
+            // Fallback: navigate to orders page and click (slower)
+            if (!pageLoaded) {
+                const ordersPageUrl = this.getOrdersPageUrl();
+                await newPage.goto(ordersPageUrl, { waitUntil: 'networkidle2', timeout: 15000 });
+                await new Promise(r => setTimeout(r, 800));
+
+                // Find and click the order link
+                const clicked = await newPage.evaluate((orderNum) => {
+                    const links = document.querySelectorAll('a, button');
+                    for (const el of links) {
+                        const text = el.textContent || '';
+                        const href = el.getAttribute('href') || '';
+                        const onclick = el.getAttribute('onclick') || '';
+
+                        if (text.includes(orderNum) || href.includes(orderNum) || onclick.includes(orderNum)) {
+                            el.click();
+                            return true;
+                        }
+                    }
+                    return false;
+                }, orderNumber);
+
+                if (!clicked) {
+                    return null;
+                }
+                await new Promise(r => setTimeout(r, 1200));
+            }
+
+            // Extract details from the page
+            const details = await newPage.evaluate(() => {
+                const result = {
+                    cookies: [],
+                    customerPhone: null,
+                    customerEmail: null,
+                    customerAddress: null,
+                    customerName: null
+                };
+
+                const pageText = document.body.innerText;
+
+                // Extract phone number
+                const phonePatterns = [
+                    /phone[:\s]*([(\d)\-\s.]+\d{4})/i,
+                    /tel[:\s]*([(\d)\-\s.]+\d{4})/i,
+                    /\b(\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})\b/
+                ];
+                for (const pattern of phonePatterns) {
+                    const match = pageText.match(pattern);
+                    if (match) {
+                        result.customerPhone = match[1].trim();
+                        break;
+                    }
+                }
+
+                // Extract email
+                const emailMatch = pageText.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+                if (emailMatch) {
+                    result.customerEmail = emailMatch[1];
+                }
+
+                // Extract address
+                const addressPatterns = [
+                    /address[:\s]*([^\n]+(?:,\s*[A-Z]{2}\s*\d{5})?)/i,
+                    /deliver(?:y)?\s*(?:to)?[:\s]*([^\n]+(?:,\s*[A-Z]{2}\s*\d{5})?)/i,
+                    /(\d+\s+[A-Za-z\s]+(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|way|blvd|boulevard|ct|court)[^,\n]*,\s*[A-Za-z\s]+,\s*[A-Z]{2}\s*\d{5})/i
+                ];
+                for (const pattern of addressPatterns) {
+                    const match = pageText.match(pattern);
+                    if (match && match[1].length > 10) {
+                        result.customerAddress = match[1].trim();
+                        break;
+                    }
+                }
+
+                // Extract cookie details
+                const cookieNames = [
+                    'Thin Mints', 'Samoas', 'Caramel deLites', 'Tagalongs', 'Peanut Butter Patties',
+                    'Do-si-dos', 'Peanut Butter Sandwich', 'Trefoils', 'Shortbread',
+                    'Girl Scout S\'mores', 'S\'mores', 'Lemon-Ups', 'Lemonades',
+                    'Adventurefuls', 'Raspberry Rally', 'Toffee-tastic', 'Toast-Yay'
+                ];
+
+                // Look for cookies in tables
+                const tables = document.querySelectorAll('table');
+                tables.forEach(table => {
+                    const rows = table.querySelectorAll('tr');
+                    rows.forEach(row => {
+                        const rowText = row.textContent;
+                        cookieNames.forEach(cookieName => {
+                            if (rowText.toLowerCase().includes(cookieName.toLowerCase())) {
+                                const cells = row.querySelectorAll('td');
+                                let qty = 1;
+                                cells.forEach(cell => {
+                                    const cellText = cell.textContent.trim();
+                                    if (/^\d{1,2}$/.test(cellText)) {
+                                        qty = parseInt(cellText, 10);
+                                    }
+                                });
+                                let normalizedName = cookieName;
+                                if (cookieName === 'Caramel deLites') normalizedName = 'Samoas';
+                                if (cookieName === 'Peanut Butter Patties') normalizedName = 'Tagalongs';
+                                if (cookieName === 'Peanut Butter Sandwich') normalizedName = 'Do-si-dos';
+                                if (cookieName === 'Shortbread') normalizedName = 'Trefoils';
+                                result.cookies.push({ name: normalizedName, quantity: qty });
+                            }
+                        });
+                    });
+                });
+
+                // Fallback: parse text patterns
+                if (result.cookies.length === 0) {
+                    cookieNames.forEach(cookieName => {
+                        const patterns = [
+                            new RegExp(`(\\d+)\\s*(?:x|×)?\\s*${cookieName}`, 'i'),
+                            new RegExp(`${cookieName}[:\\s]*(\\d+)`, 'i'),
+                            new RegExp(`${cookieName}\\s*\\((\\d+)\\)`, 'i')
+                        ];
+                        for (const pattern of patterns) {
+                            const match = pageText.match(pattern);
+                            if (match) {
+                                let normalizedName = cookieName;
+                                if (cookieName === 'Caramel deLites') normalizedName = 'Samoas';
+                                if (cookieName === 'Peanut Butter Patties') normalizedName = 'Tagalongs';
+                                if (cookieName === 'Peanut Butter Sandwich') normalizedName = 'Do-si-dos';
+                                if (cookieName === 'Shortbread') normalizedName = 'Trefoils';
+                                result.cookies.push({ name: normalizedName, quantity: parseInt(match[1], 10) });
+                                break;
+                            }
+                        }
+                    });
+                }
+
+                // Extract customer name
+                const namePatterns = [
+                    /customer[:\s]*([A-Za-z]+\s+[A-Za-z]+)/i,
+                    /name[:\s]*([A-Za-z]+\s+[A-Za-z]+)/i,
+                    /ordered\s+by[:\s]*([A-Za-z]+\s+[A-Za-z]+)/i
+                ];
+                for (const pattern of namePatterns) {
+                    const match = pageText.match(pattern);
+                    if (match) {
+                        result.customerName = match[1].trim();
+                        break;
+                    }
+                }
+
+                return result;
+            });
+
+            return details;
+        } catch (error) {
+            logger.debug('Error in new tab scrape', { orderNumber, error: error.message });
+            return null;
+        } finally {
+            // Always close the tab
+            if (newPage) {
+                await newPage.close().catch(() => {});
+            }
         }
     }
 

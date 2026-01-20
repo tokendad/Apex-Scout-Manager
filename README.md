@@ -81,9 +81,11 @@ Since GSCTracker uses a Node.js backend with SQLite, you cannot just open `index
 ### Digital Cookie Sync
 To enable automatic order imports:
 1. Go to the **Settings** tab.
-2. Enter your Digital Cookie orders page URL, email, and password.
-3. Click "Test Connection" to verify.
+2. Enter your Digital Cookie email and password.
+3. Click "Save Settings" to store your credentials.
 4. Click "Sync Now" to import recent orders.
+
+The system automatically detects your scout account and imports orders with full details including individual cookie types, customer information, and payment status.
 
 ### Payment Methods
 1. Go to **Settings**.
@@ -95,13 +97,13 @@ To enable automatic order imports:
 For the best mobile experience:
 
 ### iOS (iPhone/iPad):
-1. Open `index.html` in Safari
+1. Open the app URL in Safari (e.g., `http://your-server:3000`)
 2. Tap the share button
 3. Select "Add to Home Screen"
 4. Access the tracker like a native app from your home screen
 
 ### Android:
-1. Open `index.html` in Chrome
+1. Open the app URL in Chrome (e.g., `http://your-server:3000`)
 2. Tap the menu (three dots)
 3. Select "Add to Home Screen"
 4. Access the tracker from your home screen
