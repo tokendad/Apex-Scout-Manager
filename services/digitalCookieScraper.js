@@ -428,20 +428,33 @@ class DigitalCookieScraper {
                             const cellText = cell.textContent.trim();
                             const header = headers[cellIndex] || '';
 
-                            if (header.includes('cookie') && header.includes('pkg')) {
+                            if (header.includes('order') && header.includes('#')) {
+                                // Handle "Order #" column - extract order number from cell
+                                if (!order.orderNumber) {
+                                    const orderNumMatch = cellText.match(/(\d{8,12})/);
+                                    if (orderNumMatch) {
+                                        order.orderNumber = orderNumMatch[1];
+                                    }
+                                }
+                            } else if (header.includes('cookie') && header.includes('pkg')) {
                                 order.totalBoxes = extractNumber(cellText);
                             } else if (header.includes('deliver to') || header.includes('name') || header.includes('customer')) {
                                 if (!order.customerName) order.customerName = cellText;
+                            } else if (header.includes('paid by') || header.includes('paid') || header.includes('payment')) {
+                                // Handle "Paid By" column - could contain customer name or payment method
+                                if (header.includes('paid by')) {
+                                    if (!order.customerName) order.customerName = cellText;
+                                    order.isPaid = true;
+                                } else if (header.includes('payment') || header.includes('paid')) {
+                                    order.paymentMethod = cellText;
+                                    if (cellText && cellText.toLowerCase() !== 'unpaid') {
+                                        order.isPaid = true;
+                                    }
+                                }
                             } else if (header.includes('address') || header.includes('delivery address')) {
                                 order.customerAddress = cellText;
                             } else if (header.includes('date') && !header.includes('initial')) {
-                                order.orderDate = parseDate(cellText);
-                            } else if (header.includes('payment') || header.includes('paid')) {
-                                order.paymentMethod = cellText;
-                                if (cellText && cellText.toLowerCase() !== 'unpaid') {
-                                    order.isPaid = true;
-                                }
-                            } else if (header.includes('status')) {
+                                order.orderDate = parseDate(cellText);                            } else if (header.includes('status')) {
                                 order.orderStatus = cellText;
                                 if (cellText.toLowerCase() === 'delivered') {
                                     order.isCompleted = true;
@@ -455,11 +468,20 @@ class DigitalCookieScraper {
                             links.forEach(link => {
                                 const href = link.getAttribute('href') || '';
                                 const onclick = link.getAttribute('onclick') || '';
+                                const linkText = link.textContent.trim();
 
                                 // Extract order ID from URLs
                                 const orderMatch = href.match(/order[\/=](\d+)/i) || onclick.match(/order[^\d]*(\d+)/i);
                                 if (orderMatch && !order.orderNumber) {
                                     order.orderNumber = orderMatch[1];
+                                }
+                                
+                                // Extract order ID from link text (e.g., "Order #163717824" or just "163717824")
+                                if (!order.orderNumber) {
+                                    const linkTextMatch = linkText.match(/(?:order\s*#?\s*)?(\d{8,12})/i);
+                                    if (linkTextMatch) {
+                                        order.orderNumber = linkTextMatch[1];
+                                    }
                                 }
 
                                 // Capture detail page link
@@ -468,9 +490,9 @@ class DigitalCookieScraper {
                                 }
                             });
 
-                            // Check for order number in cell text
+                            // Check for order number in cell text (standalone or with label)
                             if (!order.orderNumber) {
-                                const orderNumMatch = cellText.match(/^(\d{8,12})$/);
+                                const orderNumMatch = cellText.match(/(?:order\s*#?\s*)?(\d{8,12})/i);
                                 if (orderNumMatch) {
                                     order.orderNumber = orderNumMatch[1];
                                 }
@@ -482,8 +504,12 @@ class DigitalCookieScraper {
                             const cellTexts = Array.from(cells).map(c => c.textContent.trim());
 
                             cellTexts.forEach((text, idx) => {
-                                if (/^\d{8,12}$/.test(text) && !order.orderNumber) {
-                                    order.orderNumber = text;
+                                // Look for 8-12 digit order numbers (more flexible pattern)
+                                if (/\b(\d{8,12})\b/.test(text) && !order.orderNumber) {
+                                    const match = text.match(/\b(\d{8,12})\b/);
+                                    if (match) {
+                                        order.orderNumber = match[1];
+                                    }
                                 } else if (/^\d{1,3}$/.test(text) && !order.totalBoxes) {
                                     const num = parseInt(text, 10);
                                     if (num > 0 && num < 100) {
@@ -557,7 +583,9 @@ class DigitalCookieScraper {
             const extractedOrders = basicOrders.orders || [];
             logger.info('Initial order extraction complete', {
                 orderCount: extractedOrders.length,
-                tablesFound: basicOrders.debug?.tablesFound || 0
+                tablesFound: basicOrders.debug?.tablesFound || 0,
+                ordersWithNumbers: extractedOrders.filter(o => o.orderNumber).length,
+                ordersWithoutNumbers: extractedOrders.filter(o => !o.orderNumber).length
             });
 
             // Filter orders that need detail scraping (have order numbers)
@@ -571,6 +599,22 @@ class DigitalCookieScraper {
 
                 // Process orders in parallel batches using multiple tabs
                 await this.scrapeOrderDetailsParallel(ordersNeedingDetails);
+            } else {
+                logger.warn('No orders with order numbers found for detail scraping');
+            }
+            
+            // Log orders without numbers for debugging
+            const ordersWithoutNumbers = extractedOrders.filter(o => !o.orderNumber);
+            if (ordersWithoutNumbers.length > 0) {
+                logger.warn('Found orders without order numbers (will not get detailed cookie info)', {
+                    count: ordersWithoutNumbers.length,
+                    samples: ordersWithoutNumbers.slice(0, 3).map(o => ({
+                        customerName: o.customerName,
+                        totalBoxes: o.totalBoxes,
+                        orderDate: o.orderDate,
+                        tableSection: o.tableSection
+                    }))
+                });
             }
 
             // Log final results
@@ -758,7 +802,7 @@ class DigitalCookieScraper {
                     'Thin Mints', 'Samoas', 'Caramel deLites', 'Tagalongs', 'Peanut Butter Patties',
                     'Do-si-dos', 'Peanut Butter Sandwich', 'Trefoils', 'Shortbread',
                     'Girl Scout S\'mores', 'S\'mores', 'Lemon-Ups', 'Lemonades',
-                    'Adventurefuls', 'Raspberry Rally', 'Toffee-tastic', 'Toast-Yay'
+                    'Adventurefuls', 'Raspberry Rally', 'Toffee-tastic', 'Toast-Yay', 'Exploremores'
                 ];
 
                 // Look for cookies in tables
@@ -767,22 +811,49 @@ class DigitalCookieScraper {
                     const rows = table.querySelectorAll('tr');
                     rows.forEach(row => {
                         const rowText = row.textContent;
+                        
+                        // Skip generic "assorted" or summary rows
+                        const lowerRowText = rowText.toLowerCase();
+                        if (lowerRowText.includes('assorted') || 
+                            lowerRowText.includes('total') ||
+                            lowerRowText.includes('subtotal')) {
+                            return;
+                        }
+                        
                         cookieNames.forEach(cookieName => {
-                            if (rowText.toLowerCase().includes(cookieName.toLowerCase())) {
+                            // Use word boundary matching to avoid false positives
+                            const cookiePattern = new RegExp(`\\b${cookieName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+                            if (cookiePattern.test(rowText)) {
                                 const cells = row.querySelectorAll('td');
-                                let qty = 1;
-                                cells.forEach(cell => {
-                                    const cellText = cell.textContent.trim();
-                                    if (/^\d{1,2}$/.test(cellText)) {
-                                        qty = parseInt(cellText, 10);
+                                let qty = null;
+                                
+                                // Look for the quantity in cells (usually last numeric cell with 1-3 digits)
+                                for (let i = cells.length - 1; i >= 0; i--) {
+                                    const cellText = cells[i].textContent.trim();
+                                    // Match only standalone numbers (not dates/IDs), max 3 digits for reasonable quantities
+                                    if (/^\d+$/.test(cellText) && cellText.length <= 3) {
+                                        const parsedQty = parseInt(cellText, 10);
+                                        if (parsedQty > 0 && parsedQty <= 999) {
+                                            qty = parsedQty;
+                                            break;
+                                        }
                                     }
-                                });
-                                let normalizedName = cookieName;
-                                if (cookieName === 'Caramel deLites') normalizedName = 'Samoas';
-                                if (cookieName === 'Peanut Butter Patties') normalizedName = 'Tagalongs';
-                                if (cookieName === 'Peanut Butter Sandwich') normalizedName = 'Do-si-dos';
-                                if (cookieName === 'Shortbread') normalizedName = 'Trefoils';
-                                result.cookies.push({ name: normalizedName, quantity: qty });
+                                }
+                                
+                                // Only add if we found a valid quantity
+                                if (qty && qty > 0) {
+                                    let normalizedName = cookieName;
+                                    if (cookieName === 'Caramel deLites') normalizedName = 'Samoas';
+                                    if (cookieName === 'Peanut Butter Patties') normalizedName = 'Tagalongs';
+                                    if (cookieName === 'Peanut Butter Sandwich') normalizedName = 'Do-si-dos';
+                                    if (cookieName === 'Shortbread') normalizedName = 'Trefoils';
+                                    
+                                    // Check if this cookie already exists (deduplication)
+                                    const existingCookie = result.cookies.find(c => c.name === normalizedName);
+                                    if (!existingCookie) {
+                                        result.cookies.push({ name: normalizedName, quantity: qty });
+                                    }
+                                }
                             }
                         });
                     });
@@ -792,19 +863,27 @@ class DigitalCookieScraper {
                 if (result.cookies.length === 0) {
                     cookieNames.forEach(cookieName => {
                         const patterns = [
-                            new RegExp(`(\\d+)\\s*(?:x|×)?\\s*${cookieName}`, 'i'),
-                            new RegExp(`${cookieName}[:\\s]*(\\d+)`, 'i'),
-                            new RegExp(`${cookieName}\\s*\\((\\d+)\\)`, 'i')
+                            new RegExp(`(\\d+)\\s*(?:x|×|pkg|pkgs)?\\s*${cookieName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'),
+                            new RegExp(`${cookieName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[:\\s]*(\\d+)`, 'i'),
+                            new RegExp(`${cookieName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\((\\d+)\\)`, 'i')
                         ];
                         for (const pattern of patterns) {
                             const match = pageText.match(pattern);
                             if (match) {
-                                let normalizedName = cookieName;
-                                if (cookieName === 'Caramel deLites') normalizedName = 'Samoas';
-                                if (cookieName === 'Peanut Butter Patties') normalizedName = 'Tagalongs';
-                                if (cookieName === 'Peanut Butter Sandwich') normalizedName = 'Do-si-dos';
-                                if (cookieName === 'Shortbread') normalizedName = 'Trefoils';
-                                result.cookies.push({ name: normalizedName, quantity: parseInt(match[1], 10) });
+                                const qty = parseInt(match[1], 10);
+                                if (qty > 0 && qty <= 999) {
+                                    let normalizedName = cookieName;
+                                    if (cookieName === 'Caramel deLites') normalizedName = 'Samoas';
+                                    if (cookieName === 'Peanut Butter Patties') normalizedName = 'Tagalongs';
+                                    if (cookieName === 'Peanut Butter Sandwich') normalizedName = 'Do-si-dos';
+                                    if (cookieName === 'Shortbread') normalizedName = 'Trefoils';
+                                    
+                                    // Check if this cookie already exists (deduplication)
+                                    const existingCookie = result.cookies.find(c => c.name === normalizedName);
+                                    if (!existingCookie) {
+                                        result.cookies.push({ name: normalizedName, quantity: qty });
+                                    }
+                                }
                                 break;
                             }
                         }
