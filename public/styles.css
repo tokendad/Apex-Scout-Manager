@@ -1056,6 +1056,69 @@ footer {
     color: var(--secondary-color);
 }
 
+/* Digital Cookie Sync Styles */
+.sync-buttons {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.sync-controls {
+    margin-top: 1rem;
+}
+
+.sync-btn {
+    width: 100%;
+}
+
+.sync-info {
+    margin-top: 1rem;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1rem;
+    background-color: var(--card-background);
+    color: var(--text-color);
+    box-sizing: border-box;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(30, 123, 60, 0.1);
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.form-hint {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+[data-theme="dark"] .form-input {
+    background-color: var(--card-background);
+    border-color: var(--border-color);
+}
+
 /* Order Details Modal */
 .order-details-overlay {
     position: fixed;

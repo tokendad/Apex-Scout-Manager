@@ -1515,6 +1515,229 @@ function setupImport() {
     });
 }
 
+// Digital Cookie Sync Management
+function setupDigitalCookieSync() {
+    const storeUrlInput = document.getElementById('digitalCookieStoreUrl');
+    const emailInput = document.getElementById('digitalCookieEmail');
+    const passwordInput = document.getElementById('digitalCookiePassword');
+    const testConnectionBtn = document.getElementById('testConnectionBtn');
+    const saveCredentialsBtn = document.getElementById('saveCredentialsBtn');
+    const syncNowBtn = document.getElementById('syncNowBtn');
+    const syncStatus = document.getElementById('syncStatus');
+    const lastSyncInfo = document.getElementById('lastSyncInfo');
+    const lastSyncTimeSpan = document.getElementById('lastSyncTime');
+
+    // Load existing settings from profile
+    function loadSyncSettings() {
+        if (profile) {
+            if (profile.digitalCookieStoreUrl) {
+                storeUrlInput.value = profile.digitalCookieStoreUrl;
+            }
+            if (profile.digitalCookieEmail) {
+                emailInput.value = profile.digitalCookieEmail;
+            }
+            // Don't populate password for security
+
+            // Enable sync button if credentials exist
+            updateSyncButtonState();
+
+            // Show last sync time
+            if (profile.lastSyncTime) {
+                lastSyncInfo.style.display = 'block';
+                lastSyncTimeSpan.textContent = new Date(profile.lastSyncTime).toLocaleString();
+            }
+        }
+    }
+
+    // Update sync button state based on credentials
+    function updateSyncButtonState() {
+        const hasCredentials = emailInput.value && passwordInput.value;
+        const hasUrl = storeUrlInput.value;
+        syncNowBtn.disabled = !(hasCredentials || (profile && profile.digitalCookieEmail)) || !hasUrl;
+    }
+
+    // Load settings when profile is loaded
+    loadSyncSettings();
+
+    // Update button state when inputs change
+    storeUrlInput.addEventListener('input', updateSyncButtonState);
+    emailInput.addEventListener('input', updateSyncButtonState);
+    passwordInput.addEventListener('input', updateSyncButtonState);
+
+    // Save credentials
+    saveCredentialsBtn.addEventListener('click', async () => {
+        const storeUrl = storeUrlInput.value.trim();
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+
+        if (!storeUrl) {
+            showFeedback('Please enter your Digital Cookie orders page URL', true);
+            return;
+        }
+
+        if (!email) {
+            showFeedback('Please enter your email', true);
+            return;
+        }
+
+        try {
+            // Validate URL format
+            new URL(storeUrl);
+        } catch {
+            showFeedback('Please enter a valid URL', true);
+            return;
+        }
+
+        saveCredentialsBtn.disabled = true;
+        saveCredentialsBtn.textContent = 'Saving...';
+
+        try {
+            const updateData = {
+                digitalCookieStoreUrl: storeUrl,
+                digitalCookieEmail: email
+            };
+
+            // Only include password if provided
+            if (password) {
+                updateData.digitalCookiePassword = password;
+            }
+
+            const response = await fetch(`${API_BASE_URL}/profile`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateData)
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to save settings');
+            }
+
+            await loadProfile();
+            loadSyncSettings();
+            showFeedback('Digital Cookie settings saved!');
+
+        } catch (error) {
+            console.error('Error saving credentials:', error);
+            showFeedback('Failed to save settings: ' + error.message, true);
+        } finally {
+            saveCredentialsBtn.disabled = false;
+            saveCredentialsBtn.textContent = 'Save Settings';
+        }
+    });
+
+    // Test connection
+    testConnectionBtn.addEventListener('click', async () => {
+        // First save any new credentials
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+
+        if (email && password) {
+            // Save credentials first
+            try {
+                await fetch(`${API_BASE_URL}/profile`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        digitalCookieEmail: email,
+                        digitalCookiePassword: password
+                    })
+                });
+            } catch (error) {
+                showFeedback('Failed to save credentials for testing', true);
+                return;
+            }
+        }
+
+        testConnectionBtn.disabled = true;
+        testConnectionBtn.textContent = 'Testing...';
+        syncStatus.className = 'import-status';
+        syncStatus.textContent = 'Testing connection...';
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/scrape/test`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                syncStatus.className = 'import-status success';
+                syncStatus.textContent = 'Connection successful! Your credentials are valid.';
+                showFeedback('Connection test successful!');
+            } else {
+                syncStatus.className = 'import-status error';
+                syncStatus.textContent = result.error || 'Connection failed';
+                showFeedback('Connection test failed', true);
+            }
+        } catch (error) {
+            console.error('Test connection error:', error);
+            syncStatus.className = 'import-status error';
+            syncStatus.textContent = 'Error: ' + error.message;
+            showFeedback('Connection test failed', true);
+        } finally {
+            testConnectionBtn.disabled = false;
+            testConnectionBtn.textContent = 'Test Connection';
+        }
+    });
+
+    // Sync now
+    syncNowBtn.addEventListener('click', async () => {
+        syncNowBtn.disabled = true;
+        syncNowBtn.textContent = 'Syncing...';
+        syncStatus.className = 'import-status';
+        syncStatus.textContent = 'Connecting to Digital Cookie...';
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/scrape`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                syncStatus.className = 'import-status success';
+                let message = `Sync complete! Imported ${result.salesImported} sales`;
+                if (result.donationsImported > 0) {
+                    message += `, ${result.donationsImported} donations`;
+                }
+                if (result.skippedDuplicates > 0) {
+                    message += ` (${result.skippedDuplicates} duplicates skipped)`;
+                }
+                syncStatus.textContent = message;
+
+                // Update last sync time
+                lastSyncInfo.style.display = 'block';
+                lastSyncTimeSpan.textContent = new Date().toLocaleString();
+
+                // Reload data
+                await loadSales();
+                await loadDonations();
+                renderSales();
+                updateSummary();
+                updateBreakdown();
+                updateGoalDisplay();
+
+                showFeedback('Digital Cookie sync successful!');
+            } else {
+                syncStatus.className = 'import-status error';
+                syncStatus.textContent = result.error || 'Sync failed';
+                showFeedback('Sync failed: ' + (result.error || 'Unknown error'), true);
+            }
+        } catch (error) {
+            console.error('Sync error:', error);
+            syncStatus.className = 'import-status error';
+            syncStatus.textContent = 'Error: ' + error.message;
+            showFeedback('Sync failed: ' + error.message, true);
+        } finally {
+            syncNowBtn.disabled = false;
+            syncNowBtn.textContent = 'Sync Now';
+            updateSyncButtonState();
+        }
+    });
+}
+
 // Initialize app when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
@@ -1522,6 +1745,7 @@ if (document.readyState === 'loading') {
         setupNavigation();
         setupTheme();
         setupImport();
+        setupDigitalCookieSync();
         setupCookieTableListeners();
     });
 } else {
@@ -1529,5 +1753,6 @@ if (document.readyState === 'loading') {
     setupNavigation();
     setupTheme();
     setupImport();
+    setupDigitalCookieSync();
     setupCookieTableListeners();
 }

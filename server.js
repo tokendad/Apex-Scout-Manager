@@ -7,6 +7,7 @@ const fs = require('fs');
 const multer = require('multer');
 const XLSX = require('xlsx');
 const logger = require('./logger');
+const DigitalCookieScraper = require('./services/digitalCookieScraper');
 
 // Configure multer for file uploads (memory storage)
 const upload = multer({
@@ -129,7 +130,52 @@ try {
             logger.info(`Migration: Added ${column.name} column to sales table`);
         }
     }
-    
+
+    // Migration: Add Digital Cookie sync columns to profile table
+    const digitalCookieProfileColumns = [
+        { name: 'digitalCookieEmail', type: 'TEXT', default: null },
+        { name: 'digitalCookiePassword', type: 'TEXT', default: null },
+        { name: 'digitalCookieStoreUrl', type: 'TEXT', default: null },
+        { name: 'lastSyncTime', type: 'TEXT', default: null }
+    ];
+
+    const currentProfileInfo = db.prepare("PRAGMA table_info(profile)").all();
+    for (const column of digitalCookieProfileColumns) {
+        const hasColumn = currentProfileInfo.some(col => col.name === column.name);
+        if (!hasColumn) {
+            const defaultClause = column.default ? ` DEFAULT ${column.default}` : '';
+            db.exec(`ALTER TABLE profile ADD COLUMN ${column.name} ${column.type}${defaultClause}`);
+            logger.info(`Migration: Added ${column.name} column to profile table`);
+        }
+    }
+
+    // Migration: Add columns to donations table for Digital Cookie sync
+    const donationsTableInfo = db.prepare("PRAGMA table_info(donations)").all();
+    const donationsColumnsToAdd = [
+        { name: 'orderNumber', type: 'TEXT', default: null },
+        { name: 'source', type: 'TEXT', default: "'manual'" },
+        { name: 'boxCount', type: 'INTEGER', default: '0' }
+    ];
+
+    for (const column of donationsColumnsToAdd) {
+        const hasColumn = donationsTableInfo.some(col => col.name === column.name);
+        if (!hasColumn) {
+            const defaultClause = column.default ? ` DEFAULT ${column.default}` : '';
+            db.exec(`ALTER TABLE donations ADD COLUMN ${column.name} ${column.type}${defaultClause}`);
+            logger.info(`Migration: Added ${column.name} column to donations table`);
+        }
+    }
+
+    // Create import_history table for tracking synced orders
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS import_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            orderNumber TEXT UNIQUE NOT NULL,
+            importDate TEXT NOT NULL,
+            source TEXT DEFAULT 'scrape'
+        )
+    `);
+
     logger.info('Database tables initialized');
 } catch (error) {
     logger.error('Failed to create database tables', { error: error.message, stack: error.stack });
@@ -347,31 +393,41 @@ app.get('/api/profile', (req, res) => {
 // Update profile
 app.put('/api/profile', (req, res) => {
     try {
-        const { photoData, qrCodeUrl, paymentQrCodeUrl, goalBoxes, goalAmount } = req.body;
-        
+        const {
+            photoData, qrCodeUrl, paymentQrCodeUrl, goalBoxes, goalAmount,
+            digitalCookieEmail, digitalCookiePassword, digitalCookieStoreUrl
+        } = req.body;
+
         // Validate goalBoxes and goalAmount
         const validGoalBoxes = (typeof goalBoxes === 'number' && goalBoxes >= 0) ? goalBoxes : 0;
         const validGoalAmount = (typeof goalAmount === 'number' && goalAmount >= 0) ? goalAmount : 0;
-        
+
         const stmt = db.prepare(`
-            UPDATE profile 
+            UPDATE profile
             SET photoData = COALESCE(?, photoData),
                 qrCodeUrl = COALESCE(?, qrCodeUrl),
                 paymentQrCodeUrl = COALESCE(?, paymentQrCodeUrl),
                 goalBoxes = ?,
-                goalAmount = ?
+                goalAmount = ?,
+                digitalCookieEmail = COALESCE(?, digitalCookieEmail),
+                digitalCookiePassword = COALESCE(?, digitalCookiePassword),
+                digitalCookieStoreUrl = COALESCE(?, digitalCookieStoreUrl)
             WHERE id = 1
         `);
-        stmt.run(photoData, qrCodeUrl, paymentQrCodeUrl, validGoalBoxes, validGoalAmount);
-        
+        stmt.run(
+            photoData, qrCodeUrl, paymentQrCodeUrl, validGoalBoxes, validGoalAmount,
+            digitalCookieEmail, digitalCookiePassword, digitalCookieStoreUrl
+        );
+
         const updatedProfile = db.prepare('SELECT * FROM profile WHERE id = 1').get();
-        logger.info('Profile updated successfully', { 
-            updates: { 
-                hasPhoto: !!photoData, 
-                hasStoreQr: !!qrCodeUrl, 
-                hasPaymentQr: !!paymentQrCodeUrl, 
-                goalBoxes: validGoalBoxes 
-            } 
+        logger.info('Profile updated successfully', {
+            updates: {
+                hasPhoto: !!photoData,
+                hasStoreQr: !!qrCodeUrl,
+                hasPaymentQr: !!paymentQrCodeUrl,
+                goalBoxes: validGoalBoxes,
+                hasDigitalCookieCredentials: !!(digitalCookieEmail || digitalCookiePassword)
+            }
         });
         res.json(updatedProfile);
     } catch (error) {
@@ -749,6 +805,196 @@ app.post('/api/import', upload.single('file'), (req, res) => {
     } catch (error) {
         logger.error('Error importing XLSX', { error: error.message, stack: error.stack });
         res.status(500).json({ error: 'Failed to import file: ' + error.message });
+    }
+});
+
+// Digital Cookie Scrape - Test connection
+app.post('/api/scrape/test', async (req, res) => {
+    const scraper = new DigitalCookieScraper();
+    try {
+        // Get credentials from profile
+        const profile = db.prepare('SELECT digitalCookieEmail, digitalCookiePassword FROM profile WHERE id = 1').get();
+
+        if (!profile || !profile.digitalCookieEmail || !profile.digitalCookiePassword) {
+            return res.status(400).json({ error: 'Digital Cookie credentials not configured' });
+        }
+
+        await scraper.init();
+        const loginSuccess = await scraper.login(profile.digitalCookieEmail, profile.digitalCookiePassword);
+
+        if (loginSuccess) {
+            logger.info('Digital Cookie test connection successful');
+            res.json({ success: true, message: 'Connection successful' });
+        } else {
+            logger.warn('Digital Cookie test connection failed - invalid credentials');
+            res.status(401).json({ success: false, error: 'Login failed - check your credentials' });
+        }
+    } catch (error) {
+        logger.error('Digital Cookie test connection error', { error: error.message });
+        res.status(500).json({ success: false, error: 'Connection test failed: ' + error.message });
+    } finally {
+        await scraper.close();
+    }
+});
+
+// Digital Cookie Scrape - Get sync status
+app.get('/api/scrape/status', (req, res) => {
+    try {
+        const profile = db.prepare('SELECT lastSyncTime, digitalCookieEmail, digitalCookieStoreUrl FROM profile WHERE id = 1').get();
+        const importHistory = db.prepare('SELECT COUNT(*) as count FROM import_history WHERE source = ?').get('scrape');
+
+        res.json({
+            lastSyncTime: profile?.lastSyncTime || null,
+            hasCredentials: !!(profile?.digitalCookieEmail),
+            hasStoreUrl: !!(profile?.digitalCookieStoreUrl),
+            totalImported: importHistory?.count || 0
+        });
+    } catch (error) {
+        logger.error('Error fetching scrape status', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch status' });
+    }
+});
+
+// Digital Cookie Scrape - Trigger sync
+app.post('/api/scrape', async (req, res) => {
+    const scraper = new DigitalCookieScraper();
+    try {
+        // Get credentials and store URL from profile
+        const profile = db.prepare('SELECT digitalCookieEmail, digitalCookiePassword, digitalCookieStoreUrl FROM profile WHERE id = 1').get();
+
+        if (!profile || !profile.digitalCookieEmail || !profile.digitalCookiePassword) {
+            return res.status(400).json({ error: 'Digital Cookie credentials not configured' });
+        }
+
+        if (!profile.digitalCookieStoreUrl) {
+            return res.status(400).json({ error: 'Digital Cookie store URL not configured' });
+        }
+
+        logger.info('Starting Digital Cookie sync');
+
+        await scraper.init();
+
+        // Login
+        const loginSuccess = await scraper.login(profile.digitalCookieEmail, profile.digitalCookiePassword);
+        if (!loginSuccess) {
+            return res.status(401).json({ error: 'Login failed - check your credentials' });
+        }
+
+        // Scrape orders
+        const orders = await scraper.scrapeOrders(profile.digitalCookieStoreUrl);
+
+        // Process orders
+        let salesImported = 0;
+        let donationsImported = 0;
+        let skippedDuplicates = 0;
+
+        const PRICE_PER_BOX = 6;
+
+        const insertSale = db.prepare(`
+            INSERT INTO sales (
+                cookieType, quantity, customerName, customerAddress, customerPhone,
+                customerEmail, date, saleType, unitType, orderNumber, orderType,
+                orderStatus, amountCollected, amountDue, paymentMethod
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+
+        const insertDonation = db.prepare(`
+            INSERT INTO donations (amount, donorName, date, orderNumber, source, boxCount)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `);
+
+        const insertHistory = db.prepare(`
+            INSERT OR IGNORE INTO import_history (orderNumber, importDate, source)
+            VALUES (?, ?, ?)
+        `);
+
+        const checkHistory = db.prepare('SELECT id FROM import_history WHERE orderNumber = ?');
+
+        const processTransaction = db.transaction(() => {
+            for (const order of orders) {
+                // Skip if already imported
+                if (order.orderNumber) {
+                    const existing = checkHistory.get(order.orderNumber);
+                    if (existing) {
+                        skippedDuplicates++;
+                        continue;
+                    }
+                }
+
+                const orderDate = order.orderDate || new Date().toISOString();
+                const totalBoxes = order.totalBoxes || 1;
+                const totalAmount = totalBoxes * PRICE_PER_BOX;
+
+                if (order.isDonation) {
+                    // Insert as donation
+                    insertDonation.run(
+                        totalAmount,
+                        order.customerName || 'Digital Cookie Donor',
+                        orderDate,
+                        order.orderNumber,
+                        'digital_cookie',
+                        totalBoxes
+                    );
+                    donationsImported++;
+                } else {
+                    // Insert as sale
+                    // For website orders, payment is already collected
+                    const amountCollected = order.isWebsiteOrder ? totalAmount : 0;
+                    const amountDue = order.isWebsiteOrder ? 0 : totalAmount;
+                    const paymentMethod = order.isWebsiteOrder ? 'online' : null;
+
+                    // Insert a generic cookie entry for the order
+                    insertSale.run(
+                        'Assorted',         // cookieType - we may not have detailed breakdown
+                        totalBoxes,         // quantity
+                        order.customerName || 'Digital Cookie Customer',
+                        order.customerAddress || null,
+                        order.customerPhone || null,
+                        order.customerEmail || null,
+                        orderDate,
+                        'individual',       // saleType
+                        'box',              // unitType
+                        order.orderNumber,
+                        order.isWebsiteOrder ? 'Website' : 'Digital Cookie',
+                        order.orderStatus || 'Pending',
+                        amountCollected,
+                        amountDue,
+                        paymentMethod
+                    );
+                    salesImported++;
+                }
+
+                // Record in import history
+                if (order.orderNumber) {
+                    insertHistory.run(order.orderNumber, new Date().toISOString(), 'scrape');
+                }
+            }
+        });
+
+        processTransaction();
+
+        // Update lastSyncTime
+        db.prepare('UPDATE profile SET lastSyncTime = ? WHERE id = 1').run(new Date().toISOString());
+
+        logger.info('Digital Cookie sync completed', {
+            ordersProcessed: orders.length,
+            salesImported,
+            donationsImported,
+            skippedDuplicates
+        });
+
+        res.json({
+            success: true,
+            ordersProcessed: orders.length,
+            salesImported,
+            donationsImported,
+            skippedDuplicates
+        });
+    } catch (error) {
+        logger.error('Digital Cookie sync failed', { error: error.message, stack: error.stack });
+        res.status(500).json({ error: 'Sync failed: ' + error.message });
+    } finally {
+        await scraper.close();
     }
 });
 

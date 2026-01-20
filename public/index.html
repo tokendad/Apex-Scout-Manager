@@ -493,6 +493,48 @@
                             <div id="importStatus" class="import-status"></div>
                         </div>
                     </div>
+
+                    <!-- Digital Cookie Sync -->
+                    <div class="settings-group">
+                        <h3>Digital Cookie Sync</h3>
+                        <div class="import-section">
+                            <p class="import-description">Automatically import orders from your Digital Cookie store by connecting your account.</p>
+
+                            <div class="form-group">
+                                <label for="digitalCookieStoreUrl">Orders Page URL</label>
+                                <input type="url" id="digitalCookieStoreUrl" class="form-input"
+                                    placeholder="https://digitalcookie.girlscouts.org/scout/username/cookieOrdersPage">
+                                <small class="form-hint">Your Digital Cookie orders page URL</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="digitalCookieEmail">Email</label>
+                                <input type="email" id="digitalCookieEmail" class="form-input"
+                                    placeholder="your@email.com">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="digitalCookiePassword">Password</label>
+                                <input type="password" id="digitalCookiePassword" class="form-input"
+                                    placeholder="Enter your password">
+                                <small class="form-hint">Your credentials are stored locally and only used for syncing</small>
+                            </div>
+
+                            <div class="sync-buttons">
+                                <button id="testConnectionBtn" class="btn btn-secondary">Test Connection</button>
+                                <button id="saveCredentialsBtn" class="btn btn-primary">Save Settings</button>
+                            </div>
+
+                            <div class="sync-controls">
+                                <button id="syncNowBtn" class="btn btn-primary sync-btn" disabled>Sync Now</button>
+                                <div id="syncStatus" class="import-status"></div>
+                            </div>
+
+                            <div id="lastSyncInfo" class="sync-info" style="display: none;">
+                                <span>Last sync: <span id="lastSyncTime">Never</span></span>
+                            </div>
+                        </div>
+                    </div>
                 </section>
             </div>
         </main>

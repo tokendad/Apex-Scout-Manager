@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Digital Cookie Sync feature to automatically import orders from Girl Scouts Digital Cookie platform
+- New Digital Cookie Sync settings section with email/password authentication
+- Test connection and sync now buttons for Digital Cookie integration
+- Puppeteer-based web scraper service (`services/digitalCookieScraper.js`) with stealth plugin
+- New database fields for sync tracking: `digitalCookieEmail`, `digitalCookiePassword`, `digitalCookieStoreUrl`, `lastSyncTime` in profile table
+- New database fields for donations: `orderNumber`, `source`, `boxCount`
+- New `import_history` table to track synced orders and prevent duplicates
+- API endpoints for Digital Cookie sync: `POST /api/scrape`, `POST /api/scrape/test`, `GET /api/scrape/status`
 - Profile tab displaying scout photo, Store QR code, and Payment QR code
 - Payment QR code functionality in Settings for payment method display
 - Cookie details section on Profile with official Girl Scout cookie images and descriptions
@@ -31,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive error logging with Winston, daily rotation, and colored output ([#16](https://github.com/tokendad/GSCTracker/pull/16))
 
 ### Changed
+- Dockerfile now includes Chromium and dependencies for Puppeteer web scraping
+- Added puppeteer, puppeteer-extra, and puppeteer-extra-plugin-stealth dependencies
 - Redesigned tab navigation with 5 tabs: Profile, Summary, Individual, Events, Settings
 - Renamed Dashboard tab to "Sales Summary"
 - Updated Record a Sale form layout: Customer info first, then cookie selection table, then payment section
