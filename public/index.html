@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <title>Girl Scout Cookie Tracker</title>
-    <link rel="stylesheet" href="styles.css?v=2">
+    <link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
     <div class="container">
@@ -535,6 +535,34 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Danger Zone -->
+                    <div class="settings-group danger-zone">
+                        <h3>Danger Zone</h3>
+                        <div class="danger-section">
+                            <div class="danger-item">
+                                <div class="danger-info">
+                                    <strong>Delete All Sales</strong>
+                                    <p>Permanently delete all sales data. This cannot be undone.</p>
+                                </div>
+                                <button id="deleteAllSalesBtn" class="btn btn-danger">Delete All Sales</button>
+                            </div>
+                            <div class="danger-item">
+                                <div class="danger-info">
+                                    <strong>Delete All Donations</strong>
+                                    <p>Permanently delete all donation records. This cannot be undone.</p>
+                                </div>
+                                <button id="deleteAllDonationsBtn" class="btn btn-danger">Delete All Donations</button>
+                            </div>
+                            <div class="danger-item">
+                                <div class="danger-info">
+                                    <strong>Clear Import History</strong>
+                                    <p>Clear sync history to allow re-importing previously synced orders.</p>
+                                </div>
+                                <button id="clearImportHistoryBtn" class="btn btn-warning">Clear History</button>
+                            </div>
+                        </div>
+                    </div>
                 </section>
             </div>
         </main>
@@ -544,6 +572,6 @@
         </footer>
     </div>
 
-    <script src="script.js?v=2"></script>
+    <script src="script.js?v=3"></script>
 </body>
 </html>

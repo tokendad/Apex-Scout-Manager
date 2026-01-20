@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Danger Zone section in Settings with data management buttons (Delete All Sales, Delete All Donations, Clear Import History)
+- API endpoints for data deletion: `DELETE /api/sales`, `DELETE /api/donations`, `DELETE /api/import-history`
+- Detailed order logging during Digital Cookie sync showing customer names, box counts, dates, and order numbers
+- Documentation for future scraper improvements (`docs/DIGITAL_COOKIE_SCRAPER_IMPROVEMENTS.md`)
 - Digital Cookie Sync feature to automatically import orders from Girl Scouts Digital Cookie platform
 - New Digital Cookie Sync settings section with email/password authentication
 - Test connection and sync now buttons for Digital Cookie integration
@@ -39,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive error logging with Winston, daily rotation, and colored output ([#16](https://github.com/tokendad/GSCTracker/pull/16))
 
 ### Changed
+- Improved Digital Cookie scraper login reliability with expanded selectors and JavaScript fallback
+- Digital Cookie scraper now correctly handles cookie consent banners
+- Scraper uses exact Digital Cookie selectors: `#username`, `#password`, `#loginButton`, `#acceptAllCookieButton`
 - Dockerfile now includes Chromium and dependencies for Puppeteer web scraping
 - Added puppeteer, puppeteer-extra, and puppeteer-extra-plugin-stealth dependencies
 - Redesigned tab navigation with 5 tabs: Profile, Summary, Individual, Events, Settings
@@ -56,6 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+- Fixed Digital Cookie scraper duplicate order detection - removed VIEW link parsing that caused duplicate entries
+- Fixed scraper to skip action words (View, Edit, Delete) when parsing customer names
+- Fixed `waitForTimeout` deprecation by replacing with Promise-based timeout
 - Fix top bar navigation to match PR#14 design - moved nav below header with 3 tabs (Profile, Individual, Events) using icons above text
 - Fix YAML syntax errors in changelog workflow ([#17](https://github.com/tokendad/GSCTracker/pull/17))
   - Resolved issues from 21 consecutive failed workflow runs between PR #7 (which created the workflow) and PR #17

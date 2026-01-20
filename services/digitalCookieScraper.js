@@ -60,59 +60,134 @@ class DigitalCookieScraper {
             // Navigate to login page
             await this.page.goto(this.loginUrl, { waitUntil: 'networkidle2', timeout: 30000 });
 
-            // Wait for login form
-            await this.page.waitForSelector('input[type="email"], input[name="email"], #email', { timeout: 10000 });
+            // Log current URL in case of redirect
+            const currentUrl = this.page.url();
+            logger.info('Login page loaded', { url: currentUrl });
 
-            // Find and fill email field
-            const emailSelector = await this.findSelector([
+            // Give the page a moment to fully render any dynamic content
+            await new Promise(r => setTimeout(r, 2000));
+
+            // Check for and handle cookie consent / popup overlays
+            await this.dismissOverlays();
+
+            // Wait for login form with expanded selector list
+            const emailSelectors = [
+                '#username',
+                'input[name="j_username"]',
                 'input[type="email"]',
                 'input[name="email"]',
                 '#email',
-                'input[placeholder*="email" i]'
-            ]);
-            if (emailSelector) {
-                await this.page.type(emailSelector, email, { delay: 50 });
-            } else {
-                throw new Error('Could not find email input field');
+                'input[placeholder*="email" i]',
+                'input[name="username"]',
+                'input[id*="email" i]',
+                'input[id*="user" i]',
+                'input[type="text"][name*="user" i]',
+                'input[autocomplete="email"]',
+                'input[autocomplete="username"]'
+            ];
+
+            // Try to find any email/username input
+            let emailSelector = null;
+            try {
+                await this.page.waitForSelector(emailSelectors.join(', '), { timeout: 10000 });
+                emailSelector = await this.findSelector(emailSelectors);
+            } catch (waitError) {
+                // Take a debug screenshot to see what the page looks like
+                const screenshotPath = '/tmp/digitalcookie-login-debug.png';
+                await this.takeScreenshot(screenshotPath);
+                logger.error('Could not find email field, screenshot saved', { screenshotPath, pageUrl: this.page.url() });
+
+                // Log page content for debugging
+                const bodyText = await this.page.evaluate(() => document.body?.innerText?.substring(0, 500) || 'No body content');
+                logger.error('Page content preview', { bodyText });
+
+                throw new Error(`Could not find email input field. Page URL: ${this.page.url()}. Debug screenshot saved to ${screenshotPath}`);
             }
 
-            // Find and fill password field
-            const passwordSelector = await this.findSelector([
+            // Fill email/username field (Digital Cookie uses #username)
+            if (emailSelector) {
+                logger.info('Filling username field', { selector: emailSelector });
+                await this.page.evaluate((selector, value) => {
+                    const el = document.querySelector(selector);
+                    if (el) {
+                        el.value = '';  // Clear first
+                        el.focus();
+                        el.value = value;
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }, emailSelector, email);
+                await new Promise(r => setTimeout(r, 300));
+            } else {
+                throw new Error('Could not find username input field');
+            }
+
+            // Fill password field (Digital Cookie uses #password)
+            const passwordSelectors = [
+                '#password',
+                'input[name="j_password"]',
                 'input[type="password"]',
                 'input[name="password"]',
-                '#password'
-            ]);
+                'input[id*="password" i]',
+                'input[autocomplete="current-password"]'
+            ];
+            const passwordSelector = await this.findSelector(passwordSelectors);
             if (passwordSelector) {
-                await this.page.type(passwordSelector, password, { delay: 50 });
+                logger.info('Filling password field', { selector: passwordSelector });
+                await this.page.evaluate((selector, value) => {
+                    const el = document.querySelector(selector);
+                    if (el) {
+                        el.value = '';  // Clear first
+                        el.focus();
+                        el.value = value;
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }, passwordSelector, password);
+                await new Promise(r => setTimeout(r, 300));
             } else {
                 throw new Error('Could not find password input field');
             }
 
-            // Find and click submit button
-            const submitSelector = await this.findSelector([
+            // Find and click submit button (Digital Cookie uses #loginButton)
+            const submitSelectors = [
+                '#loginButton',
                 'button[type="submit"]',
                 'input[type="submit"]',
-                'button:contains("Sign In")',
-                'button:contains("Login")',
                 '.login-btn',
-                '#login-button'
-            ]);
-            if (submitSelector) {
-                await Promise.all([
-                    this.page.click(submitSelector),
-                    this.page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 })
-                ]);
-            } else {
-                // Try pressing Enter if no button found
-                await Promise.all([
-                    this.page.keyboard.press('Enter'),
-                    this.page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 })
-                ]);
+                '#login-button',
+                'button[id*="login" i]',
+                'button[id*="submit" i]',
+                'input[value*="Sign" i]',
+                'input[value*="Log" i]'
+            ];
+            const submitSelector = await this.findSelector(submitSelectors);
+
+            logger.info('Submitting login form', { selector: submitSelector || 'using Enter key' });
+
+            try {
+                if (submitSelector) {
+                    // Use JS click for reliability
+                    await this.page.evaluate((selector) => {
+                        const el = document.querySelector(selector);
+                        if (el) el.click();
+                    }, submitSelector);
+                } else {
+                    // Try pressing Enter on the password field
+                    await this.page.keyboard.press('Enter');
+                }
+
+                // Wait for navigation
+                await this.page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 });
+            } catch (navError) {
+                // Navigation might not happen if there's an error on the page
+                logger.warn('Navigation after submit', { error: navError.message });
+                await new Promise(r => setTimeout(r, 2000));
             }
 
             // Check if login was successful (should be redirected away from login page)
-            const currentUrl = this.page.url();
-            const loginSuccessful = !currentUrl.includes('/login');
+            const finalUrl = this.page.url();
+            const loginSuccessful = !finalUrl.includes('/login');
 
             if (loginSuccessful) {
                 logger.info('Digital Cookie login successful');
@@ -152,8 +227,32 @@ class DigitalCookieScraper {
     }
 
     /**
+     * Dismiss cookie consent banner if present
+     */
+    async dismissOverlays() {
+        try {
+            // Digital Cookie uses this specific button ID for cookie consent
+            const cookieButton = await this.page.$('#acceptAllCookieButton');
+            if (cookieButton) {
+                await this.page.evaluate(() => {
+                    const btn = document.querySelector('#acceptAllCookieButton');
+                    if (btn) btn.click();
+                });
+                logger.info('Cookie consent accepted');
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        } catch {
+            // No cookie banner or already dismissed
+        }
+    }
+
+    /**
      * Scrape orders from the orders page
-     * @param {string} storeUrl - URL to the orders page
+     * Digital Cookie has two main tables:
+     * 1. "Orders to deliver" - pending delivery orders
+     * 2. "Completed Digital Cookie Online Orders" - completed/paid orders
+     *
+     * @param {string} storeUrl - URL to the orders page (cookieOrdersPage)
      * @returns {Object[]} - Array of order objects
      */
     async scrapeOrders(storeUrl) {
@@ -164,20 +263,96 @@ class DigitalCookieScraper {
             await this.page.goto(storeUrl, { waitUntil: 'networkidle2', timeout: 30000 });
 
             // Wait for page content to load
-            await this.page.waitForTimeout(2000);
+            await new Promise(r => setTimeout(r, 3000));
 
-            // Try to find and extract order data
+            // Take debug screenshot
+            await this.takeScreenshot('/tmp/orders-page-debug.png');
+
+            // Extract orders from the page
             const orders = await this.page.evaluate(() => {
                 const extractedOrders = [];
 
-                // Look for order containers/rows
-                const orderContainers = document.querySelectorAll(
-                    '[class*="order"], .order-row, .order-item, tr[data-order], .cookie-order'
-                );
+                // Helper to parse a date string
+                const parseDate = (dateStr) => {
+                    if (!dateStr) return null;
+                    // Handle formats like "1/18/2026" or "12/10/2025"
+                    return dateStr.trim();
+                };
 
-                // If we find specific order containers, parse them
-                if (orderContainers.length > 0) {
-                    orderContainers.forEach((container, index) => {
+                // Helper to extract number from text (for box counts)
+                const extractNumber = (text) => {
+                    if (!text) return 0;
+                    const match = text.match(/(\d+)/);
+                    return match ? parseInt(match[1], 10) : 0;
+                };
+
+                // Find all tables on the page
+                const tables = document.querySelectorAll('table');
+
+                // Track which section we're in based on preceding headers
+                let currentSection = 'unknown';
+
+                // Look for section headers to understand context
+                const allHeaders = document.querySelectorAll('h1, h2, h3, h4, h5, h6, .section-header, [class*="header"], [class*="title"]');
+                const headerTexts = Array.from(allHeaders).map(h => ({
+                    text: h.textContent.trim().toLowerCase(),
+                    element: h
+                }));
+
+                tables.forEach((table, tableIndex) => {
+                    // Try to determine which section this table belongs to
+                    // by looking at text before the table
+                    let tableSection = 'orders_to_deliver'; // default
+
+                    // Check the page text for section indicators
+                    const pageText = document.body.innerText.toLowerCase();
+
+                    // Get table's preceding text/headers
+                    let prevElement = table.previousElementSibling;
+                    let attempts = 0;
+                    while (prevElement && attempts < 5) {
+                        const prevText = prevElement.textContent.toLowerCase();
+                        if (prevText.includes('completed') || prevText.includes('online orders')) {
+                            tableSection = 'completed';
+                            break;
+                        }
+                        if (prevText.includes('orders to deliver') || prevText.includes('delivery')) {
+                            tableSection = 'orders_to_deliver';
+                            break;
+                        }
+                        if (prevText.includes('approve')) {
+                            tableSection = 'orders_to_approve';
+                            break;
+                        }
+                        prevElement = prevElement.previousElementSibling;
+                        attempts++;
+                    }
+
+                    // Get headers from this table
+                    const headerRow = table.querySelector('thead tr, tr:first-child');
+                    const headers = [];
+                    if (headerRow) {
+                        const headerCells = headerRow.querySelectorAll('th, td');
+                        headerCells.forEach(cell => {
+                            headers.push(cell.textContent.trim().toLowerCase());
+                        });
+                    }
+
+                    // Process data rows
+                    const rows = table.querySelectorAll('tbody tr, tr');
+
+                    rows.forEach((row, rowIndex) => {
+                        // Skip header row
+                        if (rowIndex === 0 && row.querySelector('th')) return;
+
+                        const cells = row.querySelectorAll('td');
+                        if (cells.length < 3) return; // Skip rows with too few cells
+
+                        const rowText = row.textContent.trim();
+
+                        // Skip empty or info rows
+                        if (rowText.includes('no orders') || rowText.includes('at this time')) return;
+
                         const order = {
                             orderNumber: null,
                             customerName: null,
@@ -185,115 +360,185 @@ class DigitalCookieScraper {
                             customerPhone: null,
                             customerAddress: null,
                             orderDate: null,
-                            orderType: null,
-                            orderStatus: null,
+                            orderType: null,        // "In-Person delivery" or "Shipped"
+                            orderStatus: null,      // "Shipped", "Delivered", "Approved for Delivery"
+                            paymentMethod: null,    // How it was paid
                             cookies: [],
-                            totalBoxes: 0,
+                            totalBoxes: 0,          // "pkgs" = boxes
+                            isPaid: false,
+                            isCompleted: false,
                             isDonation: false,
-                            isWebsiteOrder: false
+                            isWebsiteOrder: true,   // All Digital Cookie orders are website orders
+                            tableSection: tableSection
                         };
 
-                        // Try to extract order number
-                        const orderNumEl = container.querySelector('[class*="order-num"], [class*="orderNumber"]');
-                        if (orderNumEl) order.orderNumber = orderNumEl.textContent.trim();
+                        // Parse cells based on headers or position
+                        cells.forEach((cell, cellIndex) => {
+                            const cellText = cell.textContent.trim();
+                            const header = headers[cellIndex] || '';
 
-                        // Try to extract customer name
-                        const nameEl = container.querySelector('[class*="customer"], [class*="name"], [class*="deliver"]');
-                        if (nameEl) order.customerName = nameEl.textContent.trim();
+                            // Match by header name
+                            if (header.includes('cookie') && header.includes('pkg')) {
+                                order.totalBoxes = extractNumber(cellText);
+                            } else if (header.includes('deliver to') || header.includes('name') || header.includes('customer')) {
+                                if (!order.customerName) order.customerName = cellText;
+                            } else if (header.includes('address') || header.includes('delivery address')) {
+                                order.customerAddress = cellText;
+                            } else if (header.includes('date') && !header.includes('initial')) {
+                                order.orderDate = parseDate(cellText);
+                            } else if (header.includes('initial order')) {
+                                // This indicates if it was an initial order
+                            } else if (header.includes('payment') || header.includes('paid')) {
+                                order.paymentMethod = cellText;
+                                if (cellText && cellText.toLowerCase() !== 'unpaid') {
+                                    order.isPaid = true;
+                                }
+                            } else if (header.includes('status')) {
+                                order.orderStatus = cellText;
+                                if (cellText.toLowerCase() === 'delivered') {
+                                    order.isCompleted = true;
+                                }
+                            } else if (header.includes('type')) {
+                                order.orderType = cellText;
+                            }
 
-                        // Check for donation indicator
-                        const containerText = container.textContent || '';
-                        order.isDonation = containerText.toLowerCase().includes('donate order') ||
-                            containerText.toLowerCase().includes('secondary delivery option:donate');
-                        order.isWebsiteOrder = containerText.includes('My Cookie Website') ||
-                            containerText.includes('Ordered From:');
+                            // Also check for order number in links or data attributes
+                            const links = cell.querySelectorAll('a');
+                            links.forEach(link => {
+                                const href = link.getAttribute('href') || '';
+                                const onclick = link.getAttribute('onclick') || '';
 
-                        // Extract date if available
-                        const dateEl = container.querySelector('[class*="date"]');
-                        if (dateEl) order.orderDate = dateEl.textContent.trim();
-
-                        // Extract status
-                        const statusEl = container.querySelector('[class*="status"]');
-                        if (statusEl) order.orderStatus = statusEl.textContent.trim();
-
-                        // Only add if we have some meaningful data
-                        if (order.orderNumber || order.customerName) {
-                            extractedOrders.push(order);
-                        }
-                    });
-                }
-
-                // Also try parsing any visible tables
-                const tables = document.querySelectorAll('table');
-                tables.forEach(table => {
-                    const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent.trim().toLowerCase());
-                    const rows = table.querySelectorAll('tbody tr');
-
-                    rows.forEach(row => {
-                        const cells = row.querySelectorAll('td');
-                        if (cells.length > 0) {
-                            const order = {
-                                orderNumber: null,
-                                customerName: null,
-                                customerEmail: null,
-                                customerPhone: null,
-                                customerAddress: null,
-                                orderDate: null,
-                                orderType: null,
-                                orderStatus: null,
-                                cookies: [],
-                                totalBoxes: 0,
-                                isDonation: false,
-                                isWebsiteOrder: false
-                            };
-
-                            cells.forEach((cell, idx) => {
-                                const header = headers[idx] || '';
-                                const value = cell.textContent.trim();
-
-                                if (header.includes('order') && header.includes('num')) {
-                                    order.orderNumber = value;
-                                } else if (header.includes('name') || header.includes('customer') || header.includes('deliver')) {
-                                    order.customerName = value;
-                                } else if (header.includes('date')) {
-                                    order.orderDate = value;
-                                } else if (header.includes('status')) {
-                                    order.orderStatus = value;
-                                } else if (header.includes('email')) {
-                                    order.customerEmail = value;
-                                } else if (header.includes('phone')) {
-                                    order.customerPhone = value;
-                                } else if (header.includes('address')) {
-                                    order.customerAddress = value;
+                                // Extract order ID from URLs like /order/123456
+                                const orderMatch = href.match(/order[\/=](\d+)/i) || onclick.match(/order[^\d]*(\d+)/i);
+                                if (orderMatch && !order.orderNumber) {
+                                    order.orderNumber = orderMatch[1];
                                 }
                             });
 
-                            const rowText = row.textContent || '';
-                            order.isDonation = rowText.toLowerCase().includes('donate order');
-                            order.isWebsiteOrder = rowText.includes('My Cookie Website');
-
-                            if (order.orderNumber || order.customerName) {
-                                // Check for duplicates
-                                const exists = extractedOrders.some(o =>
-                                    o.orderNumber === order.orderNumber && o.customerName === order.customerName
-                                );
-                                if (!exists) {
-                                    extractedOrders.push(order);
+                            // Check for order number in cell text (9-digit numbers)
+                            if (!order.orderNumber) {
+                                const orderNumMatch = cellText.match(/^(\d{8,12})$/);
+                                if (orderNumMatch) {
+                                    order.orderNumber = orderNumMatch[1];
                                 }
+                            }
+                        });
+
+                        // If no headers, try positional parsing based on Digital Cookie structure
+                        // Typical structure: [checkbox], Order#, Boxes, Name, Address, Date, [Status/Action]
+                        if (headers.length === 0 || !order.customerName) {
+                            const cellTexts = Array.from(cells).map(c => c.textContent.trim());
+
+                            cellTexts.forEach((text, idx) => {
+                                // Order number (8-12 digit number)
+                                if (/^\d{8,12}$/.test(text) && !order.orderNumber) {
+                                    order.orderNumber = text;
+                                }
+                                // Box count (small number, usually 1-50)
+                                else if (/^\d{1,3}$/.test(text) && !order.totalBoxes) {
+                                    const num = parseInt(text, 10);
+                                    if (num > 0 && num < 100) {
+                                        order.totalBoxes = num;
+                                    }
+                                }
+                                // Date (contains /)
+                                else if (/\d{1,2}\/\d{1,2}\/\d{2,4}/.test(text) && !order.orderDate) {
+                                    order.orderDate = text;
+                                }
+                                // Address (contains comma or street indicators)
+                                else if ((text.includes(',') || /\d+\s+\w+\s+(rd|st|ave|dr|ln|way|blvd)/i.test(text)) && !order.customerAddress) {
+                                    order.customerAddress = text;
+                                }
+                                // Name (text without special patterns, not too short, not "VIEW" or similar)
+                                else if (text.length > 2 && text.length < 50 && /^[A-Za-z\s\-']+$/.test(text) && !order.customerName) {
+                                    // Skip common action words that aren't names
+                                    const skipWords = ['view', 'edit', 'delete', 'approve', 'decline', 'select', 'order', 'delivered'];
+                                    if (!skipWords.includes(text.toLowerCase())) {
+                                        order.customerName = text;
+                                    }
+                                }
+                            });
+                        }
+
+                        // Determine payment status from table section
+                        if (tableSection === 'completed') {
+                            order.isPaid = true;
+                            order.isCompleted = true;
+                        }
+
+                        // Check for donation indicators
+                        if (rowText.toLowerCase().includes('donate') || rowText.toLowerCase().includes('donation')) {
+                            order.isDonation = true;
+                        }
+
+                        // Determine order type from content
+                        if (rowText.toLowerCase().includes('shipped') || rowText.toLowerCase().includes('ship')) {
+                            order.orderType = 'Shipped';
+                            if (rowText.toLowerCase().includes('shipped')) {
+                                order.orderStatus = 'Shipped';
+                            }
+                        } else if (rowText.toLowerCase().includes('in-person') || rowText.toLowerCase().includes('delivery')) {
+                            order.orderType = 'In-Person delivery';
+                        }
+
+                        // Determine order status from content
+                        if (!order.orderStatus) {
+                            if (rowText.toLowerCase().includes('delivered')) {
+                                order.orderStatus = 'Delivered';
+                                order.isCompleted = true;
+                            } else if (rowText.toLowerCase().includes('approved')) {
+                                order.orderStatus = 'Approved for Delivery';
+                            } else if (rowText.toLowerCase().includes('pending')) {
+                                order.orderStatus = 'Pending';
+                            }
+                        }
+
+                        // Only add if we have meaningful data
+                        if (order.orderNumber || order.customerName) {
+                            // Check for duplicates
+                            const exists = extractedOrders.some(o =>
+                                o.orderNumber === order.orderNumber &&
+                                o.customerName === order.customerName &&
+                                o.orderDate === order.orderDate
+                            );
+                            if (!exists) {
+                                extractedOrders.push(order);
                             }
                         }
                     });
                 });
 
-                return extractedOrders;
+                // Return extracted orders with debug info
+                return {
+                    orders: extractedOrders,
+                    debug: {
+                        tablesFound: tables.length,
+                        totalOrdersExtracted: extractedOrders.length
+                    }
+                };
             });
 
-            logger.info('Scraped orders from Digital Cookie', { orderCount: orders.length });
+            // Extract orders and debug info
+            const result = orders;
+            const extractedOrders = result.orders || [];
 
-            // Try to get additional details for each order by parsing the full page content
-            const pageContent = await this.page.content();
+            // Log detailed info about each order for debugging
+            logger.info('Scraped orders from Digital Cookie', {
+                tablesFound: result.debug?.tablesFound || 0,
+                orderCount: extractedOrders.length,
+                paidOrders: extractedOrders.filter(o => o.isPaid).length,
+                completedOrders: extractedOrders.filter(o => o.isCompleted).length,
+                totalBoxes: extractedOrders.reduce((sum, o) => sum + (o.totalBoxes || 0), 0),
+                orderDetails: extractedOrders.map(o => ({
+                    name: o.customerName,
+                    boxes: o.totalBoxes,
+                    date: o.orderDate,
+                    section: o.tableSection,
+                    orderNum: o.orderNumber
+                }))
+            });
 
-            return orders;
+            return extractedOrders;
         } catch (error) {
             logger.error('Failed to scrape orders', { error: error.message });
             throw error;

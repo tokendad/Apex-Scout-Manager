@@ -912,9 +912,10 @@ app.post('/api/scrape', async (req, res) => {
 
         const processTransaction = db.transaction(() => {
             for (const order of orders) {
-                // Skip if already imported
-                if (order.orderNumber) {
-                    const existing = checkHistory.get(order.orderNumber);
+                // Skip if already imported (use order number or customer+date combo as key)
+                const orderKey = order.orderNumber || `${order.customerName}_${order.orderDate}`;
+                if (orderKey) {
+                    const existing = checkHistory.get(orderKey);
                     if (existing) {
                         skippedDuplicates++;
                         continue;
@@ -938,15 +939,32 @@ app.post('/api/scrape', async (req, res) => {
                     donationsImported++;
                 } else {
                     // Insert as sale
-                    // For website orders, payment is already collected
-                    const amountCollected = order.isWebsiteOrder ? totalAmount : 0;
-                    const amountDue = order.isWebsiteOrder ? 0 : totalAmount;
-                    const paymentMethod = order.isWebsiteOrder ? 'online' : null;
+                    // Determine payment status from scraped data
+                    // isPaid is true if order is in "Completed" table or has payment method
+                    const isPaid = order.isPaid || order.isCompleted || false;
+                    const amountCollected = isPaid ? totalAmount : 0;
+                    const amountDue = isPaid ? 0 : totalAmount;
+
+                    // Use payment method from order, or default to 'online' if paid
+                    let paymentMethod = order.paymentMethod || null;
+                    if (isPaid && !paymentMethod) {
+                        paymentMethod = 'online';
+                    }
+
+                    // Map order type: "In-Person delivery" or "Shipped"
+                    const orderType = order.orderType || 'Website';
+
+                    // Map order status: "Shipped", "Delivered", "Approved for Delivery", "Pending"
+                    // If isCompleted (Delivered status), mark as completed
+                    let orderStatus = order.orderStatus || 'Pending';
+                    if (order.isCompleted && !orderStatus.toLowerCase().includes('deliver')) {
+                        orderStatus = 'Delivered';
+                    }
 
                     // Insert a generic cookie entry for the order
                     insertSale.run(
                         'Assorted',         // cookieType - we may not have detailed breakdown
-                        totalBoxes,         // quantity
+                        totalBoxes,         // quantity (pkgs = boxes)
                         order.customerName || 'Digital Cookie Customer',
                         order.customerAddress || null,
                         order.customerPhone || null,
@@ -955,8 +973,8 @@ app.post('/api/scrape', async (req, res) => {
                         'individual',       // saleType
                         'box',              // unitType
                         order.orderNumber,
-                        order.isWebsiteOrder ? 'Website' : 'Digital Cookie',
-                        order.orderStatus || 'Pending',
+                        orderType,          // orderType: "In-Person delivery", "Shipped", or "Website"
+                        orderStatus,        // orderStatus: "Shipped", "Delivered", "Approved for Delivery", "Pending"
                         amountCollected,
                         amountDue,
                         paymentMethod
@@ -965,8 +983,8 @@ app.post('/api/scrape', async (req, res) => {
                 }
 
                 // Record in import history
-                if (order.orderNumber) {
-                    insertHistory.run(order.orderNumber, new Date().toISOString(), 'scrape');
+                if (orderKey) {
+                    insertHistory.run(orderKey, new Date().toISOString(), 'scrape');
                 }
             }
         });
@@ -995,6 +1013,42 @@ app.post('/api/scrape', async (req, res) => {
         res.status(500).json({ error: 'Sync failed: ' + error.message });
     } finally {
         await scraper.close();
+    }
+});
+
+// Delete all sales
+app.delete('/api/sales', (req, res) => {
+    try {
+        const result = db.prepare('DELETE FROM sales').run();
+        logger.info('All sales deleted', { deletedCount: result.changes });
+        res.json({ success: true, deletedCount: result.changes });
+    } catch (error) {
+        logger.error('Failed to delete sales', { error: error.message });
+        res.status(500).json({ error: 'Failed to delete sales' });
+    }
+});
+
+// Delete all donations
+app.delete('/api/donations', (req, res) => {
+    try {
+        const result = db.prepare('DELETE FROM donations').run();
+        logger.info('All donations deleted', { deletedCount: result.changes });
+        res.json({ success: true, deletedCount: result.changes });
+    } catch (error) {
+        logger.error('Failed to delete donations', { error: error.message });
+        res.status(500).json({ error: 'Failed to delete donations' });
+    }
+});
+
+// Clear import history
+app.delete('/api/import-history', (req, res) => {
+    try {
+        const result = db.prepare('DELETE FROM import_history').run();
+        logger.info('Import history cleared', { deletedCount: result.changes });
+        res.json({ success: true, deletedCount: result.changes });
+    } catch (error) {
+        logger.error('Failed to clear import history', { error: error.message });
+        res.status(500).json({ error: 'Failed to clear import history' });
     }
 });
 

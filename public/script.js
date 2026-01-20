@@ -1738,6 +1738,112 @@ function setupDigitalCookieSync() {
     });
 }
 
+// Setup Danger Zone buttons
+function setupDangerZone() {
+    const deleteAllSalesBtn = document.getElementById('deleteAllSalesBtn');
+    const deleteAllDonationsBtn = document.getElementById('deleteAllDonationsBtn');
+    const clearImportHistoryBtn = document.getElementById('clearImportHistoryBtn');
+
+    if (deleteAllSalesBtn) {
+        deleteAllSalesBtn.addEventListener('click', async () => {
+            const confirmed = confirm(
+                '⚠️ WARNING: Delete All Sales?\n\n' +
+                'This will permanently delete ALL sales records.\n' +
+                'This action cannot be undone.\n\n' +
+                'Are you sure you want to continue?'
+            );
+
+            if (!confirmed) return;
+
+            // Double confirmation for safety
+            const doubleConfirm = confirm(
+                '🚨 FINAL WARNING 🚨\n\n' +
+                'You are about to delete ALL sales data.\n' +
+                'Click OK to permanently delete all sales.'
+            );
+
+            if (!doubleConfirm) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/sales`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showFeedback(`Deleted ${result.deletedCount} sales records`);
+                    await loadSales();
+                    updateGoalDisplay();
+                } else {
+                    showFeedback('Failed to delete sales', true);
+                }
+            } catch (error) {
+                console.error('Delete sales error:', error);
+                showFeedback('Error deleting sales: ' + error.message, true);
+            }
+        });
+    }
+
+    if (deleteAllDonationsBtn) {
+        deleteAllDonationsBtn.addEventListener('click', async () => {
+            const confirmed = confirm(
+                '⚠️ WARNING: Delete All Donations?\n\n' +
+                'This will permanently delete ALL donation records.\n' +
+                'This action cannot be undone.\n\n' +
+                'Are you sure you want to continue?'
+            );
+
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/donations`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showFeedback(`Deleted ${result.deletedCount} donation records`);
+                    await loadDonations();
+                } else {
+                    showFeedback('Failed to delete donations', true);
+                }
+            } catch (error) {
+                console.error('Delete donations error:', error);
+                showFeedback('Error deleting donations: ' + error.message, true);
+            }
+        });
+    }
+
+    if (clearImportHistoryBtn) {
+        clearImportHistoryBtn.addEventListener('click', async () => {
+            const confirmed = confirm(
+                'Clear Import History?\n\n' +
+                'This will allow previously synced orders to be imported again.\n' +
+                'Use this if you want to re-sync orders from Digital Cookie.\n\n' +
+                'Continue?'
+            );
+
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/import-history`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showFeedback(`Cleared ${result.deletedCount} import history records`);
+                } else {
+                    showFeedback('Failed to clear import history', true);
+                }
+            } catch (error) {
+                console.error('Clear history error:', error);
+                showFeedback('Error clearing history: ' + error.message, true);
+            }
+        });
+    }
+}
+
 // Initialize app when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
@@ -1747,6 +1853,7 @@ if (document.readyState === 'loading') {
         setupImport();
         setupDigitalCookieSync();
         setupCookieTableListeners();
+        setupDangerZone();
     });
 } else {
     init();
@@ -1755,4 +1862,5 @@ if (document.readyState === 'loading') {
     setupImport();
     setupDigitalCookieSync();
     setupCookieTableListeners();
+    setupDangerZone();
 }
