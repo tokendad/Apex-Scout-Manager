@@ -440,12 +440,12 @@ class DigitalCookieScraper {
                                 order.totalBoxes = extractNumber(cellText);
                             } else if (header.includes('deliver to') || header.includes('name') || header.includes('customer')) {
                                 if (!order.customerName) order.customerName = cellText;
-                            } else if (header.includes('paid by') || header.includes('paid')) {
+                            } else if (header.includes('paid by') || header.includes('paid') || header.includes('payment')) {
                                 // Handle "Paid By" column - could contain customer name or payment method
                                 if (header.includes('paid by')) {
                                     if (!order.customerName) order.customerName = cellText;
                                     order.isPaid = true;
-                                } else if (header.includes('payment')) {
+                                } else if (header.includes('payment') || header.includes('paid')) {
                                     order.paymentMethod = cellText;
                                     if (cellText && cellText.toLowerCase() !== 'unpaid') {
                                         order.isPaid = true;
@@ -454,13 +454,7 @@ class DigitalCookieScraper {
                             } else if (header.includes('address') || header.includes('delivery address')) {
                                 order.customerAddress = cellText;
                             } else if (header.includes('date') && !header.includes('initial')) {
-                                order.orderDate = parseDate(cellText);
-                            } else if (header.includes('payment')) {
-                                order.paymentMethod = cellText;
-                                if (cellText && cellText.toLowerCase() !== 'unpaid') {
-                                    order.isPaid = true;
-                                }
-                            } else if (header.includes('status')) {
+                                order.orderDate = parseDate(cellText);                            } else if (header.includes('status')) {
                                 order.orderStatus = cellText;
                                 if (cellText.toLowerCase() === 'delivered') {
                                     order.isCompleted = true;
