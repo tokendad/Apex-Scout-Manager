@@ -2,6 +2,12 @@
 
 All notable changes to GSCTracker will be documented in this file.
 
+## [1.2.0] - 2026-01-21
+
+### Removed
+- **Digital Cookie Sync (Scraping)** removed to comply with Girl Scouts Digital Cookie Terms of Service.
+- **Puppeteer dependencies** removed to reduce application size and complexity.
+
 ## [1.1.0] - 2026-01-20
 
 ### Added

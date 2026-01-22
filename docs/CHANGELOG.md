@@ -66,6 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 
 ### Removed
+- **Digital Cookie Sync (Scraping)** removed to comply with Terms of Service.
+- **Puppeteer dependencies** removed.
 - Removed example Excel files from `docs/` folder to clean up repository.
 
 ### Fixed

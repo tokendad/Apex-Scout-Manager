@@ -7,7 +7,6 @@ A mobile-responsive web application for tracking Girl Scout Cookie sales. Design
 
 - 📱 **Mobile-First Design**: Optimized for phone screens with responsive layout
 - 🍪 **Track Cookie Sales**: Record sales by cookie type, quantity, customer, and payment status
-- 🔄 **Digital Cookie Sync**: Automatically import orders from the Girl Scouts Digital Cookie platform
 - 💳 **Payment Methods**: Manage multiple payment options (Venmo, PayPal, etc.) with dynamic QR code generation
 - 📅 **Event Management**: Track booth sales, inventory, and donations with support for editing event details
 - 📊 **Sales Summary**: View total boxes sold, revenue, and donation stats at a glance
@@ -86,15 +85,6 @@ Since GSCTracker uses a Node.js backend with SQLite, you cannot just open `index
    Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Configuration
-
-### Digital Cookie Sync
-To enable automatic order imports:
-1. Go to the **Settings** tab.
-2. Enter your Digital Cookie email and password.
-3. Click "Save Settings" to store your credentials.
-4. Click "Sync Now" to import recent orders.
-
-The system automatically detects your scout account and imports orders with full details including individual cookie types, customer information, and payment status.
 
 ### Payment Methods
 1. Go to **Settings**.

@@ -489,40 +489,7 @@
                         </div>
                     </div>
 
-                    <!-- Digital Cookie Sync -->
-                    <div class="settings-group">
-                        <h3>Digital Cookie Sync</h3>
-                        <div class="import-section">
-                            <p class="import-description">Automatically import orders from your Digital Cookie store by connecting your account.</p>
 
-                            <div class="form-group">
-                                <label for="digitalCookieEmail">Email</label>
-                                <input type="email" id="digitalCookieEmail" class="form-input"
-                                    placeholder="your@email.com">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="digitalCookiePassword">Password</label>
-                                <input type="password" id="digitalCookiePassword" class="form-input"
-                                    placeholder="Enter your password">
-                                <small class="form-hint">Your credentials are stored locally and only used for syncing</small>
-                            </div>
-
-                            <div class="sync-buttons">
-                                <button id="testConnectionBtn" class="btn btn-secondary">Test Connection</button>
-                                <button id="saveCredentialsBtn" class="btn btn-primary">Save Settings</button>
-                            </div>
-
-                            <div class="sync-controls">
-                                <button id="syncNowBtn" class="btn btn-primary sync-btn" disabled>Sync Now</button>
-                                <div id="syncStatus" class="import-status"></div>
-                            </div>
-
-                            <div id="lastSyncInfo" class="sync-info" style="display: none;">
-                                <span>Last sync: <span id="lastSyncTime">Never</span></span>
-                            </div>
-                        </div>
-                    </div>
 
                     <!-- Danger Zone -->
                     <div class="settings-group danger-zone">
@@ -530,24 +497,10 @@
                         <div class="danger-section">
                             <div class="danger-item">
                                 <div class="danger-info">
-                                    <strong>Delete All Sales</strong>
-                                    <p>Permanently delete all sales data. This cannot be undone.</p>
+                                    <strong>Delete All Data</strong>
+                                    <p>Permanently delete all sales and donation records. This cannot be undone.</p>
                                 </div>
-                                <button id="deleteAllSalesBtn" class="btn btn-danger">Delete All Sales</button>
-                            </div>
-                            <div class="danger-item">
-                                <div class="danger-info">
-                                    <strong>Delete All Donations</strong>
-                                    <p>Permanently delete all donation records. This cannot be undone.</p>
-                                </div>
-                                <button id="deleteAllDonationsBtn" class="btn btn-danger">Delete All Donations</button>
-                            </div>
-                            <div class="danger-item">
-                                <div class="danger-info">
-                                    <strong>Clear Import History</strong>
-                                    <p>Clear sync history to allow re-importing previously synced orders.</p>
-                                </div>
-                                <button id="clearImportHistoryBtn" class="btn btn-warning">Clear History</button>
+                                <button id="deleteAllDataBtn" class="btn btn-danger">Delete All Data</button>
                             </div>
                         </div>
                     </div>

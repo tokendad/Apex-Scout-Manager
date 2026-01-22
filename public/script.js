@@ -1890,219 +1890,15 @@ function setupImport() {
     });
 }
 
-// Digital Cookie Sync Management
-function setupDigitalCookieSync() {
-    const emailInput = document.getElementById('digitalCookieEmail');
-    const passwordInput = document.getElementById('digitalCookiePassword');
-    const testConnectionBtn = document.getElementById('testConnectionBtn');
-    const saveCredentialsBtn = document.getElementById('saveCredentialsBtn');
-    const syncNowBtn = document.getElementById('syncNowBtn');
-    const syncStatus = document.getElementById('syncStatus');
-    const lastSyncInfo = document.getElementById('lastSyncInfo');
-    const lastSyncTimeSpan = document.getElementById('lastSyncTime');
-
-    // Load existing settings from profile
-    function loadSyncSettings() {
-        if (profile) {
-            if (profile.digitalCookieEmail) {
-                emailInput.value = profile.digitalCookieEmail;
-            }
-            // Don't populate password for security
-
-            // Enable sync button if credentials exist
-            updateSyncButtonState();
-
-            // Show last sync time
-            if (profile.lastSyncTime) {
-                lastSyncInfo.style.display = 'block';
-                lastSyncTimeSpan.textContent = new Date(profile.lastSyncTime).toLocaleString();
-            }
-        }
-    }
-
-    // Update sync button state based on credentials
-    function updateSyncButtonState() {
-        const hasCredentials = emailInput.value && passwordInput.value;
-        syncNowBtn.disabled = !(hasCredentials || (profile && profile.digitalCookieEmail));
-    }
-
-    // Load settings when profile is loaded
-    loadSyncSettings();
-
-    // Update button state when inputs change
-    emailInput.addEventListener('input', updateSyncButtonState);
-    passwordInput.addEventListener('input', updateSyncButtonState);
-
-    // Save credentials
-    saveCredentialsBtn.addEventListener('click', async () => {
-        const email = emailInput.value.trim();
-        const password = passwordInput.value;
-
-        if (!email) {
-            showFeedback('Please enter your email', true);
-            return;
-        }
-
-        saveCredentialsBtn.disabled = true;
-        saveCredentialsBtn.textContent = 'Saving...';
-
-        try {
-            const updateData = {
-                digitalCookieEmail: email
-            };
-
-            // Only include password if provided
-            if (password) {
-                updateData.digitalCookiePassword = password;
-            }
-
-            const response = await fetch(`${API_BASE_URL}/profile`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updateData)
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to save settings');
-            }
-
-            await loadProfile();
-            loadSyncSettings();
-            showFeedback('Digital Cookie settings saved!');
-
-        } catch (error) {
-            console.error('Error saving credentials:', error);
-            showFeedback('Failed to save settings: ' + error.message, true);
-        } finally {
-            saveCredentialsBtn.disabled = false;
-            saveCredentialsBtn.textContent = 'Save Settings';
-        }
-    });
-
-    // Test connection
-    testConnectionBtn.addEventListener('click', async () => {
-        // First save any new credentials
-        const email = emailInput.value.trim();
-        const password = passwordInput.value;
-
-        if (email && password) {
-            // Save credentials first
-            try {
-                await fetch(`${API_BASE_URL}/profile`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        digitalCookieEmail: email,
-                        digitalCookiePassword: password
-                    })
-                });
-            } catch (error) {
-                showFeedback('Failed to save credentials for testing', true);
-                return;
-            }
-        }
-
-        testConnectionBtn.disabled = true;
-        testConnectionBtn.textContent = 'Testing...';
-        syncStatus.className = 'import-status';
-        syncStatus.textContent = 'Testing connection...';
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/scrape/test`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
-
-            const result = await response.json();
-
-            if (response.ok && result.success) {
-                syncStatus.className = 'import-status success';
-                syncStatus.textContent = 'Connection successful! Your credentials are valid.';
-                showFeedback('Connection test successful!');
-            } else {
-                syncStatus.className = 'import-status error';
-                syncStatus.textContent = result.error || 'Connection failed';
-                showFeedback('Connection test failed', true);
-            }
-        } catch (error) {
-            console.error('Test connection error:', error);
-            syncStatus.className = 'import-status error';
-            syncStatus.textContent = 'Error: ' + error.message;
-            showFeedback('Connection test failed', true);
-        } finally {
-            testConnectionBtn.disabled = false;
-            testConnectionBtn.textContent = 'Test Connection';
-        }
-    });
-
-    // Sync now
-    syncNowBtn.addEventListener('click', async () => {
-        syncNowBtn.disabled = true;
-        syncNowBtn.textContent = 'Syncing...';
-        syncStatus.className = 'import-status';
-        syncStatus.textContent = 'Connecting to Digital Cookie...';
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/scrape`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
-
-            const result = await response.json();
-
-            if (response.ok && result.success) {
-                syncStatus.className = 'import-status success';
-                let message = `Sync complete! Imported ${result.salesImported} sales`;
-                if (result.donationsImported > 0) {
-                    message += `, ${result.donationsImported} donations`;
-                }
-                if (result.skippedDuplicates > 0) {
-                    message += ` (${result.skippedDuplicates} duplicates skipped)`;
-                }
-                syncStatus.textContent = message;
-
-                // Update last sync time
-                lastSyncInfo.style.display = 'block';
-                lastSyncTimeSpan.textContent = new Date().toLocaleString();
-
-                // Reload data
-                await loadSales();
-                await loadDonations();
-                renderSales();
-                updateSummary();
-                updateBreakdown();
-                updateGoalDisplay();
-
-                showFeedback('Digital Cookie sync successful!');
-            } else {
-                syncStatus.className = 'import-status error';
-                syncStatus.textContent = result.error || 'Sync failed';
-                showFeedback('Sync failed: ' + (result.error || 'Unknown error'), true);
-            }
-        } catch (error) {
-            console.error('Sync error:', error);
-            syncStatus.className = 'import-status error';
-            syncStatus.textContent = 'Error: ' + error.message;
-            showFeedback('Sync failed: ' + error.message, true);
-        } finally {
-            syncNowBtn.disabled = false;
-            syncNowBtn.textContent = 'Sync Now';
-            updateSyncButtonState();
-        }
-    });
-}
-
 // Setup Danger Zone buttons
 function setupDangerZone() {
-    const deleteAllSalesBtn = document.getElementById('deleteAllSalesBtn');
-    const deleteAllDonationsBtn = document.getElementById('deleteAllDonationsBtn');
-    const clearImportHistoryBtn = document.getElementById('clearImportHistoryBtn');
+    const deleteAllDataBtn = document.getElementById('deleteAllDataBtn');
 
-    if (deleteAllSalesBtn) {
-        deleteAllSalesBtn.addEventListener('click', async () => {
+    if (deleteAllDataBtn) {
+        deleteAllDataBtn.addEventListener('click', async () => {
             const confirmed = confirm(
-                '⚠️ WARNING: Delete All Sales?\n\n' +
-                'This will permanently delete ALL sales records.\n' +
+                '⚠️ WARNING: Delete All Data?\n\n' +
+                'This will permanently delete ALL sales and donation records.\n' +
                 'This action cannot be undone.\n\n' +
                 'Are you sure you want to continue?'
             );
@@ -2112,87 +1908,31 @@ function setupDangerZone() {
             // Double confirmation for safety
             const doubleConfirm = confirm(
                 '🚨 FINAL WARNING 🚨\n\n' +
-                'You are about to delete ALL sales data.\n' +
-                'Click OK to permanently delete all sales.'
+                'You are about to delete ALL data.\n' +
+                'Click OK to permanently wipe the database.'
             );
 
             if (!doubleConfirm) return;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/sales`, {
+                const response = await fetch(`${API_BASE_URL}/data`, {
                     method: 'DELETE'
                 });
 
                 if (response.ok) {
                     const result = await response.json();
-                    showFeedback(`Deleted ${result.deletedCount} sales records`);
+                    showFeedback(`Deleted ${result.salesDeleted} sales and ${result.donationsDeleted} donations`);
                     await loadSales();
+                    await loadDonations();
+                    updateSummary();
+                    updateBreakdown();
                     updateGoalDisplay();
                 } else {
-                    showFeedback('Failed to delete sales', true);
+                    showFeedback('Failed to delete data', true);
                 }
             } catch (error) {
-                console.error('Delete sales error:', error);
-                showFeedback('Error deleting sales: ' + error.message, true);
-            }
-        });
-    }
-
-    if (deleteAllDonationsBtn) {
-        deleteAllDonationsBtn.addEventListener('click', async () => {
-            const confirmed = confirm(
-                '⚠️ WARNING: Delete All Donations?\n\n' +
-                'This will permanently delete ALL donation records.\n' +
-                'This action cannot be undone.\n\n' +
-                'Are you sure you want to continue?'
-            );
-
-            if (!confirmed) return;
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/donations`, {
-                    method: 'DELETE'
-                });
-
-                if (response.ok) {
-                    const result = await response.json();
-                    showFeedback(`Deleted ${result.deletedCount} donation records`);
-                    await loadDonations();
-                } else {
-                    showFeedback('Failed to delete donations', true);
-                }
-            } catch (error) {
-                console.error('Delete donations error:', error);
-                showFeedback('Error deleting donations: ' + error.message, true);
-            }
-        });
-    }
-
-    if (clearImportHistoryBtn) {
-        clearImportHistoryBtn.addEventListener('click', async () => {
-            const confirmed = confirm(
-                'Clear Import History?\n\n' +
-                'This will allow previously synced orders to be imported again.\n' +
-                'Use this if you want to re-sync orders from Digital Cookie.\n\n' +
-                'Continue?'
-            );
-
-            if (!confirmed) return;
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/import-history`, {
-                    method: 'DELETE'
-                });
-
-                if (response.ok) {
-                    const result = await response.json();
-                    showFeedback(`Cleared ${result.deletedCount} import history records`);
-                } else {
-                    showFeedback('Failed to clear import history', true);
-                }
-            } catch (error) {
-                console.error('Clear history error:', error);
-                showFeedback('Error clearing history: ' + error.message, true);
+                console.error('Delete data error:', error);
+                showFeedback('Error deleting data: ' + error.message, true);
             }
         });
     }
@@ -2205,7 +1945,6 @@ if (document.readyState === 'loading') {
         setupNavigation();
         setupTheme();
         setupImport();
-        setupDigitalCookieSync();
         setupCookieTableListeners();
         setupDangerZone();
     });
@@ -2214,7 +1953,6 @@ if (document.readyState === 'loading') {
     setupNavigation();
     setupTheme();
     setupImport();
-    setupDigitalCookieSync();
     setupCookieTableListeners();
     setupDangerZone();
 }
