@@ -1,6 +1,87 @@
 /**
  * Digital Cookie Store Scraper Service
  * Handles authentication and order data extraction from the Girl Scouts Digital Cookie platform
+ *
+ * ============================================================================
+ * PATCH NOTES - Box Count Inconsistency Fixes
+ * ============================================================================
+ *
+ * ISSUE REPORTED:
+ *   Box counts appear different between test runs when scraping order data.
+ *
+ * ROOT CAUSES IDENTIFIED:
+ *
+ *   1. PRIMARY ISSUE - totalBoxes Never Recalculated (Lines ~524-530)
+ *      ------------------------------------------------------------
+ *      After fetching detailed cookie information from order detail pages,
+ *      the code merged the cookies array but NEVER updated totalBoxes.
+ *      This meant totalBoxes came from the initial table scrape (often
+ *      incomplete or incorrectly parsed), while cookies[] came from the
+ *      more accurate detail page. These values could differ, and which
+ *      source "won" depended on timing.
+ *
+ *      FIX: Recalculate totalBoxes from the sum of cookie quantities
+ *      whenever detailed cookie data is successfully retrieved.
+ *
+ *   2. RACE CONDITION - Fixed Page Load Delays (Line ~296)
+ *      ---------------------------------------------------
+ *      The code used arbitrary fixed delays (1500ms) instead of waiting
+ *      for actual content to render. On slower page loads, tables might
+ *      not be fully populated, leading to missing or partial data.
+ *
+ *      FIX: Replace fixed delays with explicit waits for table elements,
+ *      with a fallback timeout and warning.
+ *
+ *   3. MISSING VALIDATION - No Consistency Checks
+ *      ------------------------------------------
+ *      There was no validation to detect when totalBoxes didn't match
+ *      the sum of individual cookie quantities, making debugging difficult.
+ *
+ *      FIX: Added validation logging to detect and report mismatches
+ *      before returning results.
+ *
+ *   4. DETAIL PAGE TIMING - Insufficient Wait (Line ~489)
+ *      -------------------------------------------------
+ *      The detail page scraping used a short fixed delay that could
+ *      result in incomplete data extraction on slower connections.
+ *
+ *      FIX: Added explicit wait for table content on detail pages.
+ *
+ *   5. ORDER NUMBER EXTRACTION - URL Pattern Mismatch
+ *      ----------------------------------------------
+ *      The regex order[\/=](\d+) didn't match the actual URL pattern
+ *      /cookieorderdetail/163717824 used by Digital Cookie.
+ *
+ *      FIX: Added URL path extraction pattern to handle this format.
+ *
+ *   6. WRONG ORDER DATA - Parallel Tab Session Issues
+ *      -----------------------------------------------
+ *      Parallel tabs were causing session/cache issues where order
+ *      detail pages for different orders were being mixed up.
+ *      Example: Ashley Mathers (2 boxes) getting Elisabeth Whittemore's
+ *      data (11 boxes).
+ *
+ *      FIX: Added order page verification before extraction.
+ *      FIX: Reduced parallel tabs to 1 (sequential processing).
+ *      FIX: Added cache-busting URL parameters and headers.
+ *
+ * CHANGES SUMMARY:
+ *   - Modified scrapeOrderDetailsParallel() to recalculate totalBoxes
+ *   - Modified scrapeOrders() to wait for table elements before parsing
+ *   - Added validation logging before returning results
+ *   - Added waitForDetailPageContent() helper method
+ *   - Added verifyOrderPage() to confirm correct page before extraction
+ *   - Added mismatch warnings with detailed logging
+ *   - Improved order number extraction from "Paid By" and "Deliver To" links
+ *   - Reduced parallel processing to sequential to avoid session issues
+ *   - Added cache-busting for order detail page requests
+ *
+ * TESTING RECOMMENDATIONS:
+ *   - Run multiple consecutive syncs and compare totalBoxes values
+ *   - Check logs for "Box count mismatch" warnings
+ *   - Verify cookies array sum matches totalBoxes for all orders
+ *
+ * ============================================================================
  */
 
 const puppeteer = require('puppeteer-extra');
@@ -16,7 +97,8 @@ class DigitalCookieScraper {
         this.page = null;
         this.baseUrl = 'https://digitalcookie.girlscouts.org';
         this.loginUrl = 'https://digitalcookie.girlscouts.org/login';
-        this.maxParallelTabs = 3; // Number of parallel tabs for detail scraping
+        // Reduced from 3 to 1 to avoid session/cache issues causing wrong order data
+        this.maxParallelTabs = 1; // Process orders sequentially to prevent data mismatch
         this.scoutUsername = null; // Extracted after login
     }
 
@@ -332,8 +414,28 @@ class DigitalCookieScraper {
             // Navigate to orders page
             await this.page.goto(ordersPageUrl, { waitUntil: 'networkidle2', timeout: 30000 });
 
-            // Wait for page content to load (reduced from 3000ms)
-            await new Promise(r => setTimeout(r, 1500));
+            /**
+             * FIX #2: Replace fixed delay with explicit wait for table elements
+             *
+             * PROBLEM: Fixed delays don't account for variable page load times.
+             * On slower connections or server responses, tables might not be
+             * fully rendered, leading to missing data.
+             *
+             * SOLUTION: Wait for actual table elements to appear, with a
+             * reasonable timeout and fallback behavior.
+             */
+            try {
+                await this.page.waitForSelector('table', { timeout: 10000 });
+                logger.info('Orders table detected, waiting for content to stabilize');
+                // Small additional delay for any dynamic content within tables
+                await new Promise(r => setTimeout(r, 500));
+            } catch (tableWaitError) {
+                logger.warn('No tables found on orders page within timeout, continuing with available content', {
+                    error: tableWaitError.message
+                });
+                // Still wait a moment in case content is loading differently
+                await new Promise(r => setTimeout(r, 1500));
+            }
 
             // Extract basic order info from the page tables
             const basicOrders = await this.page.evaluate(() => {
@@ -428,19 +530,33 @@ class DigitalCookieScraper {
                             const cellText = cell.textContent.trim();
                             const header = headers[cellIndex] || '';
 
-                            if (header.includes('cookie') && header.includes('pkg')) {
+                            if (header.includes('order') && header.includes('#')) {
+                                // Handle "Order #" column - extract order number from cell
+                                if (!order.orderNumber) {
+                                    const orderNumMatch = cellText.match(/(\d{8,12})/);
+                                    if (orderNumMatch) {
+                                        order.orderNumber = orderNumMatch[1];
+                                    }
+                                }
+                            } else if (header.includes('cookie') && header.includes('pkg')) {
                                 order.totalBoxes = extractNumber(cellText);
                             } else if (header.includes('deliver to') || header.includes('name') || header.includes('customer')) {
                                 if (!order.customerName) order.customerName = cellText;
+                            } else if (header.includes('paid by') || header.includes('paid') || header.includes('payment')) {
+                                // Handle "Paid By" column - could contain customer name or payment method
+                                if (header.includes('paid by')) {
+                                    if (!order.customerName) order.customerName = cellText;
+                                    order.isPaid = true;
+                                } else if (header.includes('payment') || header.includes('paid')) {
+                                    order.paymentMethod = cellText;
+                                    if (cellText && cellText.toLowerCase() !== 'unpaid') {
+                                        order.isPaid = true;
+                                    }
+                                }
                             } else if (header.includes('address') || header.includes('delivery address')) {
                                 order.customerAddress = cellText;
                             } else if (header.includes('date') && !header.includes('initial')) {
                                 order.orderDate = parseDate(cellText);
-                            } else if (header.includes('payment') || header.includes('paid')) {
-                                order.paymentMethod = cellText;
-                                if (cellText && cellText.toLowerCase() !== 'unpaid') {
-                                    order.isPaid = true;
-                                }
                             } else if (header.includes('status')) {
                                 order.orderStatus = cellText;
                                 if (cellText.toLowerCase() === 'delivered') {
@@ -450,16 +566,34 @@ class DigitalCookieScraper {
                                 order.orderType = cellText;
                             }
 
-                            // Check for order number and detail links
+                            // Check for order number and detail links in "Paid By" and "Deliver To" columns
                             const links = cell.querySelectorAll('a');
                             links.forEach(link => {
                                 const href = link.getAttribute('href') || '';
                                 const onclick = link.getAttribute('onclick') || '';
+                                const linkText = link.textContent.trim();
 
-                                // Extract order ID from URLs
-                                const orderMatch = href.match(/order[\/=](\d+)/i) || onclick.match(/order[^\d]*(\d+)/i);
+                                // Extract order ID from URLs - multiple patterns for robustness
+                                // Pattern 1: order/123 or order=123
+                                let orderMatch = href.match(/order[\/=](\d+)/i) || onclick.match(/order[^\d]*(\d+)/i);
                                 if (orderMatch && !order.orderNumber) {
                                     order.orderNumber = orderMatch[1];
+                                }
+
+                                // Pattern 2: Extract 8-12 digit number from URL path (handles /cookieorderdetail/163717824)
+                                if (!order.orderNumber) {
+                                    const pathMatch = href.match(/\/(\d{8,12})(?:\/|$|\?)/);
+                                    if (pathMatch) {
+                                        order.orderNumber = pathMatch[1];
+                                    }
+                                }
+
+                                // Extract order ID from link text (e.g., "Order #163717824" or just "163717824")
+                                if (!order.orderNumber) {
+                                    const linkTextMatch = linkText.match(/(?:order\s*#?\s*)?(\d{8,12})/i);
+                                    if (linkTextMatch) {
+                                        order.orderNumber = linkTextMatch[1];
+                                    }
                                 }
 
                                 // Capture detail page link
@@ -468,9 +602,9 @@ class DigitalCookieScraper {
                                 }
                             });
 
-                            // Check for order number in cell text
+                            // Check for order number in cell text (standalone or with label)
                             if (!order.orderNumber) {
-                                const orderNumMatch = cellText.match(/^(\d{8,12})$/);
+                                const orderNumMatch = cellText.match(/(?:order\s*#?\s*)?(\d{8,12})/i);
                                 if (orderNumMatch) {
                                     order.orderNumber = orderNumMatch[1];
                                 }
@@ -482,8 +616,12 @@ class DigitalCookieScraper {
                             const cellTexts = Array.from(cells).map(c => c.textContent.trim());
 
                             cellTexts.forEach((text, idx) => {
-                                if (/^\d{8,12}$/.test(text) && !order.orderNumber) {
-                                    order.orderNumber = text;
+                                // Look for 8-12 digit order numbers (more flexible pattern)
+                                if (/\b(\d{8,12})\b/.test(text) && !order.orderNumber) {
+                                    const match = text.match(/\b(\d{8,12})\b/);
+                                    if (match) {
+                                        order.orderNumber = match[1];
+                                    }
                                 } else if (/^\d{1,3}$/.test(text) && !order.totalBoxes) {
                                     const num = parseInt(text, 10);
                                     if (num > 0 && num < 100) {
@@ -557,7 +695,9 @@ class DigitalCookieScraper {
             const extractedOrders = basicOrders.orders || [];
             logger.info('Initial order extraction complete', {
                 orderCount: extractedOrders.length,
-                tablesFound: basicOrders.debug?.tablesFound || 0
+                tablesFound: basicOrders.debug?.tablesFound || 0,
+                ordersWithNumbers: extractedOrders.filter(o => o.orderNumber).length,
+                ordersWithoutNumbers: extractedOrders.filter(o => !o.orderNumber).length
             });
 
             // Filter orders that need detail scraping (have order numbers)
@@ -571,6 +711,52 @@ class DigitalCookieScraper {
 
                 // Process orders in parallel batches using multiple tabs
                 await this.scrapeOrderDetailsParallel(ordersNeedingDetails);
+            } else {
+                logger.warn('No orders with order numbers found for detail scraping');
+            }
+
+            // Log orders without numbers for debugging
+            const ordersWithoutNumbers = extractedOrders.filter(o => !o.orderNumber);
+            if (ordersWithoutNumbers.length > 0) {
+                logger.warn('Found orders without order numbers (will not get detailed cookie info)', {
+                    count: ordersWithoutNumbers.length,
+                    samples: ordersWithoutNumbers.slice(0, 3).map(o => ({
+                        customerName: o.customerName,
+                        totalBoxes: o.totalBoxes,
+                        orderDate: o.orderDate,
+                        tableSection: o.tableSection
+                    }))
+                });
+            }
+
+            /**
+             * FIX #3: Add validation logging before returning results
+             *
+             * PROBLEM: There was no way to detect when totalBoxes didn't match
+             * the sum of individual cookie quantities, making debugging difficult.
+             *
+             * SOLUTION: Validate all orders and log any mismatches as errors
+             * so they can be investigated.
+             */
+            const validationIssues = extractedOrders.filter(order => {
+                if (!order.cookies || order.cookies.length === 0) return false;
+                const cookieSum = order.cookies.reduce((sum, c) => sum + c.quantity, 0);
+                return cookieSum !== order.totalBoxes;
+            });
+
+            if (validationIssues.length > 0) {
+                logger.error('VALIDATION: Orders with mismatched box counts detected after processing', {
+                    count: validationIssues.length,
+                    issues: validationIssues.map(o => ({
+                        orderNumber: o.orderNumber,
+                        customerName: o.customerName,
+                        totalBoxes: o.totalBoxes,
+                        cookieSum: o.cookies.reduce((sum, c) => sum + c.quantity, 0),
+                        cookies: o.cookies
+                    }))
+                });
+            } else {
+                logger.info('VALIDATION: All orders passed box count consistency check');
             }
 
             // Log final results
@@ -592,6 +778,9 @@ class DigitalCookieScraper {
     /**
      * Process order details in parallel using multiple browser tabs
      * @param {Object[]} orders - Array of order objects to update with details
+     *
+     * FIX #1: This method has been updated to recalculate totalBoxes from
+     * the detailed cookie data whenever it's successfully retrieved.
      */
     async scrapeOrderDetailsParallel(orders) {
         // Process in batches to avoid overwhelming the server
@@ -621,25 +810,137 @@ class DigitalCookieScraper {
             // Merge results into orders
             for (const { order, details } of results) {
                 if (details) {
+                    // Log debug info for troubleshooting
+                    if (details.debugInfo) {
+                        logger.debug('Detail page debug info', {
+                            orderNumber: order.orderNumber,
+                            customerName: order.customerName,
+                            tablesFound: details.debugInfo.tablesFound,
+                            tableStructures: details.debugInfo.tableStructures,
+                            cookieMatches: details.debugInfo.cookieMatches,
+                            extractedCookies: details.cookies
+                        });
+                    }
+
                     if (details.cookies && details.cookies.length > 0) {
                         order.cookies = details.cookies;
+
+                        /**
+                         * FIX #1: Recalculate totalBoxes from actual cookie quantities
+                         *
+                         * PROBLEM: totalBoxes came from initial table scrape which could
+                         * be incomplete or incorrectly parsed. The cookies array came from
+                         * the more accurate detail page. These values could differ.
+                         *
+                         * SOLUTION: Always recalculate totalBoxes as the sum of all
+                         * cookie quantities from the detail page, which is the
+                         * authoritative source.
+                         */
+                        const calculatedTotal = details.cookies.reduce((sum, cookie) => sum + cookie.quantity, 0);
+
+                        // Log if there's a discrepancy for debugging
+                        if (order.totalBoxes !== calculatedTotal) {
+                            logger.warn('Box count mismatch detected - using calculated total from cookie details', {
+                                orderNumber: order.orderNumber,
+                                customerName: order.customerName,
+                                originalTotalFromTable: order.totalBoxes,
+                                calculatedTotalFromDetails: calculatedTotal,
+                                difference: Math.abs(order.totalBoxes - calculatedTotal),
+                                cookies: details.cookies,
+                                cookieMatches: details.debugInfo?.cookieMatches || [],
+                                tablesFound: details.debugInfo?.tablesFound || 0
+                            });
+                        }
+
+                        // Always use the calculated total from cookie details
+                        order.totalBoxes = calculatedTotal;
+                    } else {
+                        // No cookies extracted - log why
+                        logger.warn('No cookies extracted from detail page', {
+                            orderNumber: order.orderNumber,
+                            customerName: order.customerName,
+                            originalTotalBoxes: order.totalBoxes,
+                            debugInfo: details.debugInfo || 'No debug info'
+                        });
                     }
                     if (details.customerPhone) order.customerPhone = details.customerPhone;
                     if (details.customerEmail) order.customerEmail = details.customerEmail;
                     if (details.customerAddress) order.customerAddress = details.customerAddress;
                     if (details.customerName && !order.customerName) order.customerName = details.customerName;
+                } else {
+                    // No details returned at all
+                    logger.warn('Detail page scrape returned null', {
+                        orderNumber: order.orderNumber,
+                        customerName: order.customerName
+                    });
                 }
             }
 
             const elapsed = Date.now() - startTime;
             logger.info(`Batch completed in ${elapsed}ms`, {
-                ordersWithCookies: results.filter(r => r.details?.cookies?.length > 0).length
+                ordersWithCookies: results.filter(r => r.details?.cookies?.length > 0).length,
+                ordersUpdated: results.filter(r => r.details !== null).length
             });
 
-            // Small delay between batches to be respectful to the server
+            // Delay between orders to allow for proper page loads and avoid rate limiting
             if (i + batchSize < orders.length) {
-                await new Promise(r => setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 1000)); // Increased from 500ms
             }
+        }
+    }
+
+    /**
+     * Wait for detail page content to load
+     * Helper method to ensure detail page tables are rendered before extraction
+     *
+     * @param {Object} page - Puppeteer page object
+     * @param {number} timeout - Maximum wait time in ms
+     * @returns {boolean} - True if content loaded successfully
+     */
+    async waitForDetailPageContent(page, timeout = 5000) {
+        try {
+            await page.waitForSelector('table', { timeout });
+            // Additional short wait for table content to populate
+            await new Promise(r => setTimeout(r, 300));
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Verify we're on the correct order detail page
+     * CRITICAL: Prevents extracting data from wrong orders due to navigation/cache issues
+     *
+     * @param {Object} page - Puppeteer page object
+     * @param {string} orderNumber - Expected order number
+     * @returns {boolean} - True if on correct page
+     */
+    async verifyOrderPage(page, orderNumber) {
+        try {
+            // Check URL contains order number
+            const currentUrl = page.url();
+            if (currentUrl.includes(orderNumber)) {
+                return true;
+            }
+
+            // Check page content contains order number
+            const pageText = await page.evaluate(() => document.body.innerText);
+            if (pageText.includes(orderNumber)) {
+                return true;
+            }
+
+            // Check for login redirect (session expired)
+            if (currentUrl.toLowerCase().includes('login')) {
+                logger.error('Session expired - redirected to login page');
+                return false;
+            }
+
+            logger.warn(`Order verification failed: expected ${orderNumber}, URL: ${currentUrl}`);
+            return false;
+        } catch (error) {
+            logger.error('Error verifying order page', { error: error.message });
+            return false;
         }
     }
 
@@ -659,12 +960,19 @@ class DigitalCookieScraper {
             const cookies = await this.page.cookies();
             await newPage.setCookie(...cookies);
 
-            // Use the direct URL pattern (fastest)
+            // Use the direct URL pattern with cache-busting parameter
             const directUrl = this.getOrderDetailUrl(orderNumber);
+            const cacheBustUrl = `${directUrl}?_t=${Date.now()}`; // Prevent cached pages
 
             let pageLoaded = false;
             try {
-                const response = await newPage.goto(directUrl, { waitUntil: 'networkidle2', timeout: 8000 });
+                // Set cache control headers to prevent cached responses
+                await newPage.setExtraHTTPHeaders({
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache'
+                });
+
+                const response = await newPage.goto(cacheBustUrl, { waitUntil: 'networkidle2', timeout: 8000 });
                 if (response && response.status() === 200) {
                     const pageContent = await newPage.content();
                     // Verify we're on a valid detail page
@@ -707,6 +1015,37 @@ class DigitalCookieScraper {
                 await new Promise(r => setTimeout(r, 1200));
             }
 
+            /**
+             * FIX #4: Wait for detail page content before extraction
+             *
+             * PROBLEM: On slower connections, the detail page tables might
+             * not be fully rendered, leading to missing cookie data.
+             *
+             * SOLUTION: Explicitly wait for table elements before extracting.
+             */
+            const contentReady = await this.waitForDetailPageContent(newPage);
+            if (!contentReady) {
+                logger.debug('Detail page content not fully loaded', { orderNumber });
+            }
+
+            /**
+             * FIX #5: Verify we're on the correct order page before extraction
+             *
+             * PROBLEM: Parallel tab navigation can cause session/cache issues
+             * where the browser loads a cached or wrong order page.
+             *
+             * SOLUTION: Verify the order number appears on the page or URL
+             * before extracting any data. If wrong page, return null.
+             */
+            const isCorrectPage = await this.verifyOrderPage(newPage, orderNumber);
+            if (!isCorrectPage) {
+                logger.error('Wrong order page loaded - skipping extraction to prevent data mismatch', {
+                    orderNumber,
+                    actualUrl: newPage.url()
+                });
+                return null;
+            }
+
             // Extract details from the page
             const details = await newPage.evaluate(() => {
                 const result = {
@@ -714,7 +1053,13 @@ class DigitalCookieScraper {
                     customerPhone: null,
                     customerEmail: null,
                     customerAddress: null,
-                    customerName: null
+                    customerName: null,
+                    debugInfo: {
+                        tablesFound: 0,
+                        tableStructures: [],
+                        allNumbers: [],
+                        cookieMatches: []
+                    }
                 };
 
                 const pageText = document.body.innerText;
@@ -758,53 +1103,194 @@ class DigitalCookieScraper {
                     'Thin Mints', 'Samoas', 'Caramel deLites', 'Tagalongs', 'Peanut Butter Patties',
                     'Do-si-dos', 'Peanut Butter Sandwich', 'Trefoils', 'Shortbread',
                     'Girl Scout S\'mores', 'S\'mores', 'Lemon-Ups', 'Lemonades',
-                    'Adventurefuls', 'Raspberry Rally', 'Toffee-tastic', 'Toast-Yay'
+                    'Adventurefuls', 'Raspberry Rally', 'Toffee-tastic', 'Toast-Yay', 'Exploremores'
                 ];
 
                 // Look for cookies in tables
                 const tables = document.querySelectorAll('table');
-                tables.forEach(table => {
+                result.debugInfo.tablesFound = tables.length;
+
+                tables.forEach((table, tableIndex) => {
                     const rows = table.querySelectorAll('tr');
-                    rows.forEach(row => {
-                        const rowText = row.textContent;
+                    const tableInfo = {
+                        index: tableIndex,
+                        rowCount: rows.length,
+                        sampleRows: []
+                    };
+
+                    rows.forEach((row, rowIndex) => {
+                        const rowText = row.textContent.trim().replace(/\s+/g, ' ');
+                        const cells = row.querySelectorAll('td, th');
+                        const cellTexts = Array.from(cells).map(c => c.textContent.trim());
+
+                        // Capture first 5 rows for debug
+                        if (rowIndex < 5) {
+                            tableInfo.sampleRows.push({
+                                rowIndex,
+                                cellCount: cells.length,
+                                cells: cellTexts.slice(0, 6), // First 6 cells
+                                rowTextPreview: rowText.substring(0, 100)
+                            });
+                        }
+
+                        // Skip generic "assorted" or summary rows
+                        const lowerRowText = rowText.toLowerCase();
+                        if (lowerRowText.includes('assorted') ||
+                            lowerRowText.includes('total') ||
+                            lowerRowText.includes('subtotal')) {
+                            return;
+                        }
+
                         cookieNames.forEach(cookieName => {
-                            if (rowText.toLowerCase().includes(cookieName.toLowerCase())) {
-                                const cells = row.querySelectorAll('td');
-                                let qty = 1;
-                                cells.forEach(cell => {
-                                    const cellText = cell.textContent.trim();
-                                    if (/^\d{1,2}$/.test(cellText)) {
-                                        qty = parseInt(cellText, 10);
+                            // Use word boundary matching to avoid false positives
+                            const cookiePattern = new RegExp(`\\b${cookieName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+                            if (cookiePattern.test(rowText)) {
+                                let qty = null;
+                                let qtySource = null;
+
+                                // Digital Cookie format: "CookieName®, QUANTITY\npkg(s)"
+                                // The quantity is in the SAME cell as the cookie name
+                                for (let i = 0; i < cells.length; i++) {
+                                    const cellText = cells[i].textContent.trim();
+                                    // Check if this cell contains the cookie name
+                                    if (cookiePattern.test(cellText)) {
+                                        // Extract quantity from format: "CookieName®, 2\npkgs" or "CookieName, 2 pkgs"
+                                        // Pattern: cookie name followed by comma/space, then number
+                                        const qtyMatch = cellText.match(/,\s*(\d+)\s*(?:\n|pkg|$)/i);
+                                        if (qtyMatch) {
+                                            const parsedQty = parseInt(qtyMatch[1], 10);
+                                            if (parsedQty > 0 && parsedQty <= 999) {
+                                                qty = parsedQty;
+                                                qtySource = `embedded[${i}]="${qtyMatch[0].trim()}"`;
+                                                break;
+                                            }
+                                        }
                                     }
+                                }
+
+                                // Fallback: Look for standalone quantity in separate cells
+                                if (!qty) {
+                                    for (let i = cells.length - 1; i >= 0; i--) {
+                                        const cellText = cells[i].textContent.trim();
+                                        if (/^\d+$/.test(cellText) && cellText.length <= 3) {
+                                            const parsedQty = parseInt(cellText, 10);
+                                            if (parsedQty > 0 && parsedQty <= 999) {
+                                                qty = parsedQty;
+                                                qtySource = `cell[${i}]="${cellText}"`;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Log the match for debugging
+                                result.debugInfo.cookieMatches.push({
+                                    cookie: cookieName,
+                                    foundQty: qty,
+                                    qtySource,
+                                    rowCells: cellTexts.slice(0, 6),
+                                    tableIndex
                                 });
-                                let normalizedName = cookieName;
-                                if (cookieName === 'Caramel deLites') normalizedName = 'Samoas';
-                                if (cookieName === 'Peanut Butter Patties') normalizedName = 'Tagalongs';
-                                if (cookieName === 'Peanut Butter Sandwich') normalizedName = 'Do-si-dos';
-                                if (cookieName === 'Shortbread') normalizedName = 'Trefoils';
-                                result.cookies.push({ name: normalizedName, quantity: qty });
+
+                                // Only add if we found a valid quantity
+                                if (qty && qty > 0) {
+                                    let normalizedName = cookieName;
+                                    if (cookieName === 'Caramel deLites') normalizedName = 'Samoas';
+                                    if (cookieName === 'Peanut Butter Patties') normalizedName = 'Tagalongs';
+                                    if (cookieName === 'Peanut Butter Sandwich') normalizedName = 'Do-si-dos';
+                                    if (cookieName === 'Shortbread') normalizedName = 'Trefoils';
+
+                                    // Check if this cookie already exists (deduplication)
+                                    const existingCookie = result.cookies.find(c => c.name === normalizedName);
+                                    if (!existingCookie) {
+                                        result.cookies.push({ name: normalizedName, quantity: qty });
+                                    }
+                                }
                             }
                         });
                     });
+
+                    result.debugInfo.tableStructures.push(tableInfo);
                 });
 
-                // Fallback: parse text patterns
+                // Alternative: Look for cookies as column headers with quantities below
+                // (Digital Cookie sometimes displays cookies in a columnar format)
+                if (result.cookies.length === 0) {
+                    tables.forEach((table, tableIndex) => {
+                        const headerRow = table.querySelector('thead tr, tr:first-child');
+                        if (headerRow) {
+                            const headerCells = Array.from(headerRow.querySelectorAll('th, td'));
+                            const headerTexts = headerCells.map(c => c.textContent.trim());
+
+                            // Find data row (usually second row or first tbody tr)
+                            const dataRows = table.querySelectorAll('tbody tr, tr');
+                            if (dataRows.length > 1) {
+                                const dataRow = dataRows[1]; // Second row
+                                const dataCells = Array.from(dataRow.querySelectorAll('td'));
+
+                                headerTexts.forEach((header, colIndex) => {
+                                    cookieNames.forEach(cookieName => {
+                                        if (header.toLowerCase().includes(cookieName.toLowerCase())) {
+                                            const dataCell = dataCells[colIndex];
+                                            if (dataCell) {
+                                                const cellText = dataCell.textContent.trim();
+                                                const qty = parseInt(cellText, 10);
+                                                if (!isNaN(qty) && qty > 0 && qty <= 999) {
+                                                    let normalizedName = cookieName;
+                                                    if (cookieName === 'Caramel deLites') normalizedName = 'Samoas';
+                                                    if (cookieName === 'Peanut Butter Patties') normalizedName = 'Tagalongs';
+                                                    if (cookieName === 'Peanut Butter Sandwich') normalizedName = 'Do-si-dos';
+                                                    if (cookieName === 'Shortbread') normalizedName = 'Trefoils';
+
+                                                    const existingCookie = result.cookies.find(c => c.name === normalizedName);
+                                                    if (!existingCookie) {
+                                                        result.cookies.push({ name: normalizedName, quantity: qty });
+                                                        result.debugInfo.cookieMatches.push({
+                                                            cookie: cookieName,
+                                                            foundQty: qty,
+                                                            qtySource: `column-header[${colIndex}]`,
+                                                            tableIndex
+                                                        });
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+                                });
+                            }
+                        }
+                    });
+                }
+
+                // Fallback: parse text patterns from page content
                 if (result.cookies.length === 0) {
                     cookieNames.forEach(cookieName => {
+                        const escapedName = cookieName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                         const patterns = [
-                            new RegExp(`(\\d+)\\s*(?:x|×)?\\s*${cookieName}`, 'i'),
-                            new RegExp(`${cookieName}[:\\s]*(\\d+)`, 'i'),
-                            new RegExp(`${cookieName}\\s*\\((\\d+)\\)`, 'i')
+                            // Digital Cookie format: "CookieName®, 2\npkgs"
+                            new RegExp(`${escapedName}[®™]?,\\s*(\\d+)\\s*(?:\\n|pkg)`, 'i'),
+                            // Standard formats
+                            new RegExp(`(\\d+)\\s*(?:x|×|pkg|pkgs)?\\s*${escapedName}`, 'i'),
+                            new RegExp(`${escapedName}[:\\s]*(\\d+)`, 'i'),
+                            new RegExp(`${escapedName}\\s*\\((\\d+)\\)`, 'i')
                         ];
                         for (const pattern of patterns) {
                             const match = pageText.match(pattern);
                             if (match) {
-                                let normalizedName = cookieName;
-                                if (cookieName === 'Caramel deLites') normalizedName = 'Samoas';
-                                if (cookieName === 'Peanut Butter Patties') normalizedName = 'Tagalongs';
-                                if (cookieName === 'Peanut Butter Sandwich') normalizedName = 'Do-si-dos';
-                                if (cookieName === 'Shortbread') normalizedName = 'Trefoils';
-                                result.cookies.push({ name: normalizedName, quantity: parseInt(match[1], 10) });
+                                const qty = parseInt(match[1], 10);
+                                if (qty > 0 && qty <= 999) {
+                                    let normalizedName = cookieName;
+                                    if (cookieName === 'Caramel deLites') normalizedName = 'Samoas';
+                                    if (cookieName === 'Peanut Butter Patties') normalizedName = 'Tagalongs';
+                                    if (cookieName === 'Peanut Butter Sandwich') normalizedName = 'Do-si-dos';
+                                    if (cookieName === 'Shortbread') normalizedName = 'Trefoils';
+
+                                    // Check if this cookie already exists (deduplication)
+                                    const existingCookie = result.cookies.find(c => c.name === normalizedName);
+                                    if (!existingCookie) {
+                                        result.cookies.push({ name: normalizedName, quantity: qty });
+                                    }
+                                }
                                 break;
                             }
                         }
