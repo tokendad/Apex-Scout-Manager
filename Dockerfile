@@ -1,17 +1,7 @@
 FROM node:18-alpine
 
-# Install shadow package for usermod/groupmod support, su-exec, tzdata, and Chromium for Puppeteer
-RUN apk add --no-cache shadow su-exec tzdata \
-    chromium \
-    nss \
-    freetype \
-    harfbuzz \
-    ca-certificates \
-    ttf-freefont
-
-# Configure Puppeteer to use system Chromium
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+# Install shadow package for usermod/groupmod support, su-exec, and tzdata
+RUN apk add --no-cache shadow su-exec tzdata
 
 # Create app directory
 WORKDIR /app
@@ -26,7 +16,6 @@ RUN npm install --omit=dev
 COPY server.js ./
 COPY logger.js ./
 COPY public/ ./public/
-COPY services/ ./services/
 
 # Create entrypoint script to handle PUID, PGID, and UMASK
 COPY docker-entrypoint.sh /docker-entrypoint.sh
