@@ -1502,6 +1502,45 @@ async function handleOrderComplete(orderKey, markAsComplete) {
     const orderSales = sales.filter(s => getOrderKey(s) === orderKey);
     const newStatus = markAsComplete ? 'Delivered' : 'Pending';
 
+    // Calculate payment totals
+    const totalBoxes = orderSales.reduce((sum, s) => sum + convertToBoxes(s), 0);
+    const orderTotal = totalBoxes * PRICE_PER_BOX;
+    const totalCollected = orderSales.reduce((sum, s) => sum + (s.amountCollected || 0), 0);
+    const remainingBalance = orderTotal - totalCollected;
+
+    // If marking as complete and there's still payment due, show confirmation
+    if (markAsComplete && remainingBalance > 0) {
+        const shouldUpdatePayment = confirm(
+            `There is payment still due on this order ($${remainingBalance.toFixed(2)}). Do you want to update total due to $0, and payment received to $${orderTotal.toFixed(2)}?`
+        );
+
+        if (!shouldUpdatePayment) {
+            // User clicked "No" - return to sales page without marking complete
+            return;
+        }
+
+        // User clicked "Yes" - update payment first
+        try {
+            const firstSale = orderSales[0];
+            const response = await fetch(`${API_BASE_URL}/sales/${firstSale.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amountCollected: orderTotal })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update payment');
+            }
+
+            // Reload sales to get updated payment data
+            await loadSales();
+        } catch (error) {
+            console.error('Error updating payment:', error);
+            alert('Failed to update payment. Please try again.');
+            return;
+        }
+    }
+
     // Find and disable the button while processing
     const row = document.querySelector(`tr[data-order-key="${orderKey}"]`);
     const button = row?.querySelector('.btn-order-status');
