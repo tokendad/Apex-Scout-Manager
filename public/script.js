@@ -667,7 +667,7 @@ async function handleAddSale(e) {
 function resetCookieTable() {
     const qtyInputs = document.querySelectorAll('.qty-input');
     qtyInputs.forEach(input => {
-        input.value = 0;
+        input.value = '';
     });
     updateCookieTableTotals();
 }
