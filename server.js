@@ -115,6 +115,27 @@ try {
         db.exec(`ALTER TABLE profile ADD COLUMN paymentQrCodeUrl TEXT`);
         logger.info('Migration: Added paymentQrCodeUrl column to profile table');
     }
+
+    // Migration: Add on-hand inventory columns to profile table
+    const inventoryColumns = [
+        'inventoryThinMints',
+        'inventorySamoas',
+        'inventoryTagalongs',
+        'inventoryTrefoils',
+        'inventoryDosiDos',
+        'inventoryLemonUps',
+        'inventoryAdventurefuls',
+        'inventoryExploremores',
+        'inventoryToffeetastic'
+    ];
+    
+    for (const column of inventoryColumns) {
+        const hasColumn = profileTableInfo.some(col => col.name === column);
+        if (!hasColumn) {
+            db.exec(`ALTER TABLE profile ADD COLUMN ${column} INTEGER DEFAULT 0`);
+            logger.info(`Migration: Added ${column} column to profile table`);
+        }
+    }
     
     // Migration: Add new individual sales columns if they don't exist
     const columnsToAdd = [
@@ -348,7 +369,22 @@ app.delete('/api/sales', (req, res) => {
 app.get('/api/profile', (req, res) => {
     try {
         const profile = db.prepare('SELECT * FROM profile WHERE id = 1').get();
-        res.json(profile || { id: 1, photoData: null, qrCodeUrl: null, goalBoxes: 0, goalAmount: 0 });
+        res.json(profile || { 
+            id: 1, 
+            photoData: null, 
+            qrCodeUrl: null, 
+            goalBoxes: 0, 
+            goalAmount: 0,
+            inventoryThinMints: 0,
+            inventorySamoas: 0,
+            inventoryTagalongs: 0,
+            inventoryTrefoils: 0,
+            inventoryDosiDos: 0,
+            inventoryLemonUps: 0,
+            inventoryAdventurefuls: 0,
+            inventoryExploremores: 0,
+            inventoryToffeetastic: 0
+        });
     } catch (error) {
         logger.error('Error fetching profile', { error: error.message, stack: error.stack });
         res.status(500).json({ error: 'Failed to fetch profile' });
@@ -359,12 +395,26 @@ app.get('/api/profile', (req, res) => {
 app.put('/api/profile', (req, res) => {
     try {
         const {
-            photoData, qrCodeUrl, paymentQrCodeUrl, goalBoxes, goalAmount
+            photoData, qrCodeUrl, paymentQrCodeUrl, goalBoxes, goalAmount,
+            inventoryThinMints, inventorySamoas, inventoryTagalongs, 
+            inventoryTrefoils, inventoryDosiDos, inventoryLemonUps,
+            inventoryAdventurefuls, inventoryExploremores, inventoryToffeetastic
         } = req.body;
 
+        // Helper function to validate numeric values
+        const validateNumber = (value) => (typeof value === 'number' && value >= 0) ? value : 0;
+
         // Validate goalBoxes and goalAmount
-        const validGoalBoxes = (typeof goalBoxes === 'number' && goalBoxes >= 0) ? goalBoxes : 0;
-        const validGoalAmount = (typeof goalAmount === 'number' && goalAmount >= 0) ? goalAmount : 0;
+        const validGoalBoxes = validateNumber(goalBoxes);
+        const validGoalAmount = validateNumber(goalAmount);
+
+        // Validate inventory values
+        const inventoryFields = [
+            inventoryThinMints, inventorySamoas, inventoryTagalongs,
+            inventoryTrefoils, inventoryDosiDos, inventoryLemonUps,
+            inventoryAdventurefuls, inventoryExploremores, inventoryToffeetastic
+        ];
+        const validatedInventory = inventoryFields.map(validateNumber);
 
         const stmt = db.prepare(`
             UPDATE profile
@@ -372,11 +422,21 @@ app.put('/api/profile', (req, res) => {
                 qrCodeUrl = COALESCE(?, qrCodeUrl),
                 paymentQrCodeUrl = COALESCE(?, paymentQrCodeUrl),
                 goalBoxes = ?,
-                goalAmount = ?
+                goalAmount = ?,
+                inventoryThinMints = ?,
+                inventorySamoas = ?,
+                inventoryTagalongs = ?,
+                inventoryTrefoils = ?,
+                inventoryDosiDos = ?,
+                inventoryLemonUps = ?,
+                inventoryAdventurefuls = ?,
+                inventoryExploremores = ?,
+                inventoryToffeetastic = ?
             WHERE id = 1
         `);
         stmt.run(
-            photoData, qrCodeUrl, paymentQrCodeUrl, validGoalBoxes, validGoalAmount
+            photoData, qrCodeUrl, paymentQrCodeUrl, validGoalBoxes, validGoalAmount,
+            ...validatedInventory
         );
 
         const updatedProfile = db.prepare('SELECT * FROM profile WHERE id = 1').get();

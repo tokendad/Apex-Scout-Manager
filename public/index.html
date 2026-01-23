@@ -67,6 +67,86 @@
                     </div>
                 </section>
 
+                <!-- On-Hand Inventory Section -->
+                <section class="inventory-section">
+                    <h2>On-Hand Inventory</h2>
+                    <p class="inventory-subtitle">Track the boxes you currently have</p>
+                    <div class="inventory-grid">
+                        <div class="inventory-item">
+                            <span class="inventory-cookie-name">Thin Mints®</span>
+                            <div class="inventory-controls">
+                                <button class="inventory-btn" onclick="decrementInventory('ThinMints')">−</button>
+                                <input type="number" id="inventoryThinMints" class="inventory-input" min="0" value="0" onchange="saveInventory()">
+                                <button class="inventory-btn" onclick="incrementInventory('ThinMints')">+</button>
+                            </div>
+                        </div>
+                        <div class="inventory-item">
+                            <span class="inventory-cookie-name">Samoas®</span>
+                            <div class="inventory-controls">
+                                <button class="inventory-btn" onclick="decrementInventory('Samoas')">−</button>
+                                <input type="number" id="inventorySamoas" class="inventory-input" min="0" value="0" onchange="saveInventory()">
+                                <button class="inventory-btn" onclick="incrementInventory('Samoas')">+</button>
+                            </div>
+                        </div>
+                        <div class="inventory-item">
+                            <span class="inventory-cookie-name">Tagalongs®</span>
+                            <div class="inventory-controls">
+                                <button class="inventory-btn" onclick="decrementInventory('Tagalongs')">−</button>
+                                <input type="number" id="inventoryTagalongs" class="inventory-input" min="0" value="0" onchange="saveInventory()">
+                                <button class="inventory-btn" onclick="incrementInventory('Tagalongs')">+</button>
+                            </div>
+                        </div>
+                        <div class="inventory-item">
+                            <span class="inventory-cookie-name">Trefoils®</span>
+                            <div class="inventory-controls">
+                                <button class="inventory-btn" onclick="decrementInventory('Trefoils')">−</button>
+                                <input type="number" id="inventoryTrefoils" class="inventory-input" min="0" value="0" onchange="saveInventory()">
+                                <button class="inventory-btn" onclick="incrementInventory('Trefoils')">+</button>
+                            </div>
+                        </div>
+                        <div class="inventory-item">
+                            <span class="inventory-cookie-name">Do-si-dos®</span>
+                            <div class="inventory-controls">
+                                <button class="inventory-btn" onclick="decrementInventory('DosiDos')">−</button>
+                                <input type="number" id="inventoryDosiDos" class="inventory-input" min="0" value="0" onchange="saveInventory()">
+                                <button class="inventory-btn" onclick="incrementInventory('DosiDos')">+</button>
+                            </div>
+                        </div>
+                        <div class="inventory-item">
+                            <span class="inventory-cookie-name">Lemon-Ups®</span>
+                            <div class="inventory-controls">
+                                <button class="inventory-btn" onclick="decrementInventory('LemonUps')">−</button>
+                                <input type="number" id="inventoryLemonUps" class="inventory-input" min="0" value="0" onchange="saveInventory()">
+                                <button class="inventory-btn" onclick="incrementInventory('LemonUps')">+</button>
+                            </div>
+                        </div>
+                        <div class="inventory-item">
+                            <span class="inventory-cookie-name">Adventurefuls®</span>
+                            <div class="inventory-controls">
+                                <button class="inventory-btn" onclick="decrementInventory('Adventurefuls')">−</button>
+                                <input type="number" id="inventoryAdventurefuls" class="inventory-input" min="0" value="0" onchange="saveInventory()">
+                                <button class="inventory-btn" onclick="incrementInventory('Adventurefuls')">+</button>
+                            </div>
+                        </div>
+                        <div class="inventory-item">
+                            <span class="inventory-cookie-name">Exploremores™</span>
+                            <div class="inventory-controls">
+                                <button class="inventory-btn" onclick="decrementInventory('Exploremores')">−</button>
+                                <input type="number" id="inventoryExploremores" class="inventory-input" min="0" value="0" onchange="saveInventory()">
+                                <button class="inventory-btn" onclick="incrementInventory('Exploremores')">+</button>
+                            </div>
+                        </div>
+                        <div class="inventory-item">
+                            <span class="inventory-cookie-name">Toffee-tastic®</span>
+                            <div class="inventory-controls">
+                                <button class="inventory-btn" onclick="decrementInventory('Toffeetastic')">−</button>
+                                <input type="number" id="inventoryToffeetastic" class="inventory-input" min="0" value="0" onchange="saveInventory()">
+                                <button class="inventory-btn" onclick="incrementInventory('Toffeetastic')">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Cookie Details Section -->
                 <section class="cookie-details-section">
                     <h2>Meet the Cookies</h2>

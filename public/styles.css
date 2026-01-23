@@ -1948,6 +1948,136 @@ footer {
     color: #7cb890;
 }
 
+/* Inventory Section */
+.inventory-section {
+    padding: 1rem;
+    margin-top: 1rem;
+    background: var(--card-background);
+    border-radius: 12px;
+    margin-left: 1rem;
+    margin-right: 1rem;
+}
+
+.inventory-section h2 {
+    text-align: center;
+    color: var(--primary-color);
+    margin-bottom: 0.25rem;
+}
+
+.inventory-subtitle {
+    text-align: center;
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.inventory-grid {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.inventory-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: background-color 0.2s;
+}
+
+.inventory-item:hover {
+    background: #f9f9f9;
+}
+
+.inventory-cookie-name {
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.inventory-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.inventory-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border-color);
+    background: white;
+    color: var(--primary-color);
+    border-radius: 8px;
+    font-size: 1.25rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.inventory-btn:hover {
+    background: var(--primary-color);
+    color: white;
+    transform: scale(1.05);
+}
+
+.inventory-btn:active {
+    transform: scale(0.95);
+}
+
+.inventory-input {
+    width: 60px;
+    height: 36px;
+    text-align: center;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.inventory-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .inventory-section {
+    background: var(--card-background);
+}
+
+[data-theme="dark"] .inventory-subtitle {
+    color: #999;
+}
+
+[data-theme="dark"] .inventory-item {
+    background: #2a2a2a;
+    border-color: #444;
+}
+
+[data-theme="dark"] .inventory-item:hover {
+    background: #333;
+}
+
+[data-theme="dark"] .inventory-btn {
+    background: #2a2a2a;
+    border-color: #444;
+    color: var(--primary-color);
+}
+
+[data-theme="dark"] .inventory-btn:hover {
+    background: var(--primary-color);
+    color: white;
+}
+
+[data-theme="dark"] .inventory-input {
+    background: #2a2a2a;
+    border-color: #444;
+    color: white;
+}
+
 /* Cookie Details Section */
 .cookie-details-section {
     padding: 1rem;
