@@ -300,73 +300,173 @@
                             </div>
                         </div>
 
-                        <!-- Cookie Selection Table -->
+                        <!-- Cookie Selection -->
                         <div class="form-section">
                             <h3>Cookies</h3>
-                            <div class="cookie-selection-table-container">
-                                <table class="cookie-selection-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Cookie</th>
-                                            <th>Boxes</th>
-                                            <th>Cases</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td>Thin Mints®</td>
-                                            <td><input type="number" class="qty-input" data-cookie="Thin Mints" data-unit="box" min="0"></td>
-                                            <td><input type="number" class="qty-input" data-cookie="Thin Mints" data-unit="case" min="0"></td>
-                                        </tr>
-                                        <tr>
-                                            <td>Samoas®</td>
-                                            <td><input type="number" class="qty-input" data-cookie="Samoas" data-unit="box" min="0"></td>
-                                            <td><input type="number" class="qty-input" data-cookie="Samoas" data-unit="case" min="0"></td>
-                                        </tr>
-                                        <tr>
-                                            <td>Tagalongs®</td>
-                                            <td><input type="number" class="qty-input" data-cookie="Tagalongs" data-unit="box" min="0"></td>
-                                            <td><input type="number" class="qty-input" data-cookie="Tagalongs" data-unit="case" min="0"></td>
-                                        </tr>
-                                        <tr>
-                                            <td>Trefoils®</td>
-                                            <td><input type="number" class="qty-input" data-cookie="Trefoils" data-unit="box" min="0"></td>
-                                            <td><input type="number" class="qty-input" data-cookie="Trefoils" data-unit="case" min="0"></td>
-                                        </tr>
-                                        <tr>
-                                            <td>Do-si-dos®</td>
-                                            <td><input type="number" class="qty-input" data-cookie="Do-si-dos" data-unit="box" min="0"></td>
-                                            <td><input type="number" class="qty-input" data-cookie="Do-si-dos" data-unit="case" min="0"></td>
-                                        </tr>
-                                        <tr>
-                                            <td>Lemon-Ups®</td>
-                                            <td><input type="number" class="qty-input" data-cookie="Lemon-Ups" data-unit="box" min="0"></td>
-                                            <td><input type="number" class="qty-input" data-cookie="Lemon-Ups" data-unit="case" min="0"></td>
-                                        </tr>
-                                        <tr>
-                                            <td>Adventurefuls®</td>
-                                            <td><input type="number" class="qty-input" data-cookie="Adventurefuls" data-unit="box" min="0"></td>
-                                            <td><input type="number" class="qty-input" data-cookie="Adventurefuls" data-unit="case" min="0"></td>
-                                        </tr>
-                                        <tr>
-                                            <td>Exploremores™</td>
-                                            <td><input type="number" class="qty-input" data-cookie="Exploremores" data-unit="box" min="0"></td>
-                                            <td><input type="number" class="qty-input" data-cookie="Exploremores" data-unit="case" min="0"></td>
-                                        </tr>
-                                        <tr>
-                                            <td>Toffee-tastic® (GF)</td>
-                                            <td><input type="number" class="qty-input" data-cookie="Toffee-tastic" data-unit="box" min="0"></td>
-                                            <td><input type="number" class="qty-input" data-cookie="Toffee-tastic" data-unit="case" min="0"></td>
-                                        </tr>
-                                    </tbody>
-                                    <tfoot>
-                                        <tr>
-                                            <td><strong>Total</strong></td>
-                                            <td id="totalBoxesInput">0</td>
-                                            <td id="totalCasesInput">0</td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
+                            <div class="cookie-selection-grid">
+                                <div class="cookie-selection-item">
+                                    <span class="cookie-selection-name">Thin Mints®</span>
+                                    <div class="cookie-selection-qty-group">
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Boxes</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Thin Mints', 'box')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Thin Mints" data-unit="box" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Thin Mints', 'box')">+</button>
+                                        </div>
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Cases</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Thin Mints', 'case')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Thin Mints" data-unit="case" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Thin Mints', 'case')">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="cookie-selection-item">
+                                    <span class="cookie-selection-name">Samoas®</span>
+                                    <div class="cookie-selection-qty-group">
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Boxes</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Samoas', 'box')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Samoas" data-unit="box" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Samoas', 'box')">+</button>
+                                        </div>
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Cases</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Samoas', 'case')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Samoas" data-unit="case" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Samoas', 'case')">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="cookie-selection-item">
+                                    <span class="cookie-selection-name">Tagalongs®</span>
+                                    <div class="cookie-selection-qty-group">
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Boxes</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Tagalongs', 'box')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Tagalongs" data-unit="box" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Tagalongs', 'box')">+</button>
+                                        </div>
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Cases</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Tagalongs', 'case')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Tagalongs" data-unit="case" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Tagalongs', 'case')">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="cookie-selection-item">
+                                    <span class="cookie-selection-name">Trefoils®</span>
+                                    <div class="cookie-selection-qty-group">
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Boxes</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Trefoils', 'box')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Trefoils" data-unit="box" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Trefoils', 'box')">+</button>
+                                        </div>
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Cases</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Trefoils', 'case')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Trefoils" data-unit="case" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Trefoils', 'case')">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="cookie-selection-item">
+                                    <span class="cookie-selection-name">Do-si-dos®</span>
+                                    <div class="cookie-selection-qty-group">
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Boxes</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Do-si-dos', 'box')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Do-si-dos" data-unit="box" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Do-si-dos', 'box')">+</button>
+                                        </div>
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Cases</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Do-si-dos', 'case')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Do-si-dos" data-unit="case" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Do-si-dos', 'case')">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="cookie-selection-item">
+                                    <span class="cookie-selection-name">Lemon-Ups®</span>
+                                    <div class="cookie-selection-qty-group">
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Boxes</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Lemon-Ups', 'box')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Lemon-Ups" data-unit="box" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Lemon-Ups', 'box')">+</button>
+                                        </div>
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Cases</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Lemon-Ups', 'case')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Lemon-Ups" data-unit="case" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Lemon-Ups', 'case')">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="cookie-selection-item">
+                                    <span class="cookie-selection-name">Adventurefuls®</span>
+                                    <div class="cookie-selection-qty-group">
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Boxes</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Adventurefuls', 'box')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Adventurefuls" data-unit="box" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Adventurefuls', 'box')">+</button>
+                                        </div>
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Cases</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Adventurefuls', 'case')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Adventurefuls" data-unit="case" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Adventurefuls', 'case')">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="cookie-selection-item">
+                                    <span class="cookie-selection-name">Exploremores™</span>
+                                    <div class="cookie-selection-qty-group">
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Boxes</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Exploremores', 'box')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Exploremores" data-unit="box" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Exploremores', 'box')">+</button>
+                                        </div>
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Cases</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Exploremores', 'case')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Exploremores" data-unit="case" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Exploremores', 'case')">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="cookie-selection-item">
+                                    <span class="cookie-selection-name">Toffee-tastic® (GF)</span>
+                                    <div class="cookie-selection-qty-group">
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Boxes</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Toffee-tastic', 'box')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Toffee-tastic" data-unit="box" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Toffee-tastic', 'box')">+</button>
+                                        </div>
+                                        <div class="cookie-selection-controls">
+                                            <label class="cookie-selection-label">Cases</label>
+                                            <button type="button" class="cookie-selection-btn" onclick="decrementSaleQty('Toffee-tastic', 'case')">−</button>
+                                            <input type="number" class="cookie-selection-input qty-input" data-cookie="Toffee-tastic" data-unit="case" min="0" value="0">
+                                            <button type="button" class="cookie-selection-btn" onclick="incrementSaleQty('Toffee-tastic', 'case')">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="cookie-selection-totals">
+                                <div class="cookie-selection-total-row">
+                                    <span>Total Boxes:</span>
+                                    <span id="totalBoxesInput" class="cookie-selection-total-value">0</span>
+                                </div>
+                                <div class="cookie-selection-total-row">
+                                    <span>Total Cases:</span>
+                                    <span id="totalCasesInput" class="cookie-selection-total-value">0</span>
+                                </div>
                             </div>
                             <div class="order-total">
                                 <span>Order Total: </span>

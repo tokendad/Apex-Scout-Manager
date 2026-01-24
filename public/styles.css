@@ -597,60 +597,164 @@ section h2 {
 }
 
 /* Cookie Selection Table */
-.cookie-selection-table-container {
-    overflow-x: auto;
+/* Cookie Selection Grid (Sales Form) */
+.cookie-selection-grid {
+    display: grid;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.cookie-selection-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: white;
     border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: background-color 0.2s;
+}
+
+.cookie-selection-item:hover {
+    background: #f9f9f9;
+}
+
+.cookie-selection-name {
+    font-weight: 600;
+    color: var(--text-color);
+    font-size: 0.95rem;
+}
+
+.cookie-selection-qty-group {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.cookie-selection-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 140px;
+}
+
+.cookie-selection-label {
+    font-size: 0.85rem;
+    color: #666;
+    min-width: 45px;
+}
+
+.cookie-selection-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border-color);
+    background: white;
+    color: var(--primary-color);
+    border-radius: 8px;
+    font-size: 1.25rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.cookie-selection-btn:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.cookie-selection-btn:active {
+    transform: scale(0.95);
+}
+
+.cookie-selection-input {
+    width: 60px;
+    height: 36px;
+    padding: 0.25rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    text-align: center;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+.cookie-selection-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(30, 123, 60, 0.2);
+}
+
+.cookie-selection-totals {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: rgba(30, 123, 60, 0.05);
     border-radius: 8px;
     margin-bottom: 1rem;
 }
 
-.cookie-selection-table {
-    width: 100%;
-    border-collapse: collapse;
-    background-color: var(--card-background);
-}
-
-.cookie-selection-table th,
-.cookie-selection-table td {
-    padding: 0.5rem;
-    border: 1px solid var(--border-color);
-    text-align: center;
-    vertical-align: middle;
-}
-
-.cookie-selection-table th {
-    background-color: rgba(30, 123, 60, 0.05);
+.cookie-selection-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     font-weight: 600;
+    color: var(--text-color);
+}
+
+.cookie-selection-total-value {
     color: var(--primary-color);
-    text-align: left;
+    font-size: 1.1rem;
 }
 
-.cookie-selection-table th:not(:first-child),
-.cookie-selection-table td:not(:first-child) {
-    text-align: center;
-    width: 80px;
+/* Dark mode for cookie selection grid */
+[data-theme="dark"] .cookie-selection-item {
+    background: #2a2a2a;
+    border-color: #444;
 }
 
-.cookie-selection-table td:first-child {
-    text-align: left;
-    font-weight: 500;
+[data-theme="dark"] .cookie-selection-item:hover {
+    background: #333;
 }
 
+[data-theme="dark"] .cookie-selection-btn {
+    background: #2a2a2a;
+    border-color: #444;
+    color: var(--primary-color);
+}
+
+[data-theme="dark"] .cookie-selection-btn:hover {
+    background: var(--primary-color);
+    color: white;
+}
+
+[data-theme="dark"] .cookie-selection-input {
+    background: #2a2a2a;
+    border-color: #444;
+    color: white;
+}
+
+[data-theme="dark"] .cookie-selection-label {
+    color: #aaa;
+}
+
+[data-theme="dark"] .cookie-selection-totals {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Keep old qty-input class for backward compatibility */
 .qty-input {
     width: 60px;
     padding: 0.25rem;
     border: 1px solid var(--border-color);
     border-radius: 4px;
     text-align: center;
-}
-
-[data-theme="dark"] .cookie-selection-table {
-    background-color: var(--card-background);
-}
-
-[data-theme="dark"] .cookie-selection-table th {
-    background-color: rgba(255, 255, 255, 0.05);
-    color: #e0e0e0;
 }
 
 [data-theme="dark"] .qty-input {
@@ -1848,79 +1952,7 @@ footer {
     min-width: 120px;
 }
 
-/* Cookie Selection Table */
-.cookie-selection-table-container {
-    overflow-x: auto;
-    margin-bottom: 1rem;
-}
-
-.cookie-selection-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.9rem;
-}
-
-.cookie-selection-table th,
-.cookie-selection-table td {
-    padding: 0.5rem;
-    border: 1px solid var(--border-color);
-    text-align: center;
-}
-
-.cookie-selection-table th {
-    background-color: rgba(30, 123, 60, 0.1);
-    font-weight: 600;
-    color: var(--primary-color);
-}
-
-.cookie-selection-table td:first-child {
-    text-align: left;
-    font-weight: 500;
-}
-
-.cookie-selection-table tbody tr:nth-child(even) {
-    background-color: rgba(0, 0, 0, 0.02);
-}
-
-.cookie-selection-table tfoot {
-    font-weight: 600;
-    background-color: rgba(30, 123, 60, 0.05);
-}
-
-.cookie-selection-table .qty-input {
-    width: 70px;
-    padding: 0.25rem 0.5rem;
-    text-align: center;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    font-size: 0.9rem;
-}
-
-/* Make number spinners always visible and prominent */
-.cookie-selection-table .qty-input::-webkit-inner-spin-button,
-.cookie-selection-table .qty-input::-webkit-outer-spin-button {
-    opacity: 1;
-    cursor: pointer;
-    width: 18px;
-    height: 100%;
-}
-
-/* Style for better visibility of arrows */
-.cookie-selection-table .qty-input {
-    accent-color: #2196F3;
-}
-
-/* For Firefox - keep the spinners visible */
-.cookie-selection-table .qty-input[type="number"] {
-    -moz-appearance: number-input;
-}
-
-.cookie-selection-table .qty-input:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(30, 123, 60, 0.2);
-}
-
+/* Order total styling kept for compatibility */
 .order-total {
     text-align: right;
     font-size: 1.1rem;
@@ -1935,32 +1967,13 @@ footer {
     font-size: 1.1rem;
 }
 
-/* Dark mode for cookie selection */
+/* Dark mode for form sections */
 [data-theme="dark"] .form-section {
     background: var(--card-background);
 }
 
 [data-theme="dark"] .form-section h3 {
     color: #7cb890;
-}
-
-[data-theme="dark"] .cookie-selection-table th {
-    background-color: rgba(255, 255, 255, 0.05);
-    color: #e0e0e0;
-}
-
-[data-theme="dark"] .cookie-selection-table tbody tr:nth-child(even) {
-    background-color: rgba(255, 255, 255, 0.02);
-}
-
-[data-theme="dark"] .cookie-selection-table tfoot {
-    background-color: rgba(255, 255, 255, 0.05);
-}
-
-[data-theme="dark"] .cookie-selection-table .qty-input {
-    background: var(--background-color);
-    color: var(--text-color);
-    border-color: #444;
 }
 
 [data-theme="dark"] .order-total {

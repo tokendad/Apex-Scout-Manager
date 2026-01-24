@@ -281,6 +281,29 @@ function decrementInventory(cookieType) {
     }
 }
 
+// Increment sale quantity
+function incrementSaleQty(cookieName, unit) {
+    const inputs = document.querySelectorAll(`.qty-input[data-cookie="${cookieName}"][data-unit="${unit}"]`);
+    inputs.forEach(input => {
+        input.value = parseInt(input.value || 0) + 1;
+        // Trigger change event to update totals
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+}
+
+// Decrement sale quantity
+function decrementSaleQty(cookieName, unit) {
+    const inputs = document.querySelectorAll(`.qty-input[data-cookie="${cookieName}"][data-unit="${unit}"]`);
+    inputs.forEach(input => {
+        const currentValue = parseInt(input.value || 0);
+        if (currentValue > 0) {
+            input.value = currentValue - 1;
+            // Trigger change event to update totals
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    });
+}
+
 // Save inventory to profile
 async function saveInventory() {
     try {
