@@ -554,7 +554,12 @@ app.post('/api/events', (req, res) => {
             initialCases,
             remainingBoxes,
             remainingCases,
-            donationsReceived
+            donationsReceived,
+            // Variety data
+            initialThinMints, initialSamoas, initialTagalongs, initialTrefoils,
+            initialDosiDos, initialLemonUps, initialAdventurefuls, initialExploremores, initialToffeetastic,
+            remainingThinMints, remainingSamoas, remainingTagalongs, remainingTrefoils,
+            remainingDosiDos, remainingLemonUps, remainingAdventurefuls, remainingExploremores, remainingToffeetastic
         } = req.body;
         
         if (!eventName || !eventDate) {
@@ -583,17 +588,46 @@ app.post('/api/events', (req, res) => {
         const validDonationsReceived = (typeof donationsReceived === 'number' && donationsReceived >= 0) ? donationsReceived : 0;
         const sanitizedDescription = (description && description.trim()) || null;
         
+        // Validate variety numeric fields
+        const validInitialThinMints = (typeof initialThinMints === 'number' && initialThinMints >= 0) ? initialThinMints : 0;
+        const validInitialSamoas = (typeof initialSamoas === 'number' && initialSamoas >= 0) ? initialSamoas : 0;
+        const validInitialTagalongs = (typeof initialTagalongs === 'number' && initialTagalongs >= 0) ? initialTagalongs : 0;
+        const validInitialTrefoils = (typeof initialTrefoils === 'number' && initialTrefoils >= 0) ? initialTrefoils : 0;
+        const validInitialDosiDos = (typeof initialDosiDos === 'number' && initialDosiDos >= 0) ? initialDosiDos : 0;
+        const validInitialLemonUps = (typeof initialLemonUps === 'number' && initialLemonUps >= 0) ? initialLemonUps : 0;
+        const validInitialAdventurefuls = (typeof initialAdventurefuls === 'number' && initialAdventurefuls >= 0) ? initialAdventurefuls : 0;
+        const validInitialExploremores = (typeof initialExploremores === 'number' && initialExploremores >= 0) ? initialExploremores : 0;
+        const validInitialToffeetastic = (typeof initialToffeetastic === 'number' && initialToffeetastic >= 0) ? initialToffeetastic : 0;
+        
+        const validRemainingThinMints = (typeof remainingThinMints === 'number' && remainingThinMints >= 0) ? remainingThinMints : 0;
+        const validRemainingSamoas = (typeof remainingSamoas === 'number' && remainingSamoas >= 0) ? remainingSamoas : 0;
+        const validRemainingTagalongs = (typeof remainingTagalongs === 'number' && remainingTagalongs >= 0) ? remainingTagalongs : 0;
+        const validRemainingTrefoils = (typeof remainingTrefoils === 'number' && remainingTrefoils >= 0) ? remainingTrefoils : 0;
+        const validRemainingDosiDos = (typeof remainingDosiDos === 'number' && remainingDosiDos >= 0) ? remainingDosiDos : 0;
+        const validRemainingLemonUps = (typeof remainingLemonUps === 'number' && remainingLemonUps >= 0) ? remainingLemonUps : 0;
+        const validRemainingAdventurefuls = (typeof remainingAdventurefuls === 'number' && remainingAdventurefuls >= 0) ? remainingAdventurefuls : 0;
+        const validRemainingExploremores = (typeof remainingExploremores === 'number' && remainingExploremores >= 0) ? remainingExploremores : 0;
+        const validRemainingToffeetastic = (typeof remainingToffeetastic === 'number' && remainingToffeetastic >= 0) ? remainingToffeetastic : 0;
+        
         const stmt = db.prepare(`
             INSERT INTO events (
                 eventName, eventDate, description,
                 initialBoxes, initialCases, remainingBoxes, remainingCases,
-                donationsReceived
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                donationsReceived,
+                initialThinMints, initialSamoas, initialTagalongs, initialTrefoils,
+                initialDosiDos, initialLemonUps, initialAdventurefuls, initialExploremores, initialToffeetastic,
+                remainingThinMints, remainingSamoas, remainingTagalongs, remainingTrefoils,
+                remainingDosiDos, remainingLemonUps, remainingAdventurefuls, remainingExploremores, remainingToffeetastic
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         const result = stmt.run(
             sanitizedEventName, validEventDate, sanitizedDescription,
             validInitialBoxes, validInitialCases, validRemainingBoxes, validRemainingCases,
-            validDonationsReceived
+            validDonationsReceived,
+            validInitialThinMints, validInitialSamoas, validInitialTagalongs, validInitialTrefoils,
+            validInitialDosiDos, validInitialLemonUps, validInitialAdventurefuls, validInitialExploremores, validInitialToffeetastic,
+            validRemainingThinMints, validRemainingSamoas, validRemainingTagalongs, validRemainingTrefoils,
+            validRemainingDosiDos, validRemainingLemonUps, validRemainingAdventurefuls, validRemainingExploremores, validRemainingToffeetastic
         );
         
         const newEvent = db.prepare('SELECT * FROM events WHERE id = ?').get(result.lastInsertRowid);
@@ -617,7 +651,12 @@ app.put('/api/events/:id', (req, res) => {
             initialCases,
             remainingBoxes,
             remainingCases,
-            donationsReceived
+            donationsReceived,
+            // Variety data
+            initialThinMints, initialSamoas, initialTagalongs, initialTrefoils,
+            initialDosiDos, initialLemonUps, initialAdventurefuls, initialExploremores, initialToffeetastic,
+            remainingThinMints, remainingSamoas, remainingTagalongs, remainingTrefoils,
+            remainingDosiDos, remainingLemonUps, remainingAdventurefuls, remainingExploremores, remainingToffeetastic
         } = req.body;
         
         if (!eventName || !eventDate) {
@@ -646,6 +685,27 @@ app.put('/api/events/:id', (req, res) => {
         const validDonationsReceived = (typeof donationsReceived === 'number' && donationsReceived >= 0) ? donationsReceived : 0;
         const sanitizedDescription = (description && description.trim()) || null;
         
+        // Validate variety numeric fields
+        const validInitialThinMints = (typeof initialThinMints === 'number' && initialThinMints >= 0) ? initialThinMints : 0;
+        const validInitialSamoas = (typeof initialSamoas === 'number' && initialSamoas >= 0) ? initialSamoas : 0;
+        const validInitialTagalongs = (typeof initialTagalongs === 'number' && initialTagalongs >= 0) ? initialTagalongs : 0;
+        const validInitialTrefoils = (typeof initialTrefoils === 'number' && initialTrefoils >= 0) ? initialTrefoils : 0;
+        const validInitialDosiDos = (typeof initialDosiDos === 'number' && initialDosiDos >= 0) ? initialDosiDos : 0;
+        const validInitialLemonUps = (typeof initialLemonUps === 'number' && initialLemonUps >= 0) ? initialLemonUps : 0;
+        const validInitialAdventurefuls = (typeof initialAdventurefuls === 'number' && initialAdventurefuls >= 0) ? initialAdventurefuls : 0;
+        const validInitialExploremores = (typeof initialExploremores === 'number' && initialExploremores >= 0) ? initialExploremores : 0;
+        const validInitialToffeetastic = (typeof initialToffeetastic === 'number' && initialToffeetastic >= 0) ? initialToffeetastic : 0;
+        
+        const validRemainingThinMints = (typeof remainingThinMints === 'number' && remainingThinMints >= 0) ? remainingThinMints : 0;
+        const validRemainingSamoas = (typeof remainingSamoas === 'number' && remainingSamoas >= 0) ? remainingSamoas : 0;
+        const validRemainingTagalongs = (typeof remainingTagalongs === 'number' && remainingTagalongs >= 0) ? remainingTagalongs : 0;
+        const validRemainingTrefoils = (typeof remainingTrefoils === 'number' && remainingTrefoils >= 0) ? remainingTrefoils : 0;
+        const validRemainingDosiDos = (typeof remainingDosiDos === 'number' && remainingDosiDos >= 0) ? remainingDosiDos : 0;
+        const validRemainingLemonUps = (typeof remainingLemonUps === 'number' && remainingLemonUps >= 0) ? remainingLemonUps : 0;
+        const validRemainingAdventurefuls = (typeof remainingAdventurefuls === 'number' && remainingAdventurefuls >= 0) ? remainingAdventurefuls : 0;
+        const validRemainingExploremores = (typeof remainingExploremores === 'number' && remainingExploremores >= 0) ? remainingExploremores : 0;
+        const validRemainingToffeetastic = (typeof remainingToffeetastic === 'number' && remainingToffeetastic >= 0) ? remainingToffeetastic : 0;
+        
         const stmt = db.prepare(`
             UPDATE events 
             SET eventName = ?,
@@ -655,13 +715,22 @@ app.put('/api/events/:id', (req, res) => {
                 initialCases = ?,
                 remainingBoxes = ?,
                 remainingCases = ?,
-                donationsReceived = ?
+                donationsReceived = ?,
+                initialThinMints = ?, initialSamoas = ?, initialTagalongs = ?, initialTrefoils = ?,
+                initialDosiDos = ?, initialLemonUps = ?, initialAdventurefuls = ?, initialExploremores = ?, initialToffeetastic = ?,
+                remainingThinMints = ?, remainingSamoas = ?, remainingTagalongs = ?, remainingTrefoils = ?,
+                remainingDosiDos = ?, remainingLemonUps = ?, remainingAdventurefuls = ?, remainingExploremores = ?, remainingToffeetastic = ?
             WHERE id = ?
         `);
         const result = stmt.run(
             sanitizedEventName, validEventDate, sanitizedDescription,
             validInitialBoxes, validInitialCases, validRemainingBoxes, validRemainingCases,
-            validDonationsReceived, id
+            validDonationsReceived,
+            validInitialThinMints, validInitialSamoas, validInitialTagalongs, validInitialTrefoils,
+            validInitialDosiDos, validInitialLemonUps, validInitialAdventurefuls, validInitialExploremores, validInitialToffeetastic,
+            validRemainingThinMints, validRemainingSamoas, validRemainingTagalongs, validRemainingTrefoils,
+            validRemainingDosiDos, validRemainingLemonUps, validRemainingAdventurefuls, validRemainingExploremores, validRemainingToffeetastic,
+            id
         );
         
         if (result.changes === 0) {

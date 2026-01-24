@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 7
+    },
+    "auditLog": "logs/.audit.json",
+    "files": [
+        {
+            "date": 1769283107350,
+            "name": "logs/gsctracker-2026-01-24.log",
+            "hash": "760624159116230156fd188d7aad1d50da1f9749d57800669214b08e3559b56e"
+        }
+    ],
+    "hashType": "sha256"
+}
