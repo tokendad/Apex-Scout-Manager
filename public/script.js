@@ -1010,8 +1010,8 @@ function renderEvents() {
         });
         
         // Calculate total initial and remaining inventory in boxes
-        const totalInitial = event.initialBoxes + (event.initialCases * BOXES_PER_CASE);
-        const totalRemaining = event.remainingBoxes + (event.remainingCases * BOXES_PER_CASE);
+        const totalInitial = (event.initialBoxes || 0) + ((event.initialCases || 0) * BOXES_PER_CASE);
+        const totalRemaining = (event.remainingBoxes || 0) + ((event.remainingCases || 0) * BOXES_PER_CASE);
         const totalSold = Math.max(0, totalInitial - totalRemaining); // Prevent negative values
         const revenue = totalSold * PRICE_PER_BOX;
         
@@ -1745,8 +1745,8 @@ function updateSummary() {
     
     // Calculate boxes sold from booth events (initial - remaining)
     const eventBoothBoxes = events.reduce((sum, event) => {
-        const totalInitial = event.initialBoxes + (event.initialCases * BOXES_PER_CASE);
-        const totalRemaining = event.remainingBoxes + (event.remainingCases * BOXES_PER_CASE);
+        const totalInitial = (event.initialBoxes || 0) + ((event.initialCases || 0) * BOXES_PER_CASE);
+        const totalRemaining = (event.remainingBoxes || 0) + ((event.remainingCases || 0) * BOXES_PER_CASE);
         const totalSold = Math.max(0, totalInitial - totalRemaining);
         return sum + totalSold;
     }, 0);
