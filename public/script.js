@@ -133,6 +133,109 @@ function setupEventListeners() {
 
     // Event listeners
     eventForm.addEventListener('submit', handleAddEvent);
+    
+    // Event variety table listeners
+    setupVarietyTableListeners();
+}
+
+// Cookie varieties list
+const COOKIE_VARIETIES = [
+    'ThinMints', 'Samoas', 'Tagalongs', 'Trefoils',
+    'DosiDos', 'LemonUps', 'Adventurefuls', 'Exploremores', 'Toffeetastic'
+];
+
+// Setup event listeners for variety table inputs
+function setupVarietyTableListeners() {
+    const varietyInputs = document.querySelectorAll('.variety-cases-input, .variety-boxes-input');
+    
+    varietyInputs.forEach(input => {
+        input.addEventListener('input', updateVarietyTotals);
+    });
+}
+
+// Update variety totals when inputs change
+function updateVarietyTotals() {
+    const types = ['initial', 'remaining'];
+    
+    types.forEach(type => {
+        let totalCases = 0;
+        let totalBoxes = 0;
+        let grandTotal = 0;
+        
+        COOKIE_VARIETIES.forEach(variety => {
+            const casesInput = document.getElementById(`${type}Cases${variety}`);
+            const boxesInput = document.getElementById(`${type}Boxes${variety}`);
+            const totalSpan = document.getElementById(`${type}Total${variety}`);
+            
+            const cases = parseInt(casesInput.value) || 0;
+            const boxes = parseInt(boxesInput.value) || 0;
+            const varietyTotal = (cases * BOXES_PER_CASE) + boxes;
+            
+            totalSpan.textContent = varietyTotal;
+            
+            totalCases += cases;
+            totalBoxes += boxes;
+            grandTotal += varietyTotal;
+        });
+        
+        document.getElementById(`${type}TotalCases`).textContent = totalCases;
+        document.getElementById(`${type}TotalBoxes`).textContent = totalBoxes;
+        document.getElementById(`${type}GrandTotal`).textContent = grandTotal;
+    });
+}
+
+// Collect variety data from form
+function collectVarietyData() {
+    const varietyData = {};
+    
+    COOKIE_VARIETIES.forEach(variety => {
+        // Initial inventory
+        const initialCases = parseInt(document.getElementById(`initialCases${variety}`).value) || 0;
+        const initialBoxes = parseInt(document.getElementById(`initialBoxes${variety}`).value) || 0;
+        varietyData[`initial${variety}`] = (initialCases * BOXES_PER_CASE) + initialBoxes;
+        
+        // Remaining inventory
+        const remainingCases = parseInt(document.getElementById(`remainingCases${variety}`).value) || 0;
+        const remainingBoxes = parseInt(document.getElementById(`remainingBoxes${variety}`).value) || 0;
+        varietyData[`remaining${variety}`] = (remainingCases * BOXES_PER_CASE) + remainingBoxes;
+    });
+    
+    return varietyData;
+}
+
+// Populate variety inputs from event data
+function populateVarietyInputs(event) {
+    COOKIE_VARIETIES.forEach(variety => {
+        // Initial inventory
+        const initialTotal = event[`initial${variety}`] || 0;
+        const initialCases = Math.floor(initialTotal / BOXES_PER_CASE);
+        const initialBoxes = initialTotal % BOXES_PER_CASE;
+        
+        document.getElementById(`initialCases${variety}`).value = initialCases;
+        document.getElementById(`initialBoxes${variety}`).value = initialBoxes;
+        
+        // Remaining inventory
+        const remainingTotal = event[`remaining${variety}`] || 0;
+        const remainingCases = Math.floor(remainingTotal / BOXES_PER_CASE);
+        const remainingBoxes = remainingTotal % BOXES_PER_CASE;
+        
+        document.getElementById(`remainingCases${variety}`).value = remainingCases;
+        document.getElementById(`remainingBoxes${variety}`).value = remainingBoxes;
+    });
+    
+    updateVarietyTotals();
+}
+
+// Reset variety inputs
+function resetVarietyInputs() {
+    COOKIE_VARIETIES.forEach(variety => {
+        document.getElementById(`initialCases${variety}`).value = 0;
+        document.getElementById(`initialBoxes${variety}`).value = 0;
+        document.getElementById(`remainingCases${variety}`).value = 0;
+        document.getElementById(`remainingBoxes${variety}`).value = 0;
+    });
+    
+    updateVarietyTotals();
 }
 
 // Load sales from API
@@ -856,10 +959,6 @@ async function handleAddEvent(e) {
     const eventName = eventNameInput.value.trim();
     const eventDate = eventDateInput.value;
     const description = eventDescriptionInput.value.trim();
-    const initialBoxes = parseInt(initialBoxesInput.value) || 0;
-    const initialCases = parseInt(initialCasesInput.value) || 0;
-    const remainingBoxes = parseInt(remainingBoxesInput.value) || 0;
-    const remainingCases = parseInt(remainingCasesInput.value) || 0;
     const donationsReceived = parseFloat(eventDonationsInput.value) || 0;
     
     if (!eventName || !eventDate) {
@@ -867,15 +966,27 @@ async function handleAddEvent(e) {
         return;
     }
     
+    // Collect variety data
+    const varietyData = collectVarietyData();
+    
+    // Calculate totals from variety data
+    let initialTotal = 0;
+    let remainingTotal = 0;
+    COOKIE_VARIETIES.forEach(variety => {
+        initialTotal += varietyData[`initial${variety}`];
+        remainingTotal += varietyData[`remaining${variety}`];
+    });
+    
     const event = {
         eventName,
         eventDate: new Date(eventDate).toISOString(),
         description,
-        initialBoxes,
-        initialCases,
-        remainingBoxes,
-        remainingCases,
-        donationsReceived
+        initialBoxes: initialTotal % BOXES_PER_CASE,
+        initialCases: Math.floor(initialTotal / BOXES_PER_CASE),
+        remainingBoxes: remainingTotal % BOXES_PER_CASE,
+        remainingCases: Math.floor(remainingTotal / BOXES_PER_CASE),
+        donationsReceived,
+        ...varietyData
     };
     
     try {
@@ -916,6 +1027,7 @@ async function handleAddEvent(e) {
 
 function resetEventForm() {
     eventForm.reset();
+    resetVarietyInputs();
     editingEventId = null;
     const submitBtn = eventForm.querySelector('button[type="submit"]');
     submitBtn.textContent = 'Save Event';
@@ -943,11 +1055,10 @@ function handleEditEvent(id) {
     eventDateInput.value = localISOTime;
     
     eventDescriptionInput.value = event.description || '';
-    initialBoxesInput.value = event.initialBoxes;
-    initialCasesInput.value = event.initialCases;
-    remainingBoxesInput.value = event.remainingBoxes;
-    remainingCasesInput.value = event.remainingCases;
     eventDonationsInput.value = event.donationsReceived;
+    
+    // Populate variety inputs
+    populateVarietyInputs(event);
     
     // Change submit button text
     const submitBtn = eventForm.querySelector('button[type="submit"]');
@@ -1015,6 +1126,9 @@ function renderEvents() {
         const totalSold = Math.max(0, totalInitial - totalRemaining); // Prevent negative values
         const revenue = totalSold * PRICE_PER_BOX;
         
+        // Generate variety breakdown
+        const varietyBreakdown = generateVarietyBreakdown(event);
+        
         return `
             <div class="event-item">
                 <div class="event-header">
@@ -1023,14 +1137,6 @@ function renderEvents() {
                 </div>
                 ${event.description ? `<div class="event-description">${event.description}</div>` : ''}
                 <div class="event-stats">
-                    <div class="event-stat">
-                        <span class="stat-label">Initial:</span>
-                        <span class="stat-value">${totalInitial} boxes (${event.initialCases} cases, ${event.initialBoxes} boxes)</span>
-                    </div>
-                    <div class="event-stat">
-                        <span class="stat-label">Remaining:</span>
-                        <span class="stat-value">${totalRemaining} boxes (${event.remainingCases} cases, ${event.remainingBoxes} boxes)</span>
-                    </div>
                     <div class="event-stat highlight">
                         <span class="stat-label">Total Sold:</span>
                         <span class="stat-value">${totalSold} boxes ($${revenue})</span>
@@ -1042,6 +1148,7 @@ function renderEvents() {
                     </div>
                     ` : ''}
                 </div>
+                ${varietyBreakdown}
                 <div class="event-actions">
                     <button class="btn-secondary btn-edit" data-event-id="${event.id}" style="margin-right: 8px;">Edit</button>
                     <button class="btn-delete" data-event-id="${event.id}">Delete</button>
@@ -1065,6 +1172,117 @@ function renderEvents() {
             handleDeleteEvent(eventId);
         });
     });
+}
+
+// Generate variety breakdown HTML for event display
+function generateVarietyBreakdown(event) {
+    const varietyNames = {
+        'ThinMints': 'Thin Mints®',
+        'Samoas': 'Samoas®',
+        'Tagalongs': 'Tagalongs®',
+        'Trefoils': 'Trefoils®',
+        'DosiDos': 'Do-si-dos®',
+        'LemonUps': 'Lemon-Ups®',
+        'Adventurefuls': 'Adventurefuls®',
+        'Exploremores': 'Exploremores™',
+        'Toffeetastic': 'Toffee-tastic®'
+    };
+    
+    let initialTotalBoxes = 0;
+    let remainingTotalBoxes = 0;
+    
+    let initialRows = '';
+    let remainingRows = '';
+    
+    COOKIE_VARIETIES.forEach(variety => {
+        const initialBoxes = event[`initial${variety}`] || 0;
+        const remainingBoxes = event[`remaining${variety}`] || 0;
+        
+        initialTotalBoxes += initialBoxes;
+        remainingTotalBoxes += remainingBoxes;
+        
+        // Only show rows with non-zero values
+        if (initialBoxes > 0) {
+            const cases = Math.floor(initialBoxes / BOXES_PER_CASE);
+            const boxes = initialBoxes % BOXES_PER_CASE;
+            initialRows += `
+                <div class="event-variety-display-row">
+                    <span class="variety-name">${varietyNames[variety]}</span>
+                    <span class="variety-cases">${cases}</span>
+                    <span class="variety-boxes">${boxes}</span>
+                    <span class="variety-total">${initialBoxes}</span>
+                </div>
+            `;
+        }
+        
+        if (remainingBoxes > 0) {
+            const cases = Math.floor(remainingBoxes / BOXES_PER_CASE);
+            const boxes = remainingBoxes % BOXES_PER_CASE;
+            remainingRows += `
+                <div class="event-variety-display-row">
+                    <span class="variety-name">${varietyNames[variety]}</span>
+                    <span class="variety-cases">${cases}</span>
+                    <span class="variety-boxes">${boxes}</span>
+                    <span class="variety-total">${remainingBoxes}</span>
+                </div>
+            `;
+        }
+    });
+    
+    // If no variety data, return empty string
+    if (initialTotalBoxes === 0 && remainingTotalBoxes === 0) {
+        return '';
+    }
+    
+    const initialCases = Math.floor(initialTotalBoxes / BOXES_PER_CASE);
+    const initialRemBoxes = initialTotalBoxes % BOXES_PER_CASE;
+    const remainingCases = Math.floor(remainingTotalBoxes / BOXES_PER_CASE);
+    const remainingRemBoxes = remainingTotalBoxes % BOXES_PER_CASE;
+    
+    return `
+        <div class="event-variety-breakdown">
+            ${initialRows ? `
+            <div class="variety-section">
+                <h4>Initial Inventory</h4>
+                <div class="event-variety-display-table">
+                    <div class="event-variety-display-header">
+                        <span class="variety-name-col">Variety</span>
+                        <span class="variety-cases-col">Cases</span>
+                        <span class="variety-boxes-col">Boxes</span>
+                        <span class="variety-total-col">Total Boxes</span>
+                    </div>
+                    ${initialRows}
+                    <div class="event-variety-display-footer">
+                        <span class="variety-name-col">Total</span>
+                        <span class="variety-cases-col">${initialCases}</span>
+                        <span class="variety-boxes-col">${initialRemBoxes}</span>
+                        <span class="variety-total-col">${initialTotalBoxes}</span>
+                    </div>
+                </div>
+            </div>
+            ` : ''}
+            ${remainingRows ? `
+            <div class="variety-section">
+                <h4>Remaining Inventory</h4>
+                <div class="event-variety-display-table">
+                    <div class="event-variety-display-header">
+                        <span class="variety-name-col">Variety</span>
+                        <span class="variety-cases-col">Cases</span>
+                        <span class="variety-boxes-col">Boxes</span>
+                        <span class="variety-total-col">Total Boxes</span>
+                    </div>
+                    ${remainingRows}
+                    <div class="event-variety-display-footer">
+                        <span class="variety-name-col">Total</span>
+                        <span class="variety-cases-col">${remainingCases}</span>
+                        <span class="variety-boxes-col">${remainingRemBoxes}</span>
+                        <span class="variety-total-col">${remainingTotalBoxes}</span>
+                    </div>
+                </div>
+            </div>
+            ` : ''}
+        </div>
+    `;
 }
 
 // Helper to generate a unique key for grouping sales into an order

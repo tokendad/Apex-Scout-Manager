@@ -1263,6 +1263,83 @@ footer {
     justify-content: flex-end;
 }
 
+/* Event Variety Breakdown Display */
+.event-variety-breakdown {
+    margin: 1rem 0;
+}
+
+.event-variety-breakdown .variety-section {
+    margin-bottom: 1.5rem;
+}
+
+.event-variety-breakdown .variety-section:last-child {
+    margin-bottom: 0;
+}
+
+.event-variety-breakdown h4 {
+    color: var(--primary-color);
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 0.5rem;
+}
+
+.event-variety-display-table {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.event-variety-display-header,
+.event-variety-display-row,
+.event-variety-display-footer {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.5rem;
+}
+
+.event-variety-display-header {
+    font-weight: 600;
+    color: var(--primary-color);
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.event-variety-display-row {
+    background: rgba(30, 123, 60, 0.05);
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.event-variety-display-footer {
+    font-weight: 600;
+    border-top: 2px solid var(--primary-color);
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    color: var(--primary-color);
+}
+
+/* Dark theme support for variety display */
+[data-theme="dark"] .event-variety-breakdown h4 {
+    color: #7cb890;
+    border-bottom-color: #7cb890;
+}
+
+[data-theme="dark"] .event-variety-display-header {
+    color: #7cb890;
+}
+
+[data-theme="dark"] .event-variety-display-row {
+    background: rgba(124, 184, 144, 0.1);
+}
+
+[data-theme="dark"] .event-variety-display-footer {
+    border-top-color: #7cb890;
+    color: #7cb890;
+}
+
 @media (max-width: 480px) {
     .form-row {
         grid-template-columns: 1fr;
@@ -2105,6 +2182,109 @@ footer {
 }
 
 [data-theme="dark"] .inventory-input {
+    background: #2a2a2a;
+    border-color: #444;
+    color: white;
+}
+
+/* Event Variety Table */
+.event-inventory-section {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: var(--card-background);
+    border-radius: 12px;
+}
+
+.event-inventory-section h3 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.event-variety-table {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.event-variety-header,
+.event-variety-row,
+.event-variety-footer {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.5rem;
+}
+
+.event-variety-header {
+    font-weight: 600;
+    border-bottom: 2px solid var(--primary-color);
+    color: var(--primary-color);
+}
+
+.event-variety-row {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.event-variety-footer {
+    font-weight: 600;
+    border-top: 2px solid var(--primary-color);
+    margin-top: 0.5rem;
+    padding-top: 1rem;
+    color: var(--primary-color);
+}
+
+.variety-name {
+    font-weight: 500;
+    text-align: left;
+}
+
+.variety-name-col {
+    text-align: left;
+}
+
+.variety-cases-col,
+.variety-boxes-col,
+.variety-total-col {
+    text-align: center;
+}
+
+.variety-cases-input,
+.variety-boxes-input {
+    width: 100%;
+    padding: 0.4rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    text-align: center;
+    font-size: 1rem;
+}
+
+.variety-cases-input:focus,
+.variety-boxes-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.variety-total {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+/* Dark theme support */
+[data-theme="dark"] .event-inventory-section {
+    background: var(--card-background);
+}
+
+[data-theme="dark"] .event-variety-row {
+    background: #2a2a2a;
+    border-color: #444;
+}
+
+[data-theme="dark"] .variety-cases-input,
+[data-theme="dark"] .variety-boxes-input {
     background: #2a2a2a;
     border-color: #444;
     color: white;

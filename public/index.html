@@ -530,24 +530,150 @@
                             <label for="eventDescription">Description (optional)</label>
                             <textarea id="eventDescription" placeholder="Brief description of the event" rows="2"></textarea>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="initialBoxes">Initial Boxes</label>
-                                <input type="number" id="initialBoxes" min="0" value="0" placeholder="0">
-                            </div>
-                            <div class="form-group">
-                                <label for="initialCases">Initial Cases</label>
-                                <input type="number" id="initialCases" min="0" value="0" placeholder="0">
+                        
+                        <!-- Initial Inventory Breakdown -->
+                        <div class="event-inventory-section">
+                            <h3>Initial Inventory</h3>
+                            <div class="event-variety-table">
+                                <div class="event-variety-header">
+                                    <span class="variety-name-col">Variety</span>
+                                    <span class="variety-cases-col">Cases</span>
+                                    <span class="variety-boxes-col">Boxes</span>
+                                    <span class="variety-total-col">Total Boxes</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Thin Mints®</span>
+                                    <input type="number" id="initialCasesThinMints" class="variety-cases-input" min="0" value="0" data-variety="ThinMints" data-type="initial">
+                                    <input type="number" id="initialBoxesThinMints" class="variety-boxes-input" min="0" value="0" data-variety="ThinMints" data-type="initial">
+                                    <span class="variety-total" id="initialTotalThinMints">0</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Samoas®</span>
+                                    <input type="number" id="initialCasesSamoas" class="variety-cases-input" min="0" value="0" data-variety="Samoas" data-type="initial">
+                                    <input type="number" id="initialBoxesSamoas" class="variety-boxes-input" min="0" value="0" data-variety="Samoas" data-type="initial">
+                                    <span class="variety-total" id="initialTotalSamoas">0</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Tagalongs®</span>
+                                    <input type="number" id="initialCasesTagalongs" class="variety-cases-input" min="0" value="0" data-variety="Tagalongs" data-type="initial">
+                                    <input type="number" id="initialBoxesTagalongs" class="variety-boxes-input" min="0" value="0" data-variety="Tagalongs" data-type="initial">
+                                    <span class="variety-total" id="initialTotalTagalongs">0</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Trefoils®</span>
+                                    <input type="number" id="initialCasesTrefoils" class="variety-cases-input" min="0" value="0" data-variety="Trefoils" data-type="initial">
+                                    <input type="number" id="initialBoxesTrefoils" class="variety-boxes-input" min="0" value="0" data-variety="Trefoils" data-type="initial">
+                                    <span class="variety-total" id="initialTotalTrefoils">0</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Do-si-dos®</span>
+                                    <input type="number" id="initialCasesDosiDos" class="variety-cases-input" min="0" value="0" data-variety="DosiDos" data-type="initial">
+                                    <input type="number" id="initialBoxesDosiDos" class="variety-boxes-input" min="0" value="0" data-variety="DosiDos" data-type="initial">
+                                    <span class="variety-total" id="initialTotalDosiDos">0</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Lemon-Ups®</span>
+                                    <input type="number" id="initialCasesLemonUps" class="variety-cases-input" min="0" value="0" data-variety="LemonUps" data-type="initial">
+                                    <input type="number" id="initialBoxesLemonUps" class="variety-boxes-input" min="0" value="0" data-variety="LemonUps" data-type="initial">
+                                    <span class="variety-total" id="initialTotalLemonUps">0</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Adventurefuls®</span>
+                                    <input type="number" id="initialCasesAdventurefuls" class="variety-cases-input" min="0" value="0" data-variety="Adventurefuls" data-type="initial">
+                                    <input type="number" id="initialBoxesAdventurefuls" class="variety-boxes-input" min="0" value="0" data-variety="Adventurefuls" data-type="initial">
+                                    <span class="variety-total" id="initialTotalAdventurefuls">0</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Exploremores™</span>
+                                    <input type="number" id="initialCasesExploremores" class="variety-cases-input" min="0" value="0" data-variety="Exploremores" data-type="initial">
+                                    <input type="number" id="initialBoxesExploremores" class="variety-boxes-input" min="0" value="0" data-variety="Exploremores" data-type="initial">
+                                    <span class="variety-total" id="initialTotalExploremores">0</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Toffee-tastic®</span>
+                                    <input type="number" id="initialCasesToffeetastic" class="variety-cases-input" min="0" value="0" data-variety="Toffeetastic" data-type="initial">
+                                    <input type="number" id="initialBoxesToffeetastic" class="variety-boxes-input" min="0" value="0" data-variety="Toffeetastic" data-type="initial">
+                                    <span class="variety-total" id="initialTotalToffeetastic">0</span>
+                                </div>
+                                <div class="event-variety-footer">
+                                    <span class="variety-name-col">Total</span>
+                                    <span class="variety-cases-col" id="initialTotalCases">0</span>
+                                    <span class="variety-boxes-col" id="initialTotalBoxes">0</span>
+                                    <span class="variety-total-col" id="initialGrandTotal">0</span>
+                                </div>
                             </div>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="remainingBoxes">Remaining Boxes</label>
-                                <input type="number" id="remainingBoxes" min="0" value="0" placeholder="0">
-                            </div>
-                            <div class="form-group">
-                                <label for="remainingCases">Remaining Cases</label>
-                                <input type="number" id="remainingCases" min="0" value="0" placeholder="0">
+                        
+                        <!-- Remaining Inventory Breakdown -->
+                        <div class="event-inventory-section">
+                            <h3>Remaining Inventory</h3>
+                            <div class="event-variety-table">
+                                <div class="event-variety-header">
+                                    <span class="variety-name-col">Variety</span>
+                                    <span class="variety-cases-col">Cases</span>
+                                    <span class="variety-boxes-col">Boxes</span>
+                                    <span class="variety-total-col">Total Boxes</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Thin Mints®</span>
+                                    <input type="number" id="remainingCasesThinMints" class="variety-cases-input" min="0" value="0" data-variety="ThinMints" data-type="remaining">
+                                    <input type="number" id="remainingBoxesThinMints" class="variety-boxes-input" min="0" value="0" data-variety="ThinMints" data-type="remaining">
+                                    <span class="variety-total" id="remainingTotalThinMints">0</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Samoas®</span>
+                                    <input type="number" id="remainingCasesSamoas" class="variety-cases-input" min="0" value="0" data-variety="Samoas" data-type="remaining">
+                                    <input type="number" id="remainingBoxesSamoas" class="variety-boxes-input" min="0" value="0" data-variety="Samoas" data-type="remaining">
+                                    <span class="variety-total" id="remainingTotalSamoas">0</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Tagalongs®</span>
+                                    <input type="number" id="remainingCasesTagalongs" class="variety-cases-input" min="0" value="0" data-variety="Tagalongs" data-type="remaining">
+                                    <input type="number" id="remainingBoxesTagalongs" class="variety-boxes-input" min="0" value="0" data-variety="Tagalongs" data-type="remaining">
+                                    <span class="variety-total" id="remainingTotalTagalongs">0</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Trefoils®</span>
+                                    <input type="number" id="remainingCasesTrefoils" class="variety-cases-input" min="0" value="0" data-variety="Trefoils" data-type="remaining">
+                                    <input type="number" id="remainingBoxesTrefoils" class="variety-boxes-input" min="0" value="0" data-variety="Trefoils" data-type="remaining">
+                                    <span class="variety-total" id="remainingTotalTrefoils">0</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Do-si-dos®</span>
+                                    <input type="number" id="remainingCasesDosiDos" class="variety-cases-input" min="0" value="0" data-variety="DosiDos" data-type="remaining">
+                                    <input type="number" id="remainingBoxesDosiDos" class="variety-boxes-input" min="0" value="0" data-variety="DosiDos" data-type="remaining">
+                                    <span class="variety-total" id="remainingTotalDosiDos">0</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Lemon-Ups®</span>
+                                    <input type="number" id="remainingCasesLemonUps" class="variety-cases-input" min="0" value="0" data-variety="LemonUps" data-type="remaining">
+                                    <input type="number" id="remainingBoxesLemonUps" class="variety-boxes-input" min="0" value="0" data-variety="LemonUps" data-type="remaining">
+                                    <span class="variety-total" id="remainingTotalLemonUps">0</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Adventurefuls®</span>
+                                    <input type="number" id="remainingCasesAdventurefuls" class="variety-cases-input" min="0" value="0" data-variety="Adventurefuls" data-type="remaining">
+                                    <input type="number" id="remainingBoxesAdventurefuls" class="variety-boxes-input" min="0" value="0" data-variety="Adventurefuls" data-type="remaining">
+                                    <span class="variety-total" id="remainingTotalAdventurefuls">0</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Exploremores™</span>
+                                    <input type="number" id="remainingCasesExploremores" class="variety-cases-input" min="0" value="0" data-variety="Exploremores" data-type="remaining">
+                                    <input type="number" id="remainingBoxesExploremores" class="variety-boxes-input" min="0" value="0" data-variety="Exploremores" data-type="remaining">
+                                    <span class="variety-total" id="remainingTotalExploremores">0</span>
+                                </div>
+                                <div class="event-variety-row">
+                                    <span class="variety-name">Toffee-tastic®</span>
+                                    <input type="number" id="remainingCasesToffeetastic" class="variety-cases-input" min="0" value="0" data-variety="Toffeetastic" data-type="remaining">
+                                    <input type="number" id="remainingBoxesToffeetastic" class="variety-boxes-input" min="0" value="0" data-variety="Toffeetastic" data-type="remaining">
+                                    <span class="variety-total" id="remainingTotalToffeetastic">0</span>
+                                </div>
+                                <div class="event-variety-footer">
+                                    <span class="variety-name-col">Total</span>
+                                    <span class="variety-cases-col" id="remainingTotalCases">0</span>
+                                    <span class="variety-boxes-col" id="remainingTotalBoxes">0</span>
+                                    <span class="variety-total-col" id="remainingGrandTotal">0</span>
+                                </div>
                             </div>
                         </div>
                         <div class="form-group">

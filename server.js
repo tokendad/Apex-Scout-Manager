@@ -160,7 +160,22 @@ try {
         }
     }
 
-
+    // Migration: Add variety breakdown columns to events table
+    const eventsTableInfo = db.prepare("PRAGMA table_info(events)").all();
+    const varietyColumns = [
+        'initialThinMints', 'initialSamoas', 'initialTagalongs', 'initialTrefoils',
+        'initialDosiDos', 'initialLemonUps', 'initialAdventurefuls', 'initialExploremores', 'initialToffeetastic',
+        'remainingThinMints', 'remainingSamoas', 'remainingTagalongs', 'remainingTrefoils',
+        'remainingDosiDos', 'remainingLemonUps', 'remainingAdventurefuls', 'remainingExploremores', 'remainingToffeetastic'
+    ];
+    
+    for (const column of varietyColumns) {
+        const hasColumn = eventsTableInfo.some(col => col.name === column);
+        if (!hasColumn) {
+            db.exec(`ALTER TABLE events ADD COLUMN ${column} INTEGER DEFAULT 0`);
+            logger.info(`Migration: Added ${column} column to events table`);
+        }
+    }
 
     logger.info('Database tables initialized');
 } catch (error) {
