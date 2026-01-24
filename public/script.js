@@ -1743,23 +1743,33 @@ function updateSummary() {
     // Calculate donation boxes (Cookie Share)
     const donationBoxes = donations.reduce((sum, donation) => sum + (donation.boxCount || 0), 0);
     
-    const totalBoxes = salesBoxes + donationBoxes;
+    // Calculate boxes sold from booth events (initial - remaining)
+    const eventBoothBoxes = events.reduce((sum, event) => {
+        const totalInitial = event.initialBoxes + (event.initialCases * BOXES_PER_CASE);
+        const totalRemaining = event.remainingBoxes + (event.remainingCases * BOXES_PER_CASE);
+        const totalSold = Math.max(0, totalInitial - totalRemaining);
+        return sum + totalSold;
+    }, 0);
+    
+    const totalBoxes = salesBoxes + donationBoxes + eventBoothBoxes;
     
     const individualBoxes = sales.filter(s => s.saleType === 'individual').reduce((sum, sale) => sum + convertToBoxes(sale), 0);
     const eventBoxes = sales.filter(s => s.saleType === 'event').reduce((sum, sale) => sum + convertToBoxes(sale), 0);
     
     const salesRevenue = salesBoxes * PRICE_PER_BOX;
+    const eventBoothRevenue = eventBoothBoxes * PRICE_PER_BOX;
     const totalDonationAmount = donations.reduce((sum, donation) => sum + donation.amount, 0);
+    const eventDonationsAmount = events.reduce((sum, event) => sum + (event.donationsReceived || 0), 0);
     
-    const totalRevenue = salesRevenue + totalDonationAmount;
+    const totalRevenue = salesRevenue + eventBoothRevenue + totalDonationAmount + eventDonationsAmount;
     
     totalBoxesElement.textContent = totalBoxes;
     // Update labels to be more clear if needed, or just keep as is
     individualSalesElement.textContent = `${individualBoxes} boxes`;
-    eventSalesElement.textContent = `${eventBoxes} boxes`;
+    eventSalesElement.textContent = `${eventBoxes + eventBoothBoxes} boxes`;
     
     totalRevenueElement.textContent = `$${totalRevenue.toFixed(2)}`;
-    totalDonationsElement.textContent = `$${totalDonationAmount.toFixed(2)}`;
+    totalDonationsElement.textContent = `$${(totalDonationAmount + eventDonationsAmount).toFixed(2)}`;
 }
 
 // Update cookie breakdown
