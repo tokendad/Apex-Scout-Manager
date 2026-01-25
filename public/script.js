@@ -122,7 +122,7 @@ function generatePDFSummary() {
     function addLine(y, padding = 5) {
         if (y + padding > pageHeight - margin) {
             doc.addPage();
-            y = margin;
+            return margin + padding + 5;
         }
         doc.setDrawColor(200, 200, 200);
         doc.line(margin, y + padding, pageWidth - margin, y + padding);
