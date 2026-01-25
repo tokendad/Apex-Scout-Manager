@@ -400,8 +400,7 @@ function generatePDF(options) {
                     paymentMethod: sale.paymentMethod || '',
                     cookies: {},
                     totalCollected: 0,
-                    totalDue: 0,
-                    status: 'PAID'
+                    totalDue: 0
                 };
             }
 
@@ -411,16 +410,26 @@ function generatePDF(options) {
             customerOrders[key].cookies[cookieName] = (customerOrders[key].cookies[cookieName] || 0) + boxes;
             customerOrders[key].totalCollected += (sale.amountCollected || 0);
             customerOrders[key].totalDue += (sale.amountDue || 0);
-
-            if (sale.amountDue > 0) {
-                customerOrders[key].status = 'PARTIAL';
-            }
         });
 
         doc.setFontSize(8);
 
         let orderNum = 1;
         Object.values(customerOrders).forEach(order => {
+            // Calculate total amount and proper payment status
+            const totalBoxes = Object.values(order.cookies).reduce((sum, qty) => sum + qty, 0);
+            const totalAmount = totalBoxes * PRICE_PER_BOX;
+
+            // Determine payment status based on amount collected vs total amount
+            let paymentStatus;
+            if (order.totalCollected >= totalAmount) {
+                paymentStatus = 'PAID';
+            } else if (order.totalCollected > 0) {
+                paymentStatus = 'PARTIAL';
+            } else {
+                paymentStatus = 'UNPAID';
+            }
+
             doc.setFont(undefined, 'bold');
             yPos = addText(`${orderNum}. ${order.customerName}`, margin + 2, yPos, 9, 'bold');
             yPos += 5;
@@ -443,10 +452,7 @@ function generatePDF(options) {
             yPos = addText(`   Cookies: ${cookiesList}`, margin + 2, yPos, 8);
             yPos += 4;
 
-            const totalBoxes = Object.values(order.cookies).reduce((sum, qty) => sum + qty, 0);
-            const totalAmount = totalBoxes * PRICE_PER_BOX;
-
-            yPos = addText(`   Total: ${totalBoxes} boxes = $${totalAmount.toFixed(2)} | Collected: $${order.totalCollected.toFixed(2)} | Due: $${order.totalDue.toFixed(2)} | ${order.status}`, margin + 2, yPos, 8);
+            yPos = addText(`   Total: ${totalBoxes} boxes = $${totalAmount.toFixed(2)} | Collected: $${order.totalCollected.toFixed(2)} | Due: $${order.totalDue.toFixed(2)} | ${paymentStatus}`, margin + 2, yPos, 8);
             yPos += 6;
 
             orderNum++;
@@ -683,8 +689,7 @@ function generateExcel(options) {
                     paymentMethod: sale.paymentMethod || '',
                     cookies: {},
                     totalCollected: 0,
-                    totalDue: 0,
-                    status: 'PAID'
+                    totalDue: 0
                 };
             }
 
@@ -694,10 +699,6 @@ function generateExcel(options) {
             customerOrders[key].cookies[cookieName] = (customerOrders[key].cookies[cookieName] || 0) + boxes;
             customerOrders[key].totalCollected += (sale.amountCollected || 0);
             customerOrders[key].totalDue += (sale.amountDue || 0);
-
-            if (sale.amountDue > 0) {
-                customerOrders[key].status = 'PARTIAL';
-            }
         });
 
         // Create header row with all cookie types
@@ -725,13 +726,23 @@ function generateExcel(options) {
 
             const totalAmount = totalBoxes * PRICE_PER_BOX;
 
+            // Determine payment status based on amount collected vs total amount
+            let paymentStatus;
+            if (order.totalCollected >= totalAmount) {
+                paymentStatus = 'PAID';
+            } else if (order.totalCollected > 0) {
+                paymentStatus = 'PARTIAL';
+            } else {
+                paymentStatus = 'UNPAID';
+            }
+
             row.push(
                 totalBoxes,
                 totalAmount,
                 order.totalCollected,
                 order.totalDue,
                 order.paymentMethod,
-                order.status
+                paymentStatus
             );
 
             salesData.push(row);
