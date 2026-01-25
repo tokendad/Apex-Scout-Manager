@@ -2227,41 +2227,70 @@ function renderSales() {
             year: 'numeric'
         });
 
-        // Check if order is complete using the first sale item
-        const firstSale = order.items[0];
-        const isComplete = isOrderComplete(firstSale);
+        // Determine actual status based on business logic
+        // Check if order is truly complete (paid AND delivered)
+        const actuallyPaid = order.totalCollected >= order.totalDue || order.paymentStatus === 'Paid';
+        const isOnline = order.orderSource === 'Online';
+        const actuallyDelivered = order.deliveryStatus === 'Delivered' || order.deliveryStatus === 'Shipped';
 
-        // Determine status class for row coloring
-        let statusClass = '';
-        if (isComplete) {
-            statusClass = 'status-complete';
-        } else if (order.paymentStatus === 'Paid' && (order.deliveryStatus === 'Not Delivered' || order.deliveryStatus === 'Not Shipped')) {
-            statusClass = 'status-paid-pending-delivery';
-        } else if (order.paymentStatus === 'Not Paid' && (order.deliveryStatus === 'Delivered' || order.deliveryStatus === 'Shipped')) {
-            statusClass = 'status-delivered-pending-payment';
+        // Derive display values from orderStatus and actual data
+        let displayPaymentStatus, displayDeliveryStatus, displayOrderStatus;
+
+        if (order.orderStatus === 'Delivered') {
+            // If marked as Delivered, assume everything is complete
+            displayPaymentStatus = 'Paid';
+            displayDeliveryStatus = 'Delivered';
+            displayOrderStatus = 'Complete';
+        } else if (order.orderStatus === 'Shipped') {
+            // If shipped, payment must be done, delivery in progress
+            displayPaymentStatus = 'Paid';
+            displayDeliveryStatus = isOnline ? 'Shipped' : 'Delivered';
+            displayOrderStatus = 'Shipped';
         } else {
-            statusClass = 'status-pending';
+            // For Pending status, use actual values
+            displayPaymentStatus = actuallyPaid ? 'Paid' : (order.paymentStatus || 'Not Paid');
+            displayDeliveryStatus = order.deliveryStatus || (isOnline ? 'Not Shipped' : 'Not Delivered');
+
+            // Determine overall status from actual data
+            if (actuallyPaid && actuallyDelivered) {
+                displayOrderStatus = 'Complete';
+            } else if (actuallyPaid && !actuallyDelivered) {
+                displayOrderStatus = 'Paid - Awaiting Delivery';
+            } else if (!actuallyPaid && actuallyDelivered) {
+                displayOrderStatus = 'Delivered - Awaiting Payment';
+            } else {
+                displayOrderStatus = 'Pending';
+            }
         }
 
         // Create status badges
         const sourceBadge = `<span class="status-badge badge-source badge-${order.orderSource.toLowerCase()}">${order.orderSource}</span>`;
-        const paymentBadge = `<span class="status-badge badge-payment badge-${order.paymentStatus === 'Paid' ? 'paid' : 'unpaid'}">${order.paymentStatus}</span>`;
-        const deliveryBadge = `<span class="status-badge badge-delivery badge-${order.deliveryStatus.toLowerCase().replace(/\s+/g, '-')}">${order.deliveryStatus}</span>`;
-        
-        // Use orderStatus field for the status badge
-        const statusValue = order.orderStatus || 'Pending';
-        const statusBadgeClass = statusValue.toLowerCase().replace(/\s+/g, '-');
+        const paymentBadge = `<span class="status-badge badge-payment badge-${displayPaymentStatus === 'Paid' ? 'paid' : 'unpaid'}">${displayPaymentStatus}</span>`;
+        const deliveryBadge = `<span class="status-badge badge-delivery badge-${displayDeliveryStatus.toLowerCase().replace(/\s+/g, '-')}">${displayDeliveryStatus}</span>`;
 
-        // Map status values to their icons
-        // Valid orderStatus values: 'Pending', 'Shipped', 'Delivered'
+        // Status badge with appropriate icon
+        const statusBadgeClass = displayOrderStatus.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
         const statusIcons = {
+            'Complete': '✓ ',
             'Delivered': '✓ ',
             'Shipped': '✓ ',
             'Pending': '⧖ '
         };
-        const statusIcon = statusIcons[statusValue] || ''; // Default to no icon for unknown statuses
-        
-        const statusBadge = `<span class="status-badge badge-status badge-${statusBadgeClass}">${statusIcon}${statusValue}</span>`;
+        const statusIcon = statusIcons[displayOrderStatus] || (displayOrderStatus.includes('Paid') ? '💰 ' : (displayOrderStatus.includes('Delivered') ? '📦 ' : '⧖ '));
+
+        const statusBadge = `<span class="status-badge badge-status badge-${statusBadgeClass}">${statusIcon}${displayOrderStatus}</span>`;
+
+        // Determine status class for row coloring based on display status
+        let statusClass = '';
+        if (displayOrderStatus === 'Complete') {
+            statusClass = 'status-complete';
+        } else if (displayOrderStatus.includes('Paid') && displayOrderStatus.includes('Awaiting Delivery')) {
+            statusClass = 'status-paid-pending-delivery';
+        } else if (displayOrderStatus.includes('Delivered') && displayOrderStatus.includes('Awaiting Payment')) {
+            statusClass = 'status-delivered-pending-payment';
+        } else {
+            statusClass = 'status-pending';
+        }
 
         html += `
             <tr class="${statusClass}" data-order-key="${order.key}">
