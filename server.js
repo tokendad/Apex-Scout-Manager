@@ -900,11 +900,25 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
         const insertStmt = db.prepare(`
             INSERT INTO sales (
                 cookieType, quantity, customerName, customerAddress, customerPhone,
-                date, saleType, unitType, orderNumber, orderType, orderStatus, customerEmail
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                date, saleType, unitType, orderNumber, orderType, orderStatus, customerEmail,
+                orderSource, paymentStatus, deliveryStatus
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         let importedCount = 0;
+
+        // Track In-Person delivery quantities for inventory deduction
+        const inPersonInventory = {
+            'Thin Mints': 0,
+            'Samoas': 0,
+            'Tagalongs': 0,
+            'Trefoils': 0,
+            'Do-si-dos': 0,
+            'Lemon-Ups': 0,
+            'Adventurefuls': 0,
+            'Exploremores': 0,
+            'Toffee-tastic': 0
+        };
 
         // Use a transaction for better performance
         const importTransaction = db.transaction((rows) => {
@@ -943,6 +957,26 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
                     saleType = 'donation';
                 }
 
+                // Imported orders are always from 'Online' source
+                const validOrderSource = 'Online';
+
+                // Online orders from Digital Cookie are pre-paid during checkout
+                const validPaymentStatus = 'Paid';
+
+                // Set delivery status based on order type:
+                // - "Shipped" (store delivery) → 'Shipped'
+                // - "Donation" (store delivery) → 'Shipped'
+                // - "In-Person Delivery" (scout delivers) → 'Not Delivered'
+                let validDeliveryStatus = 'Not Delivered';
+                const isInPersonDelivery = orderType.toLowerCase().includes('in-person') || orderType.toLowerCase().includes('in person');
+                const isDonation = orderType.toLowerCase().includes('donation');
+
+                if (orderType.toLowerCase().includes('shipped') || isDonation) {
+                    validDeliveryStatus = 'Shipped';
+                } else if (isInPersonDelivery) {
+                    validDeliveryStatus = 'Not Delivered';
+                }
+
                 // Check for donated cookies column
                 const donatedCookies = parseInt(row['Donated Cookies'] || row['Donated Cookies (DO NOT DELIVER)'] || 0);
                 if (donatedCookies > 0) {
@@ -959,7 +993,10 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
                         orderNumber,
                         orderType,
                         orderStatus,
-                        customerEmail
+                        customerEmail,
+                        validOrderSource,
+                        validPaymentStatus,
+                        validDeliveryStatus
                     );
                     importedCount++;
                 }
@@ -980,9 +1017,17 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
                             orderNumber,
                             orderType,
                             orderStatus,
-                            customerEmail
+                            customerEmail,
+                            validOrderSource,
+                            validPaymentStatus,
+                            validDeliveryStatus
                         );
                         importedCount++;
+
+                        // Track In-Person delivery quantities for inventory deduction
+                        if (isInPersonDelivery && inPersonInventory[cookie.db] !== undefined) {
+                            inPersonInventory[cookie.db] += quantity;
+                        }
                     }
                 }
             }
@@ -990,16 +1035,57 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
 
         importTransaction(data);
 
+        // Deduct In-Person delivery quantities from inventory
+        const hasInPersonDelivery = Object.values(inPersonInventory).some(qty => qty > 0);
+        if (hasInPersonDelivery) {
+            try {
+                const updateInventoryStmt = db.prepare(`
+                    UPDATE profile SET
+                        inventoryThinMints = MAX(0, inventoryThinMints - ?),
+                        inventorySamoas = MAX(0, inventorySamoas - ?),
+                        inventoryTagalongs = MAX(0, inventoryTagalongs - ?),
+                        inventoryTrefoils = MAX(0, inventoryTrefoils - ?),
+                        inventoryDosiDos = MAX(0, inventoryDosiDos - ?),
+                        inventoryLemonUps = MAX(0, inventoryLemonUps - ?),
+                        inventoryAdventurefuls = MAX(0, inventoryAdventurefuls - ?),
+                        inventoryExploremores = MAX(0, inventoryExploremores - ?),
+                        inventoryToffeetastic = MAX(0, inventoryToffeetastic - ?)
+                    WHERE id = 1
+                `);
+
+                updateInventoryStmt.run(
+                    inPersonInventory['Thin Mints'],
+                    inPersonInventory['Samoas'],
+                    inPersonInventory['Tagalongs'],
+                    inPersonInventory['Trefoils'],
+                    inPersonInventory['Do-si-dos'],
+                    inPersonInventory['Lemon-Ups'],
+                    inPersonInventory['Adventurefuls'],
+                    inPersonInventory['Exploremores'],
+                    inPersonInventory['Toffee-tastic']
+                );
+
+                logger.info('Inventory updated for In-Person deliveries', { deductions: inPersonInventory });
+            } catch (invError) {
+                logger.warn('Failed to update inventory for In-Person deliveries', {
+                    error: invError.message,
+                    deductions: inPersonInventory
+                });
+            }
+        }
+
         logger.info('XLSX import completed', {
             filename: req.file.originalname,
             totalRows: data.length,
-            importedSales: importedCount
+            importedSales: importedCount,
+            inPersonDeliveries: hasInPersonDelivery ? inPersonInventory : null
         });
 
         res.json({
             message: 'Import successful',
             ordersProcessed: data.length,
-            salesImported: importedCount
+            salesImported: importedCount,
+            inventoryDeducted: hasInPersonDelivery ? inPersonInventory : null
         });
     } catch (error) {
         logger.error('Error importing XLSX', { error: error.message, stack: error.stack });

@@ -2183,6 +2183,7 @@ function renderSales() {
                 customerName: sale.customerName || 'Walk-in Customer',
                 date: sale.date,
                 orderSource: sale.orderSource || 'Manual',
+                orderType: sale.orderType || '',
                 paymentStatus: sale.paymentStatus || 'Not Paid',
                 deliveryStatus: sale.deliveryStatus || (sale.orderSource === 'Online' ? 'Not Shipped' : 'Not Delivered'),
                 orderStatus: sale.orderStatus || 'Pending',
@@ -2269,9 +2270,13 @@ function renderSales() {
         }
 
         // Create status badges (payment and delivery are clickable)
-        const sourceBadge = `<span class="status-badge badge-source badge-${order.orderSource.toLowerCase()}">${order.orderSource}</span>`;
+        // Add star indicator for donation orders
+        const isDonation = order.orderType && order.orderType.toLowerCase().includes('donation');
+        const donationIndicator = isDonation ? ' ⭐' : '';
+
+        const sourceBadge = `<span class="status-badge badge-source badge-${order.orderSource.toLowerCase()}">${order.orderSource}${donationIndicator}</span>`;
         const paymentBadge = `<span class="status-badge badge-payment badge-${displayPaymentStatus === 'Paid' ? 'paid' : 'unpaid'} clickable-badge" onclick="togglePaymentStatus('${order.key}'); event.stopPropagation();" title="Click to toggle payment status">${displayPaymentStatus}</span>`;
-        const deliveryBadge = `<span class="status-badge badge-delivery badge-${displayDeliveryStatus.toLowerCase().replace(/\s+/g, '-')} clickable-badge" onclick="toggleDeliveryStatus('${order.key}'); event.stopPropagation();" title="Click to toggle delivery status">${displayDeliveryStatus}</span>`;
+        const deliveryBadge = `<span class="status-badge badge-delivery badge-${displayDeliveryStatus.toLowerCase().replace(/\s+/g, '-')} clickable-badge" onclick="toggleDeliveryStatus('${order.key}'); event.stopPropagation();" title="Click to toggle delivery status">${displayDeliveryStatus}${donationIndicator}</span>`;
 
         // Status badge with appropriate icon
         const statusBadgeClass = displayOrderStatus.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
