@@ -2268,10 +2268,10 @@ function renderSales() {
             }
         }
 
-        // Create status badges
+        // Create status badges (payment and delivery are clickable)
         const sourceBadge = `<span class="status-badge badge-source badge-${order.orderSource.toLowerCase()}">${order.orderSource}</span>`;
-        const paymentBadge = `<span class="status-badge badge-payment badge-${displayPaymentStatus === 'Paid' ? 'paid' : 'unpaid'}">${displayPaymentStatus}</span>`;
-        const deliveryBadge = `<span class="status-badge badge-delivery badge-${displayDeliveryStatus.toLowerCase().replace(/\s+/g, '-')}">${displayDeliveryStatus}</span>`;
+        const paymentBadge = `<span class="status-badge badge-payment badge-${displayPaymentStatus === 'Paid' ? 'paid' : 'unpaid'} clickable-badge" onclick="togglePaymentStatus('${order.key}'); event.stopPropagation();" title="Click to toggle payment status">${displayPaymentStatus}</span>`;
+        const deliveryBadge = `<span class="status-badge badge-delivery badge-${displayDeliveryStatus.toLowerCase().replace(/\s+/g, '-')} clickable-badge" onclick="toggleDeliveryStatus('${order.key}'); event.stopPropagation();" title="Click to toggle delivery status">${displayDeliveryStatus}</span>`;
 
         // Status badge with appropriate icon
         const statusBadgeClass = displayOrderStatus.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
@@ -2325,6 +2325,117 @@ function renderSales() {
     `;
 
     salesList.innerHTML = html;
+}
+
+// Toggle payment status for an order
+async function togglePaymentStatus(orderKey) {
+    const orderSales = sales.filter(s => getOrderKey(s) === orderKey);
+    if (orderSales.length === 0) return;
+
+    const firstSale = orderSales[0];
+    const currentPaymentStatus = firstSale.paymentStatus || 'Not Paid';
+    const newPaymentStatus = currentPaymentStatus === 'Paid' ? 'Not Paid' : 'Paid';
+
+    // Also update financial data based on new payment status
+    let updateData = {
+        paymentStatus: newPaymentStatus
+    };
+
+    // If marking as paid, set amountDue to 0 on first sale
+    if (newPaymentStatus === 'Paid') {
+        updateData.amountDue = 0;
+    }
+
+    // Check if order should be marked as complete
+    const currentDeliveryStatus = firstSale.deliveryStatus || 'Not Delivered';
+    const isDelivered = currentDeliveryStatus === 'Delivered' || currentDeliveryStatus === 'Shipped';
+
+    // If both paid and delivered, mark orderStatus as Delivered (shows as Complete)
+    if (newPaymentStatus === 'Paid' && isDelivered) {
+        updateData.orderStatus = 'Delivered';
+    } else if (firstSale.orderStatus === 'Delivered') {
+        // If unmarking paid or delivered, revert to Pending
+        updateData.orderStatus = 'Pending';
+    }
+
+    try {
+        // Update all sales in the order
+        const updatePromises = orderSales.map(sale =>
+            fetch(`${API_BASE_URL}/sales/${sale.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateData)
+            })
+        );
+
+        await Promise.all(updatePromises);
+
+        // Reload and re-render
+        await loadSales();
+        renderSales();
+        updateSummary();
+        showFeedback(`Payment status updated to: ${newPaymentStatus}`);
+    } catch (error) {
+        console.error('Error updating payment status:', error);
+        alert('Failed to update payment status. Please try again.');
+    }
+}
+
+// Toggle delivery status for an order
+async function toggleDeliveryStatus(orderKey) {
+    const orderSales = sales.filter(s => getOrderKey(s) === orderKey);
+    if (orderSales.length === 0) return;
+
+    const firstSale = orderSales[0];
+    const currentDeliveryStatus = firstSale.deliveryStatus || 'Not Delivered';
+    const orderSource = firstSale.orderSource || 'Manual';
+
+    // Toggle between delivered/not delivered states based on order source
+    let newDeliveryStatus;
+    if (orderSource === 'Online') {
+        newDeliveryStatus = currentDeliveryStatus === 'Shipped' ? 'Not Shipped' : 'Shipped';
+    } else {
+        newDeliveryStatus = currentDeliveryStatus === 'Delivered' ? 'Not Delivered' : 'Delivered';
+    }
+
+    let updateData = {
+        deliveryStatus: newDeliveryStatus
+    };
+
+    // Check if order should be marked as complete
+    const currentPaymentStatus = firstSale.paymentStatus || 'Not Paid';
+    const isPaid = currentPaymentStatus === 'Paid' || (firstSale.amountDue === 0 && firstSale.amountCollected > 0);
+    const isDelivered = newDeliveryStatus === 'Delivered' || newDeliveryStatus === 'Shipped';
+
+    // If both paid and delivered, mark orderStatus as Delivered (shows as Complete)
+    if (isPaid && isDelivered) {
+        updateData.orderStatus = 'Delivered';
+    } else if (firstSale.orderStatus === 'Delivered') {
+        // If unmarking paid or delivered, revert to Pending
+        updateData.orderStatus = 'Pending';
+    }
+
+    try {
+        // Update all sales in the order
+        const updatePromises = orderSales.map(sale =>
+            fetch(`${API_BASE_URL}/sales/${sale.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateData)
+            })
+        );
+
+        await Promise.all(updatePromises);
+
+        // Reload and re-render
+        await loadSales();
+        renderSales();
+        updateSummary();
+        showFeedback(`Delivery status updated to: ${newDeliveryStatus}`);
+    } catch (error) {
+        console.error('Error updating delivery status:', error);
+        alert('Failed to update delivery status. Please try again.');
+    }
 }
 
 // Show order details when clicking on customer name
