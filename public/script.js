@@ -1565,6 +1565,7 @@ async function handleAddSale(e) {
     const orderSource = document.getElementById('orderSource').value;
     const paymentStatus = document.getElementById('paymentStatus').value;
     const deliveryStatus = document.getElementById('deliveryStatus').value;
+    const orderStatus = document.getElementById('orderStatusInput').value;
 
     // Collect all cookie quantities from the table
     const qtyInputs = document.querySelectorAll('.qty-input');
@@ -1610,6 +1611,7 @@ async function handleAddSale(e) {
                 orderSource,
                 paymentStatus,
                 deliveryStatus,
+                orderStatus,
                 date: saleDate
             };
             return sale;
@@ -2249,14 +2251,15 @@ function renderSales() {
         // Use orderStatus field for the status badge
         const statusValue = order.orderStatus || 'Pending';
         const statusBadgeClass = statusValue.toLowerCase().replace(/\s+/g, '-');
-        
+
         // Map status values to their icons
+        // Valid orderStatus values: 'Pending', 'Shipped', 'Delivered'
         const statusIcons = {
             'Delivered': '✓ ',
             'Shipped': '✓ ',
             'Pending': '⧖ '
         };
-        const statusIcon = statusIcons[statusValue] || '';
+        const statusIcon = statusIcons[statusValue] || ''; // Default to no icon for unknown statuses
         
         const statusBadge = `<span class="status-badge badge-status badge-${statusBadgeClass}">${statusIcon}${statusValue}</span>`;
 
@@ -2477,6 +2480,7 @@ function showEditOrderForm(orderKey) {
                             <label>Order Status</label>
                             <select id="editOrderStatus">
                                 <option value="Pending" ${firstSale.orderStatus === 'Pending' ? 'selected' : ''}>Pending</option>
+                                <option value="Shipped" ${firstSale.orderStatus === 'Shipped' ? 'selected' : ''}>Shipped</option>
                                 <option value="Delivered" ${firstSale.orderStatus === 'Delivered' ? 'selected' : ''}>Delivered</option>
                             </select>
                         </div>

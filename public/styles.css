@@ -785,6 +785,12 @@ section h2 {
     border: 1px solid #1976d2;
 }
 
+.badge-status.badge-pending {
+    background-color: #ff9800;
+    color: white;
+    border: 1px solid #f57c00;
+}
+
 /* Dark mode status badges */
 [data-theme="dark"] .badge-source.badge-manual {
     background-color: #1e3a5f;
@@ -856,6 +862,12 @@ section h2 {
     background-color: #0277bd;
     color: #e1f5fe;
     border-color: #01579b;
+}
+
+[data-theme="dark"] .badge-status.badge-pending {
+    background-color: #e65100;
+    color: #fff3e0;
+    border-color: #bf360c;
 }
 
 /* Donations Section */
