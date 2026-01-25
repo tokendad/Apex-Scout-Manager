@@ -881,17 +881,26 @@ async function handleSetGoal() {
 // Update goal display
 function updateGoalDisplay() {
     if (!profile) return;
-    
+
     const goalBoxes = profile.goalBoxes || 0;
     const goalAmount = profile.goalAmount || 0;
-    
-    // Calculate total boxes (sales + donations)
+
+    // Calculate total boxes (sales + donations + event booth boxes)
     const salesBoxes = sales.reduce((sum, sale) => sum + convertToBoxes(sale), 0);
     const donationBoxes = donations.reduce((sum, donation) => sum + (donation.boxCount || 0), 0);
-    const totalBoxes = salesBoxes + donationBoxes;
-    
+
+    // Calculate boxes sold from booth events (initial - remaining)
+    const eventBoothBoxes = events.reduce((sum, event) => {
+        const totalInitial = (event.initialBoxes || 0) + ((event.initialCases || 0) * BOXES_PER_CASE);
+        const totalRemaining = (event.remainingBoxes || 0) + ((event.remainingCases || 0) * BOXES_PER_CASE);
+        const totalSold = Math.max(0, totalInitial - totalRemaining);
+        return sum + totalSold;
+    }, 0);
+
+    const totalBoxes = salesBoxes + donationBoxes + eventBoothBoxes;
+
     goalBoxesDisplay.textContent = `${goalBoxes} boxes ($${goalAmount})`;
-    
+
     if (goalBoxes > 0) {
         const progress = Math.min((totalBoxes / goalBoxes) * 100, 100);
         goalProgress.textContent = `${progress.toFixed(1)}%`;
