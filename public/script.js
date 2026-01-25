@@ -2183,6 +2183,7 @@ function renderSales() {
                 orderSource: sale.orderSource || 'Manual',
                 paymentStatus: sale.paymentStatus || 'Not Paid',
                 deliveryStatus: sale.deliveryStatus || (sale.orderSource === 'Online' ? 'Not Shipped' : 'Not Delivered'),
+                orderStatus: sale.orderStatus || 'Pending',
                 items: [],
                 totalBoxes: 0,
                 totalDue: 0,
@@ -2244,9 +2245,20 @@ function renderSales() {
         const sourceBadge = `<span class="status-badge badge-source badge-${order.orderSource.toLowerCase()}">${order.orderSource}</span>`;
         const paymentBadge = `<span class="status-badge badge-payment badge-${order.paymentStatus === 'Paid' ? 'paid' : 'unpaid'}">${order.paymentStatus}</span>`;
         const deliveryBadge = `<span class="status-badge badge-delivery badge-${order.deliveryStatus.toLowerCase().replace(/\s+/g, '-')}">${order.deliveryStatus}</span>`;
-        const completionBadge = isComplete
-            ? '<span class="status-badge badge-completed">✓ Completed</span>'
-            : '<span class="status-badge badge-pending">⧖ Pending</span>';
+        
+        // Use orderStatus field for the status badge
+        const statusValue = order.orderStatus || 'Pending';
+        const statusBadgeClass = statusValue.toLowerCase().replace(/\s+/g, '-');
+        
+        // Map status values to their icons
+        const statusIcons = {
+            'Delivered': '✓ ',
+            'Shipped': '✓ ',
+            'Pending': '⧖ '
+        };
+        const statusIcon = statusIcons[statusValue] || '';
+        
+        const statusBadge = `<span class="status-badge badge-status badge-${statusBadgeClass}">${statusIcon}${statusValue}</span>`;
 
         html += `
             <tr class="${statusClass}" data-order-key="${order.key}">
@@ -2258,7 +2270,7 @@ function renderSales() {
                 <td>${sourceBadge}</td>
                 <td>${paymentBadge}</td>
                 <td>${deliveryBadge}</td>
-                <td>${completionBadge}</td>
+                <td>${statusBadge}</td>
             </tr>
         `;
     });

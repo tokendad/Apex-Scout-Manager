@@ -773,6 +773,18 @@ section h2 {
     border: 1px solid #f57c00;
 }
 
+.badge-status.badge-delivered {
+    background-color: #4caf50;
+    color: white;
+    border: 1px solid #388e3c;
+}
+
+.badge-status.badge-shipped {
+    background-color: #2196f3;
+    color: white;
+    border: 1px solid #1976d2;
+}
+
 /* Dark mode status badges */
 [data-theme="dark"] .badge-source.badge-manual {
     background-color: #1e3a5f;
@@ -832,6 +844,18 @@ section h2 {
     background-color: #e65100;
     color: #fff3e0;
     border-color: #bf360c;
+}
+
+[data-theme="dark"] .badge-status.badge-delivered {
+    background-color: #2e7d32;
+    color: #e8f5e9;
+    border-color: #1b5e20;
+}
+
+[data-theme="dark"] .badge-status.badge-shipped {
+    background-color: #0277bd;
+    color: #e1f5fe;
+    border-color: #01579b;
 }
 
 /* Donations Section */
