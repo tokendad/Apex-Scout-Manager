@@ -219,7 +219,12 @@
             <div id="view-dashboard" class="view-section hidden">
                 <!-- Summary Section -->
                 <section class="summary-section">
-                    <h2>Sales Summary</h2>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h2 style="margin: 0;">Sales Summary</h2>
+                        <button id="printSummaryBtn" class="btn btn-secondary" style="min-width: auto;">
+                            <span style="margin-right: 4px;">📄</span> Print PDF
+                        </button>
+                    </div>
                     <div class="summary-card">
                         <div class="summary-item">
                             <span class="summary-label">Total Boxes Sold</span>
@@ -819,6 +824,7 @@
         </footer>
     </div>
 
+    <script src="jspdf.umd.min.js"></script>
     <script src="script.js?v=3"></script>
 </body>
 </html>

@@ -95,6 +95,209 @@ const remainingCasesInput = document.getElementById('remainingCases');
 const eventDonationsInput = document.getElementById('eventDonations');
 const eventsList = document.getElementById('eventsList');
 
+// Generate PDF Summary Report
+function generatePDFSummary() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Set up document
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    let yPos = margin;
+    
+    // Helper function to add text with automatic page break
+    function addText(text, x, y, fontSize = 12, style = 'normal') {
+        if (y > pageHeight - margin) {
+            doc.addPage();
+            y = margin;
+        }
+        doc.setFontSize(fontSize);
+        doc.setFont(undefined, style);
+        doc.text(text, x, y);
+        return y;
+    }
+    
+    // Helper function to add a line
+    function addLine(y, padding = 5) {
+        if (y + padding > pageHeight - margin) {
+            doc.addPage();
+            return margin + padding + 5;
+        }
+        doc.setDrawColor(200, 200, 200);
+        doc.line(margin, y + padding, pageWidth - margin, y + padding);
+        return y + padding + 5;
+    }
+    
+    // Title
+    doc.setFillColor(30, 123, 60); // Girl Scout green
+    doc.rect(0, 0, pageWidth, 30, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.setFont(undefined, 'bold');
+    doc.text('🍪 Girl Scout Cookie Sales Summary', pageWidth / 2, 20, { align: 'center' });
+    
+    yPos = 40;
+    doc.setTextColor(0, 0, 0);
+    
+    // Date
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    const reportDate = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+    doc.text(`Report Generated: ${reportDate}`, margin, yPos);
+    yPos += 15;
+    
+    // Sales Summary Section
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('Sales Summary', margin, yPos);
+    yPos += 10;
+    
+    // Calculate sales totals
+    const salesBoxes = sales.reduce((sum, sale) => sum + convertToBoxes(sale), 0);
+    const donationBoxes = donations.reduce((sum, donation) => sum + (donation.boxCount || 0), 0);
+    const eventBoothBoxes = events.reduce((sum, event) => {
+        const totalInitial = (event.initialBoxes || 0) + ((event.initialCases || 0) * BOXES_PER_CASE);
+        const totalRemaining = (event.remainingBoxes || 0) + ((event.remainingCases || 0) * BOXES_PER_CASE);
+        return sum + Math.max(0, totalInitial - totalRemaining);
+    }, 0);
+    const totalBoxes = salesBoxes + donationBoxes + eventBoothBoxes;
+    
+    const individualBoxes = sales.filter(s => s.saleType === 'individual').reduce((sum, sale) => sum + convertToBoxes(sale), 0);
+    const eventBoxes = sales.filter(s => s.saleType === 'event').reduce((sum, sale) => sum + convertToBoxes(sale), 0);
+    
+    const salesRevenue = salesBoxes * PRICE_PER_BOX;
+    const eventBoothRevenue = eventBoothBoxes * PRICE_PER_BOX;
+    const totalDonationAmount = donations.reduce((sum, donation) => sum + donation.amount, 0);
+    const eventDonationsAmount = events.reduce((sum, event) => sum + (event.donationsReceived || 0), 0);
+    const totalRevenue = salesRevenue + eventBoothRevenue + totalDonationAmount + eventDonationsAmount;
+    
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'normal');
+    yPos = addText(`Total Boxes Sold: ${totalBoxes}`, margin + 5, yPos);
+    yPos += 7;
+    yPos = addText(`Individual Sales: ${individualBoxes} boxes`, margin + 5, yPos);
+    yPos += 7;
+    yPos = addText(`Event Sales: ${eventBoxes + eventBoothBoxes} boxes`, margin + 5, yPos);
+    yPos += 7;
+    doc.setFont(undefined, 'bold');
+    yPos = addText(`Total Revenue: $${totalRevenue.toFixed(2)}`, margin + 5, yPos);
+    doc.setFont(undefined, 'normal');
+    yPos += 7;
+    yPos = addText(`Total Donations: $${(totalDonationAmount + eventDonationsAmount).toFixed(2)}`, margin + 5, yPos);
+    yPos += 10;
+    
+    yPos = addLine(yPos);
+    
+    // Cookie Breakdown Section
+    if (sales.length > 0) {
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'bold');
+        yPos = addText('Cookie Breakdown', margin, yPos);
+        yPos += 10;
+        
+        // Calculate breakdown by cookie type
+        const breakdown = {};
+        sales.forEach(sale => {
+            const boxes = convertToBoxes(sale);
+            breakdown[sale.cookieType] = (breakdown[sale.cookieType] || 0) + boxes;
+        });
+        
+        const sortedBreakdown = Object.entries(breakdown).sort((a, b) => b[1] - a[1]);
+        
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'normal');
+        sortedBreakdown.forEach(([cookieType, quantity]) => {
+            yPos = addText(`${cookieType}: ${quantity} box${quantity !== 1 ? 'es' : ''}`, margin + 5, yPos);
+            yPos += 7;
+        });
+        
+        yPos += 3;
+        yPos = addLine(yPos);
+    }
+    
+    // Event Totals Section
+    if (events.length > 0) {
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'bold');
+        yPos = addText('Event Totals', margin, yPos);
+        yPos += 10;
+        
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'normal');
+        
+        events.forEach(event => {
+            const totalInitial = (event.initialBoxes || 0) + ((event.initialCases || 0) * BOXES_PER_CASE);
+            const totalRemaining = (event.remainingBoxes || 0) + ((event.remainingCases || 0) * BOXES_PER_CASE);
+            const soldBoxes = Math.max(0, totalInitial - totalRemaining);
+            const eventRevenue = soldBoxes * PRICE_PER_BOX + (event.donationsReceived || 0);
+            
+            doc.setFont(undefined, 'bold');
+            yPos = addText(`${event.eventName}`, margin + 5, yPos);
+            yPos += 7;
+            doc.setFont(undefined, 'normal');
+            yPos = addText(`  Date: ${new Date(event.eventDate).toLocaleDateString()}`, margin + 5, yPos);
+            yPos += 7;
+            yPos = addText(`  Boxes Sold: ${soldBoxes}`, margin + 5, yPos);
+            yPos += 7;
+            yPos = addText(`  Revenue: $${eventRevenue.toFixed(2)}`, margin + 5, yPos);
+            if (event.donationsReceived > 0) {
+                yPos += 7;
+                yPos = addText(`  Donations: $${event.donationsReceived.toFixed(2)}`, margin + 5, yPos);
+            }
+            yPos += 10;
+        });
+        
+        yPos = addLine(yPos);
+    }
+    
+    // On-Hand Inventory Section
+    if (profile) {
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'bold');
+        yPos = addText('On-Hand Inventory', margin, yPos);
+        yPos += 10;
+        
+        const inventoryFields = [
+            { key: 'ThinMints', name: 'Thin Mints®' },
+            { key: 'Samoas', name: 'Samoas®' },
+            { key: 'Tagalongs', name: 'Tagalongs®' },
+            { key: 'Trefoils', name: 'Trefoils®' },
+            { key: 'DosiDos', name: 'Do-si-dos®' },
+            { key: 'LemonUps', name: 'Lemon-Ups®' },
+            { key: 'Adventurefuls', name: 'Adventurefuls®' },
+            { key: 'Exploremores', name: 'Exploremores™' },
+            { key: 'Toffeetastic', name: 'Toffee-tastic®' }
+        ];
+        
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'normal');
+        
+        let hasInventory = false;
+        inventoryFields.forEach(({ key, name }) => {
+            const quantity = profile[`inventory${key}`] || 0;
+            if (quantity > 0) {
+                hasInventory = true;
+                yPos = addText(`${name}: ${quantity} box${quantity !== 1 ? 'es' : ''}`, margin + 5, yPos);
+                yPos += 7;
+            }
+        });
+        
+        if (!hasInventory) {
+            yPos = addText('No inventory currently on hand', margin + 5, yPos);
+            yPos += 7;
+        }
+    }
+    
+    // Save the PDF
+    const fileName = `GSC_Sales_Summary_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+}
+
 // Initialize app
 async function init() {
     await Promise.all([loadSales(), loadDonations(), loadEvents(), loadProfile(), loadPaymentMethods()]);
@@ -136,6 +339,12 @@ function setupEventListeners() {
     
     // Event variety table listeners
     setupVarietyTableListeners();
+    
+    // PDF Print button listener
+    const printSummaryBtn = document.getElementById('printSummaryBtn');
+    if (printSummaryBtn) {
+        printSummaryBtn.addEventListener('click', generatePDFSummary);
+    }
 }
 
 // Cookie varieties list
