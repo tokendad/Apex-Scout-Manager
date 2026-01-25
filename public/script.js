@@ -616,6 +616,29 @@ function decrementSaleQty(cookieName, unit) {
     });
 }
 
+// Increment event quantity
+function incrementEventQty(inputId) {
+    const input = document.getElementById(inputId);
+    if (input) {
+        input.value = parseInt(input.value || 0) + 1;
+        // Trigger change event to update any calculations
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+}
+
+// Decrement event quantity
+function decrementEventQty(inputId) {
+    const input = document.getElementById(inputId);
+    if (input) {
+        const currentValue = parseInt(input.value || 0);
+        if (currentValue > 0) {
+            input.value = currentValue - 1;
+            // Trigger change event to update any calculations
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+}
+
 // Save inventory to profile
 async function saveInventory() {
     try {
