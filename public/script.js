@@ -2249,12 +2249,15 @@ function renderSales() {
         // Use orderStatus field for the status badge
         const statusValue = order.orderStatus || 'Pending';
         const statusBadgeClass = statusValue.toLowerCase().replace(/\s+/g, '-');
-        let statusIcon = '';
-        if (statusValue === 'Delivered' || statusValue === 'Shipped') {
-            statusIcon = '✓ ';
-        } else if (statusValue === 'Pending') {
-            statusIcon = '⧖ ';
-        }
+        
+        // Map status values to their icons
+        const statusIcons = {
+            'Delivered': '✓ ',
+            'Shipped': '✓ ',
+            'Pending': '⧖ '
+        };
+        const statusIcon = statusIcons[statusValue] || '';
+        
         const statusBadge = `<span class="status-badge badge-status badge-${statusBadgeClass}">${statusIcon}${statusValue}</span>`;
 
         html += `
