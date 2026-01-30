@@ -4,6 +4,89 @@ This document outlines the planned features and enhancements for GSCTracker 2.0,
 
 ---
 
+## ✅ v2.0 Implementation Status (PR #106)
+
+**Status:** Completed and Merged (January 30, 2026)
+
+PR #106 implemented the foundational security and authentication system for COPPA compliance. This represents the initial phase of the v2.0 roadmap, establishing secure user authentication and data encryption.
+
+### Implemented Features
+
+#### Authentication System ✅
+- **User Management:** Username/password-based authentication system
+- **Password Security:** bcrypt hashing with 12 rounds
+- **Session Management:** HTTP-only, SameSite=Strict cookies with 24-hour expiration
+- **Rate Limiting:** 5 login attempts per 15 minutes with account lockout on failure
+- **Login/Registration UI:** Dedicated authentication pages with user display
+- **Logout Functionality:** Session termination with secure cleanup
+- **Authentication Middleware:** All API endpoints protected via `requireAuth`
+
+#### Data Encryption ✅
+- **Field-Level Encryption:** AES-256-GCM for sensitive data (emails, extensible to phone/address)
+- **Key Management:** Environment variable-based encryption key (`ENCRYPTION_KEY`)
+- **Crypto Utilities:** Centralized encryption/decryption functions in `crypto-util.js`
+- **Database Security:** Encrypted storage for sensitive user information
+
+#### Security Headers & Middleware ✅
+- **Helmet.js Integration:** CSP, HSTS, X-Frame-Options, X-XSS-Protection
+- **CSRF Protection:** SameSite=Strict cookies (mitigates 95%+ of CSRF attacks)
+- **SQL Injection Prevention:** Prepared statements throughout codebase
+- **Environment Configuration:** Production-ready with `SESSION_SECRET` and `ENCRYPTION_KEY`
+
+#### Database Schema ✅
+```sql
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,        -- bcrypt hashed
+    email TEXT,                         -- AES-256-GCM encrypted
+    isActive INTEGER DEFAULT 1,
+    lastLogin TEXT
+);
+```
+
+### Deferred to v2.1
+
+The following features were identified during PR #106 implementation but deferred to future releases:
+
+#### Recommended for v2.1
+1. **Token-Based CSRF Protection:** Traditional CSRF tokens for defense-in-depth
+2. **COPPA Age Verification:** Date of birth collection and validation
+3. **Parental Consent Flow:** Email-based consent system for users under 13
+4. **Google OAuth Integration:** "Sign in with Google" for simplified authentication
+5. **Email Verification:** Account activation via email confirmation
+6. **Password Reset/Recovery:** Self-service password reset functionality
+7. **Advanced Rate Limiting:** Distributed rate limiting for scaled deployments
+8. **Audit Logging:** Comprehensive logging of sensitive data access
+
+#### Security Recommendations for v2.1+
+- **HTTPS Enforcement:** Require TLS/SSL in production (currently documented)
+- **Enhanced Session Security:** Implement session rotation and fingerprinting
+- **Multi-Factor Authentication (MFA):** Optional 2FA for enhanced security
+- **Biometric Authentication:** Future consideration for mobile apps
+
+### Setup Requirements
+
+**Production Environment Variables:**
+```bash
+export ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+export SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+export NODE_ENV=production
+```
+
+**Required for Production:**
+- HTTPS/TLS via reverse proxy (nginx, Caddy, or cloud provider)
+- Secure environment variable storage
+- Regular key rotation procedures
+
+### Security Notes from PR #106
+
+- **CodeQL Scan:** Identified missing token-based CSRF; mitigated via SameSite=Strict cookies
+- **Dependency Audit:** bcrypt 6.0.0 scanned with no vulnerabilities
+- **Browser Compatibility:** SameSite=Strict supported by 95%+ of modern browsers
+
+---
+
 ## Version 2.0 Goals
 
 Transform GSCTracker from a single-user application into a multi-user, **troop-level** management platform with enterprise-grade security and COPPA compliance features suitable for Girl Scout troops, scouts, and their parents.
@@ -41,20 +124,30 @@ Transform GSCTracker from a single-user application into a multi-user, **troop-l
 ### 1.1 User Management System
 **Goal:** Support multiple users with role-based access control
 
-**Features:**
-- User registration and profile management
-- Email verification for new accounts
-- Password reset/recovery functionality
-- User account activation/deactivation
-- Last login tracking and session management
+**Status:** ✅ **Partially Implemented in PR #106** (Basic authentication complete, advanced features pending)
+
+**Implemented (v2.0):**
+- ✅ User registration and profile management (username/password)
+- ✅ User account activation/deactivation
+- ✅ Last login tracking and session management
+- ✅ Basic `users` table with encrypted email storage
+
+**Pending (v2.1+):**
+- ⏳ Email verification for new accounts
+- ⏳ Password reset/recovery functionality
+- ⏳ Enhanced `sessions` table with detailed tracking
+- ⏳ `userId` foreign key additions to existing tables
 
 **Database Changes:**
-- New `users` table: `id`, `email`, `password_hash`, `firstName`, `lastName`, `role`, `isActive`, `emailVerified`, `createdAt`, `lastLogin`
-- New `sessions` table: `id`, `userId`, `sessionToken`, `expiresAt`, `ipAddress`, `userAgent`
-- Add `userId` foreign key to existing tables (`profile`, `sales`, `donations`, `events`)
+- ✅ **Implemented:** `users` table: `id`, `username`, `password_hash`, `email` (encrypted), `isActive`, `lastLogin`
+- ⏳ **Pending:** Extended fields: `firstName`, `lastName`, `role`, `emailVerified`, `createdAt`
+- ⏳ **Pending:** `sessions` table: `id`, `userId`, `sessionToken`, `expiresAt`, `ipAddress`, `userAgent`
+- ⏳ **Pending:** Add `userId` foreign key to existing tables (`profile`, `sales`, `donations`, `events`)
 
 ### 1.2 Google OAuth Integration
 **Goal:** Simplify authentication with secure Google Sign-In
+
+**Status:** ⏳ **Deferred to v2.1** (Foundation established with current authentication system)
 
 **Implementation:**
 - Integrate Google OAuth 2.0 for authentication
@@ -123,24 +216,35 @@ Transform GSCTracker from a single-user application into a multi-user, **troop-l
 ### 2.1 TLS/SSL Encryption
 **Goal:** Ensure all data transmission is encrypted to protect minors' information
 
-**Requirements:**
-- Enforce HTTPS for all connections
-- TLS 1.2+ minimum (preferably TLS 1.3)
-- Valid SSL certificates (Let's Encrypt for self-hosted, managed for cloud)
-- HTTP to HTTPS redirect
-- HSTS (HTTP Strict Transport Security) headers
-- Secure cookie flags (Secure, HttpOnly, SameSite)
+**Status:** ✅ **Partially Implemented in PR #106** (Headers configured, deployment required)
 
-**Implementation:**
-- Docker image with built-in HTTPS support
-- Automatic certificate renewal (certbot)
-- Configuration guide for reverse proxy (nginx/Caddy)
-- Development mode with self-signed certificates
+**Implemented (v2.0):**
+- ✅ HSTS (HTTP Strict Transport Security) headers via Helmet.js
+- ✅ Secure cookie flags (Secure, HttpOnly, SameSite)
+
+**Pending (Production Deployment):**
+- ⏳ Enforce HTTPS for all connections (requires reverse proxy setup)
+- ⏳ TLS 1.2+ minimum (preferably TLS 1.3)
+- ⏳ Valid SSL certificates (Let's Encrypt for self-hosted, managed for cloud)
+- ⏳ HTTP to HTTPS redirect
+- ⏳ Docker image with built-in HTTPS support
+- ⏳ Automatic certificate renewal (certbot)
+- ⏳ Configuration guide for reverse proxy (nginx/Caddy)
+- ⏳ Development mode with self-signed certificates
+
+**Note:** See `docs/SECURITY.md` for reverse proxy configuration guidance.
 
 ### 2.2 COPPA Compliance Features
 **Goal:** Comply with Children's Online Privacy Protection Act requirements
 
-**Key Requirements:**
+**Status:** ⏳ **Deferred to v2.1** (Foundation established with data encryption and security)
+
+**Current Implementation (v2.0):**
+- ✅ Secure data storage with AES-256-GCM encryption
+- ✅ Minimal authentication data collection
+- ✅ No behavioral advertising or tracking
+
+**Key Requirements for v2.1:**
 - Parental consent for users under 13
 - Minimal data collection from children
 - Parental access to child's data
@@ -182,16 +286,30 @@ Transform GSCTracker from a single-user application into a multi-user, **troop-l
 ### 2.3 Data Security Enhancements
 **Goal:** Protect sensitive user information
 
-**Features:**
-- Password hashing with bcrypt (minimum 12 rounds)
-- Encryption at rest for sensitive fields (phone numbers, addresses, emails)
-- Rate limiting on authentication endpoints
-- Account lockout after failed login attempts
-- Session timeout and inactivity logout
-- IP-based suspicious activity detection
-- SQL injection prevention (prepared statements)
-- XSS protection (input sanitization, CSP headers)
-- CSRF protection with tokens
+**Status:** ✅ **Implemented in PR #106** (Core features complete, advanced features pending)
+
+**Implemented (v2.0):**
+- ✅ Password hashing with bcrypt (12 rounds)
+- ✅ Encryption at rest for sensitive fields (emails via AES-256-GCM, extensible to phone/addresses)
+- ✅ Rate limiting on authentication endpoints (5 attempts per 15 minutes)
+- ✅ Account lockout after failed login attempts
+- ✅ Session timeout (24-hour expiration)
+- ✅ SQL injection prevention (prepared statements)
+- ✅ XSS protection (CSP headers via Helmet.js)
+- ✅ CSRF protection (SameSite=Strict cookies)
+
+**Pending (v2.1+):**
+- ⏳ Inactivity logout detection
+- ⏳ IP-based suspicious activity detection
+- ⏳ Token-based CSRF protection (defense-in-depth)
+- ⏳ Advanced audit logging
+- ⏳ Session rotation and fingerprinting
+
+**Technical Implementation:**
+- `crypto-util.js`: AES-256-GCM encryption/decryption utilities
+- `auth-middleware.js`: Authentication and rate limiting middleware
+- Helmet.js: Security headers (CSP, HSTS, X-Frame-Options, X-XSS-Protection)
+- bcrypt: Password hashing library (v6.0.0, no known vulnerabilities)
 
 ---
 
@@ -794,30 +912,46 @@ Troop
 
 ## Implementation Phases
 
-### Phase 1: Foundation (Months 1-3)
+### Phase 1: Foundation (Months 1-3) - ✅ **PARTIALLY COMPLETED (PR #106)**
 **Focus:** Core multi-user support and authentication
 
 **Deliverables:**
-- [ ] User management system
-- [ ] Google OAuth integration
-- [ ] Basic RBAC (Scout, Parent, Troop Leader, Cookie Leader roles)
-- [ ] Session management
-- [ ] TLS/HTTPS enforcement
-- [ ] Database schema migration from SQLite to PostgreSQL
-- [ ] User profile enhancements with role assignment
+- [x] ✅ User management system (basic username/password authentication)
+- [ ] ⏳ Google OAuth integration (deferred to v2.1)
+- [ ] ⏳ Basic RBAC (Scout, Parent, Troop Leader, Cookie Leader roles)
+- [x] ✅ Session management (HTTP-only cookies, 24h expiration)
+- [x] ✅ Security headers and middleware (Helmet.js, rate limiting)
+- [ ] ⏳ TLS/HTTPS enforcement (deployment configuration required)
+- [ ] ⏳ Database schema migration from SQLite to PostgreSQL
+- [ ] ⏳ User profile enhancements with role assignment
 
-### Phase 2: Compliance & Security (Months 3-4)
+**PR #106 Achievements:**
+- ✅ Username/password authentication with bcrypt (12 rounds)
+- ✅ AES-256-GCM encryption for sensitive data
+- ✅ Session management with secure cookies
+- ✅ Rate limiting (5 attempts per 15 minutes)
+- ✅ Security headers (CSP, HSTS, X-Frame-Options)
+- ✅ CSRF protection via SameSite=Strict cookies
+- ✅ SQL injection prevention
+- ✅ Login/Registration UI
+
+### Phase 2: Compliance & Security (Months 3-4) - ⏳ **IN PLANNING (v2.1)**
 **Focus:** COPPA compliance and security hardening
 
 **Deliverables:**
 - [ ] Age verification and parental consent flow
 - [ ] Parent-scout account linking
 - [ ] Audit logging for minor data access
-- [ ] Data encryption at rest for sensitive fields
+- [x] ✅ Data encryption at rest for sensitive fields (completed in PR #106)
 - [ ] Privacy policy and consent management
 - [ ] Data deletion and export features
 - [ ] Security testing and penetration testing
 - [ ] COPPA compliance documentation
+
+**Notes from PR #106:**
+- Foundation for compliance established with encryption and secure authentication
+- Age verification and parental consent flows prioritized for v2.1
+- Token-based CSRF protection recommended for defense-in-depth
 
 ### Phase 3: Troop Management & Cookie Products (Months 4-6)
 **Focus:** Troop-level features and cookie catalog
