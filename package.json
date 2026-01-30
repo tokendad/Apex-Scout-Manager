@@ -15,7 +15,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "better-sqlite3": "^11.0.0",
     "chalk": "^4.1.2",
     "cookie-parser": "^1.4.6",
@@ -27,7 +27,6 @@
     "helmet": "^8.0.0",
     "jspdf": "^4.0.0",
     "multer": "^2.0.2",
-    "sqlcipher": "^5.1.2",
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0"
   },

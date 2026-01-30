@@ -6,7 +6,12 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const ExcelJS = require('exceljs');
+const session = require('express-session');
+const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
 const logger = require('./logger');
+const { hashPassword, comparePassword, encrypt, decrypt } = require('./crypto-util');
+const { requireAuth, authRateLimiter, checkAccountLockout, recordFailedLogin, clearFailedLogins } = require('./auth-middleware');
 
 
 // Configure multer for file uploads (memory storage)
@@ -95,6 +100,18 @@ try {
             name TEXT NOT NULL,
             url TEXT NOT NULL,
             isEnabled INTEGER DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            email TEXT,
+            firstName TEXT,
+            lastName TEXT,
+            isActive INTEGER DEFAULT 1,
+            createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+            lastLogin TEXT
         );
 
         INSERT OR IGNORE INTO profile (id, goalBoxes, goalAmount) VALUES (1, 0, 0);
@@ -228,15 +245,214 @@ app.use((req, res, next) => {
 });
 
 // Middleware
-app.use(cors());
+// Security headers
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts for existing functionality
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:", "blob:"],
+            connectSrc: ["'self'"]
+        }
+    },
+    hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true
+    }
+}));
+
+app.use(cookieParser());
+app.use(cors({
+    origin: process.env.CORS_ORIGIN || true,
+    credentials: true
+}));
 app.use(express.json());
+
+// Session configuration
+const sessionSecret = process.env.SESSION_SECRET || require('crypto').randomBytes(32).toString('hex');
+if (!process.env.SESSION_SECRET) {
+    logger.warn('Using auto-generated session secret. Set SESSION_SECRET environment variable for production.');
+}
+
+app.use(session({
+    secret: sessionSecret,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+        httpOnly: true, // Prevent XSS
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        sameSite: 'strict' // CSRF protection
+    },
+    name: 'sessionId' // Don't use default 'connect.sid'
+}));
+
 app.use('/api/', limiter); // Apply rate limiting to all API routes
 app.use(express.static('public'));
 
-// API Routes
+// Authentication Routes (no auth required)
+
+// Register new user
+app.post('/api/auth/register', authRateLimiter, async (req, res) => {
+    try {
+        const { username, password, email, firstName, lastName } = req.body;
+        
+        if (!username || !password) {
+            return res.status(400).json({ error: 'Username and password are required' });
+        }
+        
+        // Validate username (alphanumeric, 3-20 chars)
+        if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+            return res.status(400).json({ 
+                error: 'Username must be 3-20 characters and contain only letters, numbers, and underscores' 
+            });
+        }
+        
+        // Validate password strength (min 8 chars)
+        if (password.length < 8) {
+            return res.status(400).json({ 
+                error: 'Password must be at least 8 characters long' 
+            });
+        }
+        
+        // Check if username already exists
+        const existingUser = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
+        if (existingUser) {
+            return res.status(409).json({ error: 'Username already exists' });
+        }
+        
+        // Hash password
+        const passwordHash = await hashPassword(password);
+        
+        // Encrypt email if provided
+        const encryptedEmail = email ? encrypt(email) : null;
+        
+        // Insert user
+        const result = db.prepare(`
+            INSERT INTO users (username, password_hash, email, firstName, lastName, createdAt)
+            VALUES (?, ?, ?, ?, ?, datetime('now'))
+        `).run(username, passwordHash, encryptedEmail, firstName, lastName);
+        
+        logger.info('User registered', { userId: result.lastInsertRowid, username });
+        
+        res.status(201).json({ 
+            success: true,
+            message: 'User registered successfully',
+            userId: result.lastInsertRowid
+        });
+    } catch (error) {
+        logger.error('Registration error', { error: error.message, stack: error.stack });
+        res.status(500).json({ error: 'Failed to register user' });
+    }
+});
+
+// Login
+app.post('/api/auth/login', authRateLimiter, async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        
+        if (!username || !password) {
+            return res.status(400).json({ error: 'Username and password are required' });
+        }
+        
+        // Check account lockout
+        if (checkAccountLockout(username)) {
+            logger.warn('Login attempt on locked account', { username, ip: req.ip });
+            return res.status(429).json({ 
+                error: 'Account temporarily locked due to too many failed login attempts. Try again in 15 minutes.' 
+            });
+        }
+        
+        // Get user
+        const user = db.prepare('SELECT * FROM users WHERE username = ? AND isActive = 1').get(username);
+        
+        if (!user) {
+            recordFailedLogin(username);
+            logger.warn('Login failed - user not found', { username, ip: req.ip });
+            return res.status(401).json({ error: 'Invalid username or password' });
+        }
+        
+        // Compare password
+        const isValid = await comparePassword(password, user.password_hash);
+        
+        if (!isValid) {
+            recordFailedLogin(username);
+            logger.warn('Login failed - invalid password', { username, ip: req.ip });
+            return res.status(401).json({ error: 'Invalid username or password' });
+        }
+        
+        // Clear failed login attempts
+        clearFailedLogins(username);
+        
+        // Update last login
+        db.prepare('UPDATE users SET lastLogin = datetime(\'now\') WHERE id = ?').run(user.id);
+        
+        // Create session
+        req.session.userId = user.id;
+        req.session.username = user.username;
+        
+        logger.info('User logged in', { userId: user.id, username: user.username, ip: req.ip });
+        
+        res.json({ 
+            success: true,
+            message: 'Logged in successfully',
+            user: {
+                id: user.id,
+                username: user.username,
+                firstName: user.firstName,
+                lastName: user.lastName
+            }
+        });
+    } catch (error) {
+        logger.error('Login error', { error: error.message, stack: error.stack });
+        res.status(500).json({ error: 'Failed to login' });
+    }
+});
+
+// Logout
+app.post('/api/auth/logout', (req, res) => {
+    const userId = req.session?.userId;
+    const username = req.session?.username;
+    
+    req.session.destroy((err) => {
+        if (err) {
+            logger.error('Logout error', { error: err.message });
+            return res.status(500).json({ error: 'Failed to logout' });
+        }
+        
+        logger.info('User logged out', { userId, username, ip: req.ip });
+        res.json({ success: true, message: 'Logged out successfully' });
+    });
+});
+
+// Check session status
+app.get('/api/auth/status', (req, res) => {
+    if (req.session && req.session.userId) {
+        const user = db.prepare('SELECT id, username, firstName, lastName FROM users WHERE id = ?')
+            .get(req.session.userId);
+        
+        if (user) {
+            return res.json({ 
+                authenticated: true,
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    firstName: user.firstName,
+                    lastName: user.lastName
+                }
+            });
+        }
+    }
+    
+    res.json({ authenticated: false });
+});
+
+// Protected API Routes (require authentication)
 
 // Get all sales
-app.get('/api/sales', (req, res) => {
+app.get('/api/sales', requireAuth, (req, res) => {
     try {
         const sales = db.prepare('SELECT * FROM sales ORDER BY id DESC').all();
         res.json(sales);
@@ -247,7 +463,7 @@ app.get('/api/sales', (req, res) => {
 });
 
 // Add a new sale
-app.post('/api/sales', (req, res) => {
+app.post('/api/sales', requireAuth, (req, res) => {
     try {
         const { 
             cookieType, 
@@ -333,7 +549,7 @@ app.post('/api/sales', (req, res) => {
 });
 
 // Update a sale
-app.put('/api/sales/:id', (req, res) => {
+app.put('/api/sales/:id', requireAuth, (req, res) => {
     try {
         const { id } = req.params;
         const { orderStatus, amountCollected, amountDue, paymentStatus, deliveryStatus } = req.body;
@@ -402,7 +618,7 @@ app.put('/api/sales/:id', (req, res) => {
 });
 
 // Delete a sale
-app.delete('/api/sales/:id', (req, res) => {
+app.delete('/api/sales/:id', requireAuth, (req, res) => {
     try {
         const { id } = req.params;
         const stmt = db.prepare('DELETE FROM sales WHERE id = ?');
@@ -422,7 +638,7 @@ app.delete('/api/sales/:id', (req, res) => {
 });
 
 // Clear all sales
-app.delete('/api/sales', (req, res) => {
+app.delete('/api/sales', requireAuth, (req, res) => {
     try {
         const result = db.prepare('DELETE FROM sales').run();
         logger.warn('All sales cleared', { deletedCount: result.changes });
@@ -434,7 +650,7 @@ app.delete('/api/sales', (req, res) => {
 });
 
 // Get profile
-app.get('/api/profile', (req, res) => {
+app.get('/api/profile', requireAuth, (req, res) => {
     try {
         const profile = db.prepare('SELECT * FROM profile WHERE id = 1').get();
         res.json(profile || { 
@@ -460,7 +676,7 @@ app.get('/api/profile', (req, res) => {
 });
 
 // Update profile
-app.put('/api/profile', (req, res) => {
+app.put('/api/profile', requireAuth, (req, res) => {
     try {
         const {
             photoData, qrCodeUrl, paymentQrCodeUrl, goalBoxes, goalAmount,
@@ -524,7 +740,7 @@ app.put('/api/profile', (req, res) => {
 });
 
 // Get all donations
-app.get('/api/donations', (req, res) => {
+app.get('/api/donations', requireAuth, (req, res) => {
     try {
         const donations = db.prepare('SELECT * FROM donations ORDER BY id DESC').all();
         res.json(donations);
@@ -535,7 +751,7 @@ app.get('/api/donations', (req, res) => {
 });
 
 // Add a new donation
-app.post('/api/donations', (req, res) => {
+app.post('/api/donations', requireAuth, (req, res) => {
     try {
         const { amount, donorName, date } = req.body;
         
@@ -566,7 +782,7 @@ app.post('/api/donations', (req, res) => {
 });
 
 // Delete a donation
-app.delete('/api/donations/:id', (req, res) => {
+app.delete('/api/donations/:id', requireAuth, (req, res) => {
     try {
         const { id } = req.params;
         const stmt = db.prepare('DELETE FROM donations WHERE id = ?');
@@ -586,7 +802,7 @@ app.delete('/api/donations/:id', (req, res) => {
 });
 
 // Get all events
-app.get('/api/events', (req, res) => {
+app.get('/api/events', requireAuth, (req, res) => {
     try {
         const events = db.prepare('SELECT * FROM events ORDER BY eventDate DESC').all();
         res.json(events);
@@ -597,7 +813,7 @@ app.get('/api/events', (req, res) => {
 });
 
 // Add a new event
-app.post('/api/events', (req, res) => {
+app.post('/api/events', requireAuth, (req, res) => {
     try {
         const { 
             eventName, 
@@ -693,7 +909,7 @@ app.post('/api/events', (req, res) => {
 });
 
 // Update an event
-app.put('/api/events/:id', (req, res) => {
+app.put('/api/events/:id', requireAuth, (req, res) => {
     try {
         const { id } = req.params;
         const { 
@@ -801,7 +1017,7 @@ app.put('/api/events/:id', (req, res) => {
 });
 
 // Delete an event
-app.delete('/api/events/:id', (req, res) => {
+app.delete('/api/events/:id', requireAuth, (req, res) => {
     try {
         const { id } = req.params;
         const stmt = db.prepare('DELETE FROM events WHERE id = ?');
@@ -821,7 +1037,7 @@ app.delete('/api/events/:id', (req, res) => {
 });
 
 // Import sales from XLSX file
-app.post('/api/import', upload.single('file'), async (req, res) => {
+app.post('/api/import', requireAuth, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
             logger.warn('No file uploaded for import');
@@ -1094,7 +1310,7 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
 });
 
 // Get payment methods
-app.get('/api/payment-methods', (req, res) => {
+app.get('/api/payment-methods', requireAuth, (req, res) => {
     try {
         const methods = db.prepare('SELECT * FROM payment_methods ORDER BY id ASC').all();
         res.json(methods);
@@ -1105,7 +1321,7 @@ app.get('/api/payment-methods', (req, res) => {
 });
 
 // Add payment method
-app.post('/api/payment-methods', (req, res) => {
+app.post('/api/payment-methods', requireAuth, (req, res) => {
     try {
         const { name, url } = req.body;
         
@@ -1126,7 +1342,7 @@ app.post('/api/payment-methods', (req, res) => {
 });
 
 // Delete payment method
-app.delete('/api/payment-methods/:id', (req, res) => {
+app.delete('/api/payment-methods/:id', requireAuth, (req, res) => {
     try {
         const { id } = req.params;
         const result = db.prepare('DELETE FROM payment_methods WHERE id = ?').run(id);
@@ -1145,20 +1361,8 @@ app.delete('/api/payment-methods/:id', (req, res) => {
 
 
 
-// Delete all sales
-app.delete('/api/sales', (req, res) => {
-    try {
-        const result = db.prepare('DELETE FROM sales').run();
-        logger.info('All sales deleted', { deletedCount: result.changes });
-        res.json({ success: true, deletedCount: result.changes });
-    } catch (error) {
-        logger.error('Failed to delete sales', { error: error.message });
-        res.status(500).json({ error: 'Failed to delete sales' });
-    }
-});
-
 // Delete all donations
-app.delete('/api/donations', (req, res) => {
+app.delete('/api/donations', requireAuth, (req, res) => {
     try {
         const result = db.prepare('DELETE FROM donations').run();
         logger.info('All donations deleted', { deletedCount: result.changes });
@@ -1170,7 +1374,7 @@ app.delete('/api/donations', (req, res) => {
 });
 
 // Delete all data (sales and donations)
-app.delete('/api/data', (req, res) => {
+app.delete('/api/data', requireAuth, (req, res) => {
     try {
         const deleteTransaction = db.transaction(() => {
             const salesResult = db.prepare('DELETE FROM sales').run();
