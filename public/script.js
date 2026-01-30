@@ -3,6 +3,25 @@
 // API base URL
 const API_BASE_URL = '/api';
 
+// Authentication check - redirect to login if not authenticated
+(async () => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/status`);
+        const data = await response.json();
+        
+        if (!data.authenticated) {
+            window.location.href = '/login.html';
+            return;
+        }
+        
+        // Store user info for display
+        window.currentUser = data.user;
+    } catch (error) {
+        console.error('Auth check failed:', error);
+        window.location.href = '/login.html';
+    }
+})();
+
 // Price per box (can be adjusted)
 const PRICE_PER_BOX = 6;
 
@@ -3492,3 +3511,33 @@ function updateDeliveryStatusOptions() {
         `;
     }
 }
+
+// Logout function
+async function handleLogout() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+            window.location.href = '/login.html';
+        } else {
+            alert('Logout failed. Please try again.');
+        }
+    } catch (error) {
+        console.error('Logout error:', error);
+        alert('Network error during logout. Please try again.');
+    }
+}
+
+// Display username in header after auth check
+setTimeout(() => {
+    if (window.currentUser) {
+        const usernameDisplay = document.getElementById('username-display');
+        if (usernameDisplay) {
+            const displayName = window.currentUser.firstName || window.currentUser.username;
+            usernameDisplay.textContent = `Hello, ${displayName}`;
+        }
+    }
+}, 100);

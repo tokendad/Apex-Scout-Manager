@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Login - GSCTracker</title>
+    <link rel="stylesheet" href="styles.css?v=3">
+    <style>
+        .login-container {
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 30px;
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .login-header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            color: var(--text-color);
+        }
+        
+        .login-header p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .form-group label {
+            font-weight: 500;
+            color: var(--text-color);
+            font-size: 14px;
+        }
+        
+        .form-group input {
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 16px;
+            background: var(--input-bg);
+            color: var(--text-color);
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .error-message.show {
+            display: block;
+        }
+        
+        .success-message {
+            background: #efe;
+            color: #3c3;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .success-message.show {
+            display: block;
+        }
+        
+        .login-button {
+            padding: 14px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .login-button:hover {
+            background: #45a049;
+        }
+        
+        .login-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .toggle-form {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .toggle-form a {
+            color: #4CAF50;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .toggle-form a:hover {
+            text-decoration: underline;
+        }
+        
+        .password-requirements {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        
+        .coppa-notice {
+            background: #fff3cd;
+            color: #856404;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            margin-top: 20px;
+            border: 1px solid #ffeaa7;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .coppa-notice {
+                background: #3a3a2a;
+                color: #ffd700;
+                border-color: #5a5a3a;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>🍪 GSCTracker</h1>
+            <p id="form-subtitle">Sign in to your account</p>
+        </div>
+        
+        <div id="error-message" class="error-message"></div>
+        <div id="success-message" class="success-message"></div>
+        
+        <!-- Login Form -->
+        <form id="login-form" class="login-form">
+            <div class="form-group">
+                <label for="login-username">Username</label>
+                <input type="text" id="login-username" name="username" required autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label for="login-password">Password</label>
+                <input type="password" id="login-password" name="password" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="login-button">Sign In</button>
+        </form>
+        
+        <!-- Registration Form -->
+        <form id="register-form" class="login-form" style="display: none;">
+            <div class="form-group">
+                <label for="reg-username">Username</label>
+                <input type="text" id="reg-username" name="username" required autocomplete="username" pattern="[a-zA-Z0-9_]{3,20}" title="3-20 characters, letters, numbers, and underscores only">
+            </div>
+            <div class="form-group">
+                <label for="reg-password">Password</label>
+                <input type="password" id="reg-password" name="password" required autocomplete="new-password" minlength="8">
+                <span class="password-requirements">Minimum 8 characters</span>
+            </div>
+            <div class="form-group">
+                <label for="reg-email">Email (optional)</label>
+                <input type="email" id="reg-email" name="email" autocomplete="email">
+            </div>
+            <div class="form-group">
+                <label for="reg-firstname">First Name (optional)</label>
+                <input type="text" id="reg-firstname" name="firstName" autocomplete="given-name">
+            </div>
+            <div class="form-group">
+                <label for="reg-lastname">Last Name (optional)</label>
+                <input type="text" id="reg-lastname" name="lastName" autocomplete="family-name">
+            </div>
+            <button type="submit" class="login-button">Create Account</button>
+        </form>
+        
+        <div class="toggle-form">
+            <span id="toggle-text">Don't have an account?</span>
+            <a href="#" id="toggle-link">Create one</a>
+        </div>
+        
+        <div class="coppa-notice">
+            <strong>🔒 Privacy & Security:</strong> This application is COPPA compliant. All data is encrypted and securely stored.
+        </div>
+    </div>
+    
+    <script>
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const toggleLink = document.getElementById('toggle-link');
+        const toggleText = document.getElementById('toggle-text');
+        const formSubtitle = document.getElementById('form-subtitle');
+        const errorMessage = document.getElementById('error-message');
+        const successMessage = document.getElementById('success-message');
+        
+        let isLoginMode = true;
+        
+        // Toggle between login and registration
+        toggleLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            isLoginMode = !isLoginMode;
+            
+            if (isLoginMode) {
+                loginForm.style.display = 'flex';
+                registerForm.style.display = 'none';
+                toggleText.textContent = "Don't have an account?";
+                toggleLink.textContent = 'Create one';
+                formSubtitle.textContent = 'Sign in to your account';
+            } else {
+                loginForm.style.display = 'none';
+                registerForm.style.display = 'flex';
+                toggleText.textContent = 'Already have an account?';
+                toggleLink.textContent = 'Sign in';
+                formSubtitle.textContent = 'Create a new account';
+            }
+            
+            hideMessages();
+        });
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.add('show');
+            successMessage.classList.remove('show');
+        }
+        
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.classList.add('show');
+            errorMessage.classList.remove('show');
+        }
+        
+        function hideMessages() {
+            errorMessage.classList.remove('show');
+            successMessage.classList.remove('show');
+        }
+        
+        // Handle login
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideMessages();
+            
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            
+            const button = loginForm.querySelector('button');
+            button.disabled = true;
+            button.textContent = 'Signing in...';
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showSuccess('Login successful! Redirecting...');
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 1000);
+                } else {
+                    showError(data.error || 'Login failed');
+                    button.disabled = false;
+                    button.textContent = 'Sign In';
+                }
+            } catch (error) {
+                showError('Network error. Please try again.');
+                button.disabled = false;
+                button.textContent = 'Sign In';
+            }
+        });
+        
+        // Handle registration
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideMessages();
+            
+            const username = document.getElementById('reg-username').value;
+            const password = document.getElementById('reg-password').value;
+            const email = document.getElementById('reg-email').value;
+            const firstName = document.getElementById('reg-firstname').value;
+            const lastName = document.getElementById('reg-lastname').value;
+            
+            const button = registerForm.querySelector('button');
+            button.disabled = true;
+            button.textContent = 'Creating account...';
+            
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, email, firstName, lastName })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showSuccess('Account created! Please sign in.');
+                    setTimeout(() => {
+                        // Switch to login mode
+                        loginForm.style.display = 'flex';
+                        registerForm.style.display = 'none';
+                        toggleText.textContent = "Don't have an account?";
+                        toggleLink.textContent = 'Create one';
+                        formSubtitle.textContent = 'Sign in to your account';
+                        isLoginMode = true;
+                        
+                        // Pre-fill username
+                        document.getElementById('login-username').value = username;
+                        document.getElementById('login-password').focus();
+                        
+                        // Reset registration form
+                        registerForm.reset();
+                    }, 1500);
+                } else {
+                    showError(data.error || 'Registration failed');
+                    button.disabled = false;
+                    button.textContent = 'Create Account';
+                }
+            } catch (error) {
+                showError('Network error. Please try again.');
+                button.disabled = false;
+                button.textContent = 'Create Account';
+            }
+        });
+        
+        // Check if already logged in
+        (async () => {
+            try {
+                const response = await fetch('/api/auth/status');
+                const data = await response.json();
+                
+                if (data.authenticated) {
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                // Ignore errors, stay on login page
+            }
+        })();
+    </script>
+</body>
+</html>

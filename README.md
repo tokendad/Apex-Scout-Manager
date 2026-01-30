@@ -5,6 +5,7 @@ A mobile-responsive web application for tracking Girl Scout Cookie sales. Design
 
 ## Features
 
+- 🔒 **Secure Authentication**: Username/password login with encrypted data storage (COPPA compliant)
 - 📱 **Mobile-First Design**: Optimized for phone screens with responsive layout
 - 🍪 **Track Cookie Sales**: Record sales by cookie type, quantity, customer, and payment status
 - 💳 **Payment Methods**: Manage multiple payment options (Venmo, PayPal, etc.) with dynamic QR code generation
@@ -12,7 +13,7 @@ A mobile-responsive web application for tracking Girl Scout Cookie sales. Design
 - 📊 **Sales Summary**: View total boxes sold, revenue, and donation stats at a glance
 - 📈 **Cookie Breakdown**: See which cookies are selling best
 - 👤 **Scout Profile**: Personalize with photo, goal tracking, and shareable store/payment links
-- 💾 **Persistent Data**: SQLite database storage for reliable data management
+- 💾 **Persistent Data**: SQLite database storage with encryption for sensitive data
 - 🌓 **Dark Mode Support**: Automatically adapts to system dark mode preference
 - ⚙️ **Data Management**: Import/Export capabilities and bulk deletion tools
 
@@ -56,11 +57,26 @@ A mobile-responsive web application for tracking Girl Scout Cookie sales. Design
 
 ## Usage
 
+### First-Time Setup
+
+1. **Start the application** (see installation methods below)
+2. **Navigate to the login page** at `http://localhost:3000/login.html`
+3. **Create your account**:
+   - Click "Create one" to register
+   - Enter a username (3-20 characters)
+   - Choose a secure password (minimum 8 characters)
+   - Optionally add email, first name, and last name
+4. **Log in** with your new credentials
+
 ### Using Docker (Recommended)
 
 The easiest way to run GSCTracker is using Docker:
 
 ```bash
+# Set environment variables for security (REQUIRED for production)
+export ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+export SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+
 # Start the application
 docker-compose up -d
 
@@ -77,12 +93,40 @@ Since GSCTracker uses a Node.js backend with SQLite, you cannot just open `index
    ```bash
    npm install
    ```
-2. **Start the Server:**
+2. **Set Environment Variables (Optional for development):**
+   ```bash
+   export ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+   export SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+   ```
+3. **Start the Server:**
    ```bash
    npm start
    ```
-3. **Access the App:**
+4. **Access the App:**
    Open [http://localhost:3000](http://localhost:3000) in your browser.
+   You'll be redirected to the login page to create your account.
+
+## Security & COPPA Compliance
+
+GSCTracker v2.0 includes comprehensive security features:
+
+- 🔐 **Encrypted Data Storage**: Sensitive data encrypted with AES-256-GCM
+- 🔑 **Secure Authentication**: Bcrypt password hashing (12 rounds) with account lockout
+- 🍪 **Secure Sessions**: HTTP-only cookies with 24-hour expiration
+- 🛡️ **Security Headers**: Content Security Policy, HSTS, and XSS protection
+- 🚦 **Rate Limiting**: Prevents brute force attacks (5 login attempts per 15 minutes)
+- 📝 **Audit Logging**: All authentication events logged for security monitoring
+
+For detailed security setup and COPPA compliance information, see [docs/SECURITY.md](docs/SECURITY.md).
+
+### Production Deployment
+
+For production use with HTTPS/TLS (required for COPPA compliance):
+
+1. Set up a reverse proxy (nginx/Caddy) with SSL certificates
+2. Configure environment variables: `ENCRYPTION_KEY`, `SESSION_SECRET`, `NODE_ENV=production`
+3. Enable HTTPS-only mode in your reverse proxy
+4. See [docs/SECURITY.md](docs/SECURITY.md) for detailed setup instructions
 
 ## Configuration
 
