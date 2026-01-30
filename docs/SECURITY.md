@@ -62,6 +62,26 @@ Implemented security headers:
 - **XSS Prevention**: Content Security Policy headers
 - **Username Validation**: Alphanumeric characters, 3-20 length
 - **Email Validation**: Standard RFC 5322 format
+- **CSRF Protection**: SameSite=Strict cookies (basic protection)
+
+### 6. Known Security Considerations
+
+#### CSRF Protection (Current State)
+The application uses `SameSite=Strict` cookies for basic CSRF protection. This prevents most CSRF attacks by ensuring cookies are only sent with same-site requests. However, this is not as robust as token-based CSRF protection.
+
+**Current Mitigation:**
+- SameSite=Strict cookie attribute
+- HTTPS required in production
+- Authenticated endpoints only
+
+**Future Enhancement (v2.1):**
+- Implement token-based CSRF protection with X-CSRF-Token headers
+- This will provide defense-in-depth for browsers that don't support SameSite
+
+**Risk Assessment:** Low to Medium
+- SameSite=Strict provides good protection for modern browsers (95%+ coverage)
+- Application is intended for personal/family use, not public-facing
+- Requires HTTPS to be effective
 
 ## Setup Instructions
 
@@ -321,6 +341,43 @@ To report security vulnerabilities:
 - [ ] Audit logging for data access
 - [ ] Data export and deletion functionality
 - [ ] Google OAuth integration
+- [ ] Token-based CSRF protection
+
+## Security Summary
+
+### Current Security Posture (v2.0)
+
+**Strengths:**
+- ✅ Strong authentication with bcrypt (12 rounds)
+- ✅ Field-level encryption for sensitive data (AES-256-GCM)
+- ✅ Secure session management (HTTP-only, SameSite=Strict cookies)
+- ✅ Rate limiting and account lockout
+- ✅ Comprehensive security headers (CSP, HSTS, XSS)
+- ✅ SQL injection protection (prepared statements)
+- ✅ Security logging and monitoring
+
+**Areas for Future Improvement:**
+- ⚠️ Token-based CSRF protection (currently using SameSite cookies)
+- ⚠️ COPPA age verification and parental consent flows
+- ⚠️ Role-based access control for multi-user scenarios
+- ⚠️ Audit logging for all data access operations
+
+**Compliance Status:**
+- ✅ COPPA Encryption Requirements (at rest and in transit with HTTPS)
+- ✅ Strong Password Requirements
+- ✅ Secure Session Management
+- ⏳ Age Verification (planned for v2.1)
+- ⏳ Parental Consent (planned for v2.1)
+
+### CodeQL Security Findings
+
+**CSRF Protection Finding:**
+CodeQL flagged missing token-based CSRF validation. This is a known limitation addressed by SameSite=Strict cookies in the current implementation. Full token-based CSRF protection is planned for v2.1.
+
+**Mitigation:** SameSite=Strict cookies provide adequate CSRF protection for:
+- Modern browsers (95%+ coverage)
+- Personal/family use cases
+- When combined with HTTPS
 
 ## References
 
@@ -329,3 +386,4 @@ To report security vulnerabilities:
 - [bcrypt Documentation](https://www.npmjs.com/package/bcrypt)
 - [Helmet.js Security](https://helmetjs.github.io/)
 - [Express Session Best Practices](https://expressjs.com/en/advanced/best-practice-security.html)
+- [SameSite Cookie Specification](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie/SameSite)
