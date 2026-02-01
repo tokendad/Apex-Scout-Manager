@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: neuman1812/gsctracker
+  IMAGE_NAME: neuman1812/apex-scout-manager
 
 jobs:
   publish-demo:

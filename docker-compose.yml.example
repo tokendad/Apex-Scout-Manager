@@ -1,10 +1,10 @@
-1812version: '3.8'
+version: '3.8'
 
 services:
-  gsctracker:
+  asm:
     build: . # Alternative if published to Docker Hub
-  # image: neuman1812/gsctracker:latest
-    container_name: gsctrackerdev
+  # image: neuman1812/apex-scout-manager:latest
+    container_name: asm-dev
     restart: unless-stopped
     ports:
       - "8282:3000" # (HOST:CONTAINER) Change the host port (left side) to expose on a different port

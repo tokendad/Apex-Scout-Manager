@@ -1,5 +1,5 @@
 /**
- * GSCTracker Database Migration Verification
+ * Apex Scout Manager Database Migration Verification
  *
  * This script verifies that the v2.0 migration completed successfully.
  *
@@ -11,11 +11,11 @@ const path = require('path');
 const logger = require('../logger');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
-const DB_PATH = path.join(DATA_DIR, 'gsctracker.db');
+const DB_PATH = path.join(DATA_DIR, 'asm.db');
 
 try {
     logger.info('='.repeat(60));
-    logger.info('Verifying GSCTracker v2.0 Database Migration');
+    logger.info('Verifying Apex Scout Manager v2.0 Database Migration');
     logger.info('='.repeat(60));
 
     const db = new Database(DB_PATH);

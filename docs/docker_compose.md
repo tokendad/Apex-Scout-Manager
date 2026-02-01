@@ -1,6 +1,6 @@
 # Docker Compose Documentation
 
-This document explains how to install and run GSCTracker using Docker and Docker Compose.
+This document explains how to install and run Apex Scout Manager using Docker and Docker Compose.
 
 ## Prerequisites
 
@@ -26,8 +26,8 @@ Download and install [Docker Desktop for Windows](https://www.docker.com/product
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/tokendad/GSCTracker.git
-   cd GSCTracker
+   git clone https://github.com/tokendad/Apex-Scout-Manager.git
+   cd Apex-Scout-Manager
    ```
 
 2. **Start the application:**
@@ -153,7 +153,7 @@ environment:
 volumes:
   - ./data:/data                      # Relative path
   - /path/to/host/data:/data         # Absolute path
-  - ~/gsctracker/data:/data          # Home directory path
+  - ~/asm/data:/data                  # Home directory path
   - ./backups:/backups               # Additional volume
 ```
 
@@ -166,17 +166,17 @@ volumes:
 
 **Description:** Assigns a custom name to the container for easy reference.
 
-**Default:** `gsctracker`
+**Default:** `asm`
 
 **Usage:**
 - Makes it easier to identify the container in `docker ps` output
-- Allows direct reference in docker commands (e.g., `docker logs gsctracker`)
+- Allows direct reference in docker commands (e.g., `docker logs asm`)
 
 **Example:**
 ```yaml
-container_name: gsctracker
+container_name: asm
 # or
-container_name: my-cookie-tracker
+container_name: my-scout-manager
 ```
 
 ### Restart Options
@@ -209,9 +209,9 @@ Here's a fully configured `docker-compose.yml` example:
 version: '3.8'
 
 services:
-  gsctracker:
+  asm:
     build: .
-    container_name: my-cookie-tracker
+    container_name: my-scout-manager
     restart: unless-stopped
     ports:
       - "8080:80"
@@ -230,7 +230,7 @@ services:
 
 Build the Docker image manually:
 ```bash
-docker build -t gsctracker:latest .
+docker build -t asm:latest .
 ```
 
 ### Running Without Docker Compose
@@ -238,7 +238,7 @@ docker build -t gsctracker:latest .
 Run the container directly with Docker:
 ```bash
 docker run -d \
-  --name gsctracker \
+  --name asm \
   --restart unless-stopped \
   -p 8080:80 \
   -e PUID=1000 \
@@ -246,7 +246,7 @@ docker run -d \
   -e UMASK=022 \
   -e TZ=America/New_York \
   -v $(pwd)/data:/data \
-  gsctracker:latest
+  asm:latest
 ```
 
 ### Viewing Logs
@@ -283,7 +283,7 @@ docker-compose logs --tail=100
 docker-compose down
 
 # Backup data directory
-tar -czf gsctracker-backup-$(date +%Y%m%d).tar.gz data/
+tar -czf asm-backup-$(date +%Y%m%d).tar.gz data/
 
 # Restart
 docker-compose up -d
@@ -295,7 +295,7 @@ docker-compose up -d
 docker-compose down
 
 # Restore from backup
-tar -xzf gsctracker-backup-YYYYMMDD.tar.gz
+tar -xzf asm-backup-YYYYMMDD.tar.gz
 
 # Restart
 docker-compose up -d
@@ -342,7 +342,7 @@ docker ps
 
 2. Check port mapping:
    ```bash
-   docker port gsctracker
+   docker port asm
    ```
 
 3. Test with curl:
@@ -367,10 +367,10 @@ docker ps
 ## Support
 
 For issues and questions:
-- Open an issue on [GitHub](https://github.com/tokendad/GSCTracker/issues)
+- Open an issue on [GitHub](https://github.com/tokendad/Apex-Scout-Manager/issues)
 - Check existing issues for solutions
 - Include Docker and Docker Compose versions in bug reports
 
 ## License
 
-This project follows the same license as the main GSCTracker repository.
+This project follows the same license as the main Apex Scout Manager repository.

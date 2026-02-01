@@ -1,7 +1,7 @@
-# GSCTracker
-Girl Scout Cookie Tracker
+# Apex Scout Manager
+Full Troop Management Software
 
-A mobile-responsive web application for tracking Girl Scout Cookie sales. Designed to work seamlessly on both Android and iPhone devices.
+A mobile-responsive web application for tracking cookie sales and managing scout troops. Designed to work seamlessly on both Android and iPhone devices.
 
 ## Features
 
@@ -58,7 +58,7 @@ A mobile-responsive web application for tracking Girl Scout Cookie sales. Design
 
 ### Using Docker (Recommended)
 
-The easiest way to run GSCTracker is using Docker:
+The easiest way to run Apex Scout Manager is using Docker:
 
 ```bash
 # Start the application
@@ -71,7 +71,7 @@ For detailed Docker configuration options, see [docs/docker_compose.md](docs/doc
 
 ### Local Development (Without Docker)
 
-Since GSCTracker uses a Node.js backend with SQLite, you cannot just open `index.html`.
+Since Apex Scout Manager uses a Node.js backend with SQLite, you cannot just open `index.html`.
 
 1. **Install Dependencies:**
    ```bash
@@ -127,11 +127,11 @@ For the best mobile experience:
 
 ## Data Storage
 
-All data is stored in a SQLite database (`gsctracker.db`) in the `/data` directory. The database is persistent across container restarts when using the Docker volume mount. The application uses a Node.js backend with Express to serve the web interface and provide REST API endpoints for data operations.
+All data is stored in a SQLite database (`asm.db`) in the `/data` directory. The database is persistent across container restarts when using the Docker volume mount. The application uses a Node.js backend with Express to serve the web interface and provide REST API endpoints for data operations.
 
 ## Logging
 
-GSCTracker includes comprehensive error logging with:
+Apex Scout Manager includes comprehensive error logging with:
 - Colored console output (green for info, yellow for warnings, red for errors)
 - Automatic daily log rotation
 - 7-day log retention

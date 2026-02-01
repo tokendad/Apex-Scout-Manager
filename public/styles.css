@@ -1,4 +1,4 @@
-/* Mobile-First Responsive Design for Girl Scout Cookie Tracker */
+/* Mobile-First Responsive Design for Apex Scout Manager */
 
 /* CSS Variables for consistent theming */
 :root {
@@ -41,14 +41,44 @@ body {
 header {
     background: linear-gradient(135deg, var(--primary-color), #15562a);
     color: white;
-    padding: 1.5rem 1rem;
+    padding: 1rem 1rem;
     text-align: center;
     box-shadow: var(--shadow);
+    position: relative;
 }
 
 header h1 {
     font-size: 1.5rem;
     font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+/* User Info */
+.user-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.user-name {
+    opacity: 0.9;
+}
+
+.logout-btn {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.logout-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 /* Main Content */
@@ -2371,4 +2401,937 @@ footer {
     background: var(--background-color);
     color: var(--text-color);
     border-color: #555;
+}
+
+/* ============================================================================
+   Troop Management Styles (Phase 2)
+   ============================================================================ */
+
+.troop-section {
+    padding: 1rem;
+}
+
+.troop-header {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.troop-header h2 {
+    margin: 0;
+    color: var(--primary-color);
+}
+
+.troop-controls {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.troop-select {
+    flex: 1;
+    min-width: 200px;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1rem;
+    background: var(--card-background);
+    color: var(--text-color);
+}
+
+/* Troop Summary Cards */
+.troop-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.summary-card {
+    background: var(--card-background);
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.summary-icon {
+    font-size: 2rem;
+}
+
+.summary-data {
+    display: flex;
+    flex-direction: column;
+}
+
+.summary-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.summary-label {
+    font-size: 0.75rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Section Headers */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.section-header h3 {
+    margin: 0;
+    color: var(--text-color);
+}
+
+/* Members Table */
+.troop-members-section,
+.troop-goals-section,
+.troop-sales-section {
+    background: var(--card-background);
+    border-radius: 12px;
+    padding: 1.25rem;
+    box-shadow: var(--shadow);
+}
+
+.members-table-container {
+    overflow-x: auto;
+}
+
+.members-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.members-table th,
+.members-table td {
+    padding: 0.75rem 0.5rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.members-table th {
+    font-weight: 600;
+    color: #666;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.members-table tbody tr:hover {
+    background: rgba(30, 123, 60, 0.05);
+}
+
+.member-name {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.member-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.role-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.role-member {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+.role-co-leader {
+    background: #fff3e0;
+    color: #e65100;
+}
+
+.role-assistant {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}
+
+/* Goals */
+.goals-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.goal-card {
+    background: rgba(30, 123, 60, 0.05);
+    border-radius: 8px;
+    padding: 1rem;
+    border-left: 4px solid var(--primary-color);
+}
+
+.goal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.goal-type {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.goal-status {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    text-transform: uppercase;
+}
+
+.status-in_progress {
+    background: #fff3e0;
+    color: #e65100;
+}
+
+.status-completed {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.goal-progress {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), #4caf50);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 0.85rem;
+    color: #666;
+    white-space: nowrap;
+}
+
+.goal-description {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: #666;
+}
+
+/* Sales by Cookie */
+.cookie-sales-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.75rem;
+}
+
+.cookie-sale-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: rgba(30, 123, 60, 0.05);
+    border-radius: 8px;
+}
+
+.cookie-name {
+    font-weight: 500;
+}
+
+.cookie-quantity {
+    color: #666;
+    font-size: 0.85rem;
+}
+
+.cookie-revenue {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+/* Empty State */
+.troop-empty-state {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 300px;
+    text-align: center;
+}
+
+.empty-state-content {
+    max-width: 300px;
+}
+
+.empty-icon {
+    font-size: 4rem;
+    display: block;
+    margin-bottom: 1rem;
+}
+
+.empty-state-content h3 {
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-content p {
+    color: #666;
+}
+
+.empty-state {
+    color: #999;
+    text-align: center;
+    padding: 2rem;
+    font-style: italic;
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.modal-content {
+    background: var(--card-background);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: var(--text-color);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    color: var(--danger-color);
+}
+
+.modal-body {
+    padding: 1.25rem;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Form Row */
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+/* Search Results */
+.search-results {
+    margin-top: 0.5rem;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.search-result-item {
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.search-result-item:hover {
+    background: rgba(30, 123, 60, 0.1);
+}
+
+.result-name {
+    font-weight: 500;
+}
+
+.result-email {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.search-selected {
+    padding: 0.75rem;
+    background: rgba(30, 123, 60, 0.1);
+    border-radius: 8px;
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.search-no-results,
+.search-error {
+    padding: 0.75rem;
+    color: #666;
+    font-style: italic;
+}
+
+/* Button Small */
+.btn-sm {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+/* Responsive adjustments for troop view */
+@media (max-width: 600px) {
+    .summary-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .summary-card {
+        justify-content: center;
+    }
+
+    .members-table th:nth-child(4),
+    .members-table td:nth-child(4),
+    .members-table th:nth-child(5),
+    .members-table td:nth-child(5) {
+        display: none;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .cookie-sales-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Dark theme for troop view */
+[data-theme="dark"] .troop-select {
+    background: #333;
+    border-color: #555;
+    color: #fff;
+}
+
+[data-theme="dark"] .summary-card {
+    background: #2a2a2a;
+}
+
+[data-theme="dark"] .summary-label {
+    color: #aaa;
+}
+
+[data-theme="dark"] .troop-members-section,
+[data-theme="dark"] .troop-goals-section,
+[data-theme="dark"] .troop-sales-section {
+    background: #2a2a2a;
+}
+
+[data-theme="dark"] .members-table th {
+    color: #aaa;
+}
+
+[data-theme="dark"] .members-table tbody tr:hover {
+    background: rgba(76, 175, 80, 0.1);
+}
+
+[data-theme="dark"] .goal-card {
+    background: rgba(76, 175, 80, 0.1);
+}
+
+[data-theme="dark"] .cookie-sale-item {
+    background: rgba(76, 175, 80, 0.1);
+}
+
+[data-theme="dark"] .progress-bar {
+    background: #444;
+}
+
+[data-theme="dark"] .modal-content {
+    background: #2a2a2a;
+}
+
+[data-theme="dark"] .search-result-item {
+    border-color: #444;
+}
+
+[data-theme="dark"] .search-result-item:hover {
+    background: rgba(76, 175, 80, 0.2);
+}
+
+[data-theme="dark"] .search-selected {
+    background: rgba(76, 175, 80, 0.2);
+}
+
+[data-theme="dark"] .role-member {
+    background: rgba(21, 101, 192, 0.3);
+    color: #90caf9;
+}
+
+[data-theme="dark"] .role-co-leader {
+    background: rgba(230, 81, 0, 0.3);
+    color: #ffcc80;
+}
+
+[data-theme="dark"] .role-assistant {
+    background: rgba(123, 31, 162, 0.3);
+    color: #ce93d8;
+}
+
+/* ============================================================================
+   Phase 3: Invitation Badge and Notification Styles
+   ============================================================================ */
+
+.invitations-btn {
+    position: relative;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+}
+
+.notification-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: #dc3545;
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 700;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pulse-badge 2s infinite;
+}
+
+@keyframes pulse-badge {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+}
+
+.invitations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.invitation-item {
+    padding: 1rem;
+    background: var(--card-background, #f5f5f5);
+    border-radius: 8px;
+    border-left: 4px solid #4CAF50;
+}
+
+.invitation-item h4 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-color);
+}
+
+.invitation-item p {
+    margin: 0 0 0.75rem 0;
+    color: var(--text-secondary, #666);
+    font-size: 0.9rem;
+}
+
+.invitation-item .invitation-meta {
+    font-size: 0.8rem;
+    color: var(--text-secondary, #999);
+    margin-bottom: 0.75rem;
+}
+
+.invitation-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* ============================================================================
+   Phase 3: Leaderboard Styles
+   ============================================================================ */
+
+.troop-dashboard-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .troop-dashboard-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.troop-leaderboard-section {
+    background: var(--card-background, white);
+    border-radius: 12px;
+    padding: 1.25rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.troop-leaderboard-section .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.troop-leaderboard-section h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--text-color);
+}
+
+.metric-select {
+    padding: 0.35rem 0.5rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-color, #ddd);
+    font-size: 0.8rem;
+    background: var(--background-color, #f5f5f5);
+}
+
+.leaderboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.leaderboard-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem;
+    background: var(--background-color, #f5f5f5);
+    border-radius: 8px;
+    transition: transform 0.2s, background 0.2s;
+}
+
+.leaderboard-item:hover {
+    transform: translateX(4px);
+}
+
+.leaderboard-item.top-three {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.15), rgba(76, 175, 80, 0.05));
+    border-left: 3px solid #4CAF50;
+}
+
+.leaderboard-item .rank {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #4CAF50;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+.leaderboard-item.top-three:nth-child(1) .rank {
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    color: #333;
+}
+
+.leaderboard-item.top-three:nth-child(2) .rank {
+    background: linear-gradient(135deg, #C0C0C0, #A0A0A0);
+    color: #333;
+}
+
+.leaderboard-item.top-three:nth-child(3) .rank {
+    background: linear-gradient(135deg, #CD7F32, #B8860B);
+    color: white;
+}
+
+.leaderboard-item .member-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.leaderboard-item .member-name {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.leaderboard-item .score {
+    font-weight: 600;
+    color: #4CAF50;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+/* ============================================================================
+   Phase 3: Nutrition Modal Styles
+   ============================================================================ */
+
+.nutrition-modal {
+    max-width: 380px;
+}
+
+.nutrition-facts {
+    border: 2px solid #333;
+    padding: 0.5rem 1rem 1rem;
+    background: white;
+}
+
+.nutrition-facts h4 {
+    font-size: 1.75rem;
+    font-weight: 900;
+    margin: 0 0 0.25rem 0;
+    color: #333;
+}
+
+.serving-size {
+    font-size: 0.85rem;
+    margin: 0 0 0.5rem 0;
+    color: #333;
+}
+
+.nutrition-divider {
+    border-top: 1px solid #333;
+    margin: 0.5rem 0;
+}
+
+.nutrition-divider.thick {
+    border-top-width: 8px;
+}
+
+.nutrition-table {
+    width: 100%;
+    border-collapse: collapse;
+    color: #333;
+}
+
+.nutrition-table td {
+    padding: 0.25rem 0;
+    font-size: 0.85rem;
+    border-bottom: 1px solid #ddd;
+}
+
+.nutrition-table td:last-child {
+    text-align: right;
+    font-weight: 600;
+}
+
+.nutrition-table .nutrient-indent {
+    padding-left: 1rem;
+}
+
+.ingredients {
+    margin-top: 0.75rem;
+    padding-top: 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: #333;
+}
+
+.ingredients strong {
+    font-weight: 700;
+}
+
+.nutrition-attributes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.cookie-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.cookie-badge.dietary {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.cookie-badge.allergen {
+    background: #fff3e0;
+    color: #e65100;
+}
+
+.cookie-badge.certification {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+/* ============================================================================
+   Phase 3: Goal Progress Bar Enhancement
+   ============================================================================ */
+
+.goal-card {
+    background: rgba(76, 175, 80, 0.08);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.goal-card .goal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.goal-card .goal-type {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.goal-card .goal-progress-text {
+    font-size: 0.85rem;
+    color: var(--text-secondary, #666);
+}
+
+.goal-card .progress-bar {
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+}
+
+.goal-card .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4CAF50, #81c784);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+.goal-card .goal-dates {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #888);
+}
+
+.goal-card .goal-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+/* ============================================================================
+   Phase 3: Dark Mode Additions
+   ============================================================================ */
+
+[data-theme="dark"] .troop-leaderboard-section {
+    background: #2a2a2a;
+}
+
+[data-theme="dark"] .leaderboard-item {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .leaderboard-item.top-three {
+    background: rgba(76, 175, 80, 0.15);
+}
+
+[data-theme="dark"] .nutrition-facts {
+    background: #1e1e1e;
+    border-color: #666;
+}
+
+[data-theme="dark"] .nutrition-facts h4,
+[data-theme="dark"] .nutrition-facts .serving-size,
+[data-theme="dark"] .nutrition-table td,
+[data-theme="dark"] .ingredients {
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .nutrition-divider {
+    border-color: #666;
+}
+
+[data-theme="dark"] .invitation-item {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .cookie-badge.dietary {
+    background: rgba(46, 125, 50, 0.3);
+    color: #81c784;
+}
+
+[data-theme="dark"] .cookie-badge.allergen {
+    background: rgba(230, 81, 0, 0.3);
+    color: #ffcc80;
+}
+
+[data-theme="dark"] .cookie-badge.certification {
+    background: rgba(21, 101, 192, 0.3);
+    color: #90caf9;
 }

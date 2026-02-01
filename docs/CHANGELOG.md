@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API endpoints for data deletion: `DELETE /api/sales`, `DELETE /api/donations`, `DELETE /api/import-history`
 - Detailed order logging during Digital Cookie sync showing customer names, box counts, dates, and order numbers
 - Documentation for future scraper improvements (`docs/DIGITAL_COOKIE_SCRAPER_IMPROVEMENTS.md`)
-- Digital Cookie Sync feature to automatically import orders from Girl Scouts Digital Cookie platform
+- Digital Cookie Sync feature to automatically import orders from Digital Cookie platform
 - New Digital Cookie Sync settings section with email/password authentication
 - Test connection and sync now buttons for Digital Cookie integration
 - Puppeteer-based web scraper service (`services/digitalCookieScraper.js`) with stealth plugin
@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API endpoints for Digital Cookie sync: `POST /api/scrape`, `POST /api/scrape/test`, `GET /api/scrape/status`
 - Profile tab displaying scout photo, Store QR code, and Payment QR code
 - Payment QR code functionality in Settings for payment method display
-- Cookie details section on Profile with official Girl Scout cookie images and descriptions
+- Cookie details section on Profile with official cookie images and descriptions
 - Order grouping in sales list - orders grouped by customer name with clickable details
 - Order details modal showing customer info, cookie breakdown, and payment summary
 - Additional payment tracking in order details with save functionality
@@ -35,15 +35,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New database fields: orderNumber, orderType, orderStatus, customerEmail
 - Settings tab with theme switching (Light/Dark/System preference)
 - Manual theme control that persists across sessions via localStorage
-- Add Docker Hub publish workflow with manual trigger and nightly schedule ([#24](https://github.com/tokendad/GSCTracker/pull/24))
-- Add event sales tracking with inventory management and donations ([#22](https://github.com/tokendad/GSCTracker/pull/22))
-- Add individual sales tracking with customer contact info and payment details ([#21](https://github.com/tokendad/GSCTracker/pull/21))
-- Add Girl Scout profile, goals, sales categorization, and donation tracking ([#20](https://github.com/tokendad/GSCTracker/pull/20))
-- Add missing changelog entries from workflow outage period ([#19](https://github.com/tokendad/GSCTracker/pull/19))
-- SQLite database storage with Node.js/Express REST API backend ([#8](https://github.com/tokendad/GSCTracker/pull/8))
-- Screenshot directory with automated UI change capture workflow ([#10](https://github.com/tokendad/GSCTracker/pull/10))
-- Persistent top bar navigation with three screens (Profile, Individual Sales, Events) ([#14](https://github.com/tokendad/GSCTracker/pull/14))
-- Comprehensive error logging with Winston, daily rotation, and colored output ([#16](https://github.com/tokendad/GSCTracker/pull/16))
+- Add Docker Hub publish workflow with manual trigger and nightly schedule ([#24](https://github.com/tokendad/Apex-Scout-Manager/pull/24))
+- Add event sales tracking with inventory management and donations ([#22](https://github.com/tokendad/Apex-Scout-Manager/pull/22))
+- Add individual sales tracking with customer contact info and payment details ([#21](https://github.com/tokendad/Apex-Scout-Manager/pull/21))
+- Add scout profile, goals, sales categorization, and donation tracking ([#20](https://github.com/tokendad/Apex-Scout-Manager/pull/20))
+- Add missing changelog entries from workflow outage period ([#19](https://github.com/tokendad/Apex-Scout-Manager/pull/19))
+- SQLite database storage with Node.js/Express REST API backend ([#8](https://github.com/tokendad/Apex-Scout-Manager/pull/8))
+- Screenshot directory with automated UI change capture workflow ([#10](https://github.com/tokendad/Apex-Scout-Manager/pull/10))
+- Persistent top bar navigation with three screens (Profile, Individual Sales, Events) ([#14](https://github.com/tokendad/Apex-Scout-Manager/pull/14))
+- Comprehensive error logging with Winston, daily rotation, and colored output ([#16](https://github.com/tokendad/Apex-Scout-Manager/pull/16))
 
 ### Changed
 - Removed profile photo preview, store QR preview, and payment QR preview from the Settings screen to clean up the UI.
@@ -56,12 +56,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Redesigned tab navigation with 5 tabs: Profile, Summary, Individual, Events, Settings
 - Renamed Dashboard tab to "Sales Summary"
 - Updated Record a Sale form layout: Customer info first, then cookie selection table, then payment section
-- Updated cookie list to 9 official Girl Scout cookies: Thin Mints, Samoas, Tagalongs, Trefoils, Do-si-dos, Lemon-Ups, Adventurefuls, Exploremores, Toffee-tastic
+- Updated cookie list to 9 official cookies: Thin Mints, Samoas, Tagalongs, Trefoils, Do-si-dos, Lemon-Ups, Adventurefuls, Exploremores, Toffee-tastic
 - Sales table now shows orders grouped by customer with order details on click
 - Orders with "Shipped" status auto-check as complete
 - Cookie import mapping updated to support regional cookie name variations
 - Move all documentation files to /docs folder
-- Use npm script for screenshot capture in workflow ([#25](https://github.com/tokendad/GSCTracker/pull/25))
+- Use npm script for screenshot capture in workflow ([#25](https://github.com/tokendad/Apex-Scout-Manager/pull/25))
 
 ### Deprecated
 
@@ -86,10 +86,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Local storage for data persistence between sessions
 - Dark mode support that adapts to system preferences
 - Touch-optimized interface with large touch targets
-- Support for all 2026 Girl Scout Cookie varieties including new Exploremores™
+- Support for all 2026 cookie varieties including new Exploremores
 - Docker support with docker-compose configuration
 - Ability to delete individual sales or clear all data
 - Add to Home Screen capability for iOS and Android devices
 
-[Unreleased]: https://github.com/tokendad/GSCTracker/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/tokendad/GSCTracker/releases/tag/v1.0.0
+[Unreleased]: https://github.com/tokendad/Apex-Scout-Manager/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/tokendad/Apex-Scout-Manager/releases/tag/v1.0.0

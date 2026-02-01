@@ -40,7 +40,7 @@ const consoleFormat = winston.format.printf(({ level, message, timestamp, ...met
 
 // File transport with daily rotation
 const fileRotateTransport = new DailyRotateFile({
-    filename: path.join(LOG_DIR, 'gsctracker-%DATE%.log'),
+    filename: path.join(LOG_DIR, 'asm-%DATE%.log'),
     datePattern: 'YYYY-MM-DD',
     maxFiles: '7d', // Keep logs for 7 days
     maxSize: '20m', // Rotate if file exceeds 20MB
@@ -70,7 +70,7 @@ const errorFileRotateTransport = new DailyRotateFile({
 // Create the logger
 const logger = winston.createLogger({
     level: process.env.LOG_LEVEL || 'info',
-    defaultMeta: { service: 'gsctracker-backend' },
+    defaultMeta: { service: 'asm-backend' },
     format: winston.format.combine(
         winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
         winston.format.errors({ stack: true })

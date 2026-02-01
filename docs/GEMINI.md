@@ -1,8 +1,8 @@
-# GSCTracker Context for Gemini
+# Apex Scout Manager Context for Gemini
 
 ## Project Overview
 
-**GSCTracker** (Girl Scout Cookie Tracker) is a mobile-responsive web application designed to track Girl Scout Cookie sales. It features a mobile-first design, works offline (mostly), and supports both individual sales and event tracking.
+**Apex Scout Manager** (ASM) is a mobile-responsive web application for full troop management and cookie sales tracking. It features a mobile-first design, works offline (mostly), and supports both individual sales and event tracking.
 
 ### Key Technologies
 -   **Frontend:** Pure HTML/CSS/JavaScript (No frameworks).
@@ -15,7 +15,7 @@
 
 ### Backend (`server.js`)
 -   **Server:** Express.js application handling API requests and serving static files.
--   **Database:** SQLite database (`gsctracker.db`) stored in the `/data` directory.
+-   **Database:** SQLite database (`asm.db`) stored in the `/data` directory.
 -   **Initialization:** Automatically creates the data directory and initializes database tables (`sales`, `profile`, `donations`, `events`) on startup. Includes migration logic for schema updates.
 -   **Middleware:**
     -   `cors`: Enables Cross-Origin Resource Sharing.
@@ -30,7 +30,7 @@
 -   **Logic:** `script.js` handles UI interactions, API calls (fetch), and local state management.
 
 ### Data Storage
--   **Location:** `/data/gsctracker.db`
+-   **Location:** `/data/asm.db`
 -   **Persistence:** Docker volume mounts the `/data` directory to the host system.
 
 ## Building and Running
@@ -85,7 +85,7 @@ The backend exposes a RESTful API at `/api/`.
 ## Project Structure
 
 ```
-/data/GSCTracker/
+/data/Apex-Scout-Manager/
 ├── .github/              # GitHub Actions workflows
 ├── public/               # Frontend assets
 │   ├── index.html        # Main HTML file

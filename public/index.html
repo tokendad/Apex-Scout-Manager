@@ -5,13 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <title>Girl Scout Cookie Tracker</title>
+    <title>Apex Scout Manager</title>
     <link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🍪 Girl Scout Cookie Tracker</h1>
+            <h1>🍪 Apex Scout Manager</h1>
+            <div id="userInfo" class="user-info">
+                <span id="userName" class="user-name"></span>
+                <button id="invitationsBtn" class="invitations-btn" title="Pending Invitations" onclick="openInvitationsModal()" style="display: none;">
+                    <span class="invite-icon">📬</span>
+                    <span id="invitationBadge" class="notification-badge">0</span>
+                </button>
+                <button id="logoutBtn" class="logout-btn" title="Logout">↪ Logout</button>
+            </div>
         </header>
 
         <nav class="tab-nav">
@@ -34,6 +42,10 @@
             <button class="tab-btn" data-view="settings">
                 <span class="tab-icon">⚙️</span>
                 <span class="tab-label">Settings</span>
+            </button>
+            <button class="tab-btn" data-view="troopLeader" id="troopLeaderTab" style="display: none;">
+                <span class="tab-icon">👥</span>
+                <span class="tab-label">Troop</span>
             </button>
         </nav>
 
@@ -177,7 +189,7 @@
                         <div class="cookie-detail-card">
                             <img class="cookie-image" src="https://www.girlscouts.org/en/cookies/cookie-flavors/_jcr_content/root/container/gridsystem_copy/par_0/textandimage_copy_750886972.coreimg.png/1757342220634/meetthecookies-graphics-hybridshortbreadtrefoils-255x255.png" alt="Trefoils">
                             <h3>Trefoils®</h3>
-                            <p class="cookie-description">Iconic shortbread cookies inspired by the original Girl Scout Cookie recipe.</p>
+                            <p class="cookie-description">Iconic shortbread cookies inspired by the original recipe.</p>
                         </div>
 
                         <div class="cookie-detail-card">
@@ -586,10 +598,324 @@
                     </div>
                 </section>
             </div>
+
+            <!-- Troop Leader View -->
+            <div id="view-troopLeader" class="view-section hidden">
+                <section class="troop-section">
+                    <div class="troop-header">
+                        <h2>Troop Management</h2>
+                        <div class="troop-controls">
+                            <select id="troopSelector" class="troop-select">
+                                <option value="">Select a troop...</option>
+                            </select>
+                            <button id="createTroopBtn" class="btn btn-primary">+ New Troop</button>
+                        </div>
+                    </div>
+
+                    <!-- Troop Summary Cards -->
+                    <div id="troopSummary" class="troop-summary" style="display: none;">
+                        <div class="summary-cards">
+                            <div class="summary-card">
+                                <span class="summary-icon">📦</span>
+                                <div class="summary-data">
+                                    <span class="summary-value" id="troopTotalBoxes">0</span>
+                                    <span class="summary-label">Total Boxes</span>
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <span class="summary-icon">💵</span>
+                                <div class="summary-data">
+                                    <span class="summary-value" id="troopTotalCollected">$0</span>
+                                    <span class="summary-label">Collected</span>
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <span class="summary-icon">👥</span>
+                                <div class="summary-data">
+                                    <span class="summary-value" id="troopMemberCount">0</span>
+                                    <span class="summary-label">Members</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Leaderboard and Goals Row -->
+                        <div class="troop-dashboard-row">
+                            <!-- Leaderboard -->
+                            <div class="troop-leaderboard-section">
+                                <div class="section-header">
+                                    <h3>Top Sellers</h3>
+                                    <select id="leaderboardMetric" class="metric-select" onchange="loadLeaderboard()">
+                                        <option value="boxes">By Boxes</option>
+                                        <option value="revenue">By Revenue</option>
+                                    </select>
+                                </div>
+                                <div id="leaderboardList" class="leaderboard-list">
+                                    <p class="empty-state">No sales data yet</p>
+                                </div>
+                            </div>
+
+                            <!-- Troop Goals Progress -->
+                            <div class="troop-goals-section">
+                                <div class="section-header">
+                                    <h3>Troop Goals</h3>
+                                    <button id="addGoalBtn" class="btn btn-secondary btn-sm">+ Add Goal</button>
+                                </div>
+                                <div id="troopGoalsList" class="goals-list">
+                                    <p class="empty-state">No goals set. Add a goal to track progress!</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Member Performance Table -->
+                        <div class="troop-members-section">
+                            <div class="section-header">
+                                <h3>Member Performance</h3>
+                                <button id="addMemberBtn" class="btn btn-secondary btn-sm">+ Add Member</button>
+                            </div>
+                            <div class="members-table-container">
+                                <table class="members-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Role</th>
+                                            <th>Boxes Sold</th>
+                                            <th>Collected</th>
+                                            <th>Last Sale</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="troopMembersTable">
+                                        <tr><td colspan="6" class="empty-state">No members yet</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Sales by Cookie Type -->
+                        <div class="troop-sales-section">
+                            <h3>Sales by Cookie Type</h3>
+                            <div id="troopSalesByCookie" class="cookie-sales-grid">
+                                <p class="empty-state">No sales data yet</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Empty State (no troop selected) -->
+                    <div id="troopEmptyState" class="troop-empty-state">
+                        <div class="empty-state-content">
+                            <span class="empty-icon">👥</span>
+                            <h3>Welcome, Troop Leader!</h3>
+                            <p>Select a troop from the dropdown above or create a new one to get started.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Create Troop Modal -->
+                <div id="createTroopModal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Create New Troop</h3>
+                            <button class="modal-close" onclick="closeCreateTroopModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label for="newTroopNumber">Troop Number *</label>
+                                <input type="text" id="newTroopNumber" placeholder="e.g., 12345" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="newTroopType">Troop Type *</label>
+                                <select id="newTroopType" required>
+                                    <option value="">Select type...</option>
+                                    <option value="daisy">Daisy (K-1)</option>
+                                    <option value="brownie">Brownie (2-3)</option>
+                                    <option value="junior">Junior (4-5)</option>
+                                    <option value="cadette">Cadette (6-8)</option>
+                                    <option value="senior">Senior (9-10)</option>
+                                    <option value="ambassador">Ambassador (11-12)</option>
+                                    <option value="multi-level">Multi-Level</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="newTroopMeetingLocation">Meeting Location</label>
+                                <input type="text" id="newTroopMeetingLocation" placeholder="e.g., Community Center">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="newTroopMeetingDay">Meeting Day</label>
+                                    <select id="newTroopMeetingDay">
+                                        <option value="">Select day...</option>
+                                        <option value="Monday">Monday</option>
+                                        <option value="Tuesday">Tuesday</option>
+                                        <option value="Wednesday">Wednesday</option>
+                                        <option value="Thursday">Thursday</option>
+                                        <option value="Friday">Friday</option>
+                                        <option value="Saturday">Saturday</option>
+                                        <option value="Sunday">Sunday</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="newTroopMeetingTime">Meeting Time</label>
+                                    <input type="time" id="newTroopMeetingTime">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" onclick="closeCreateTroopModal()">Cancel</button>
+                            <button class="btn btn-primary" onclick="createTroop()">Create Troop</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Member Modal -->
+                <div id="addMemberModal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Add Member to Troop</h3>
+                            <button class="modal-close" onclick="closeAddMemberModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label for="memberSearchEmail">Search by Email *</label>
+                                <input type="email" id="memberSearchEmail" placeholder="Enter member's email address">
+                                <div id="memberSearchResults" class="search-results"></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="memberRole">Role in Troop</label>
+                                <select id="memberRole">
+                                    <option value="member">Member (Scout)</option>
+                                    <option value="co-leader">Co-Leader</option>
+                                    <option value="assistant">Assistant</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" onclick="closeAddMemberModal()">Cancel</button>
+                            <button class="btn btn-primary" id="confirmAddMemberBtn" onclick="addMemberToTroop()" disabled>Add Member</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Goal Modal -->
+                <div id="addGoalModal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Add Troop Goal</h3>
+                            <button class="modal-close" onclick="closeAddGoalModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label for="goalType">Goal Type *</label>
+                                <select id="goalType" required>
+                                    <option value="">Select type...</option>
+                                    <option value="boxes_sold">Boxes Sold</option>
+                                    <option value="revenue">Revenue ($)</option>
+                                    <option value="participation">Participation (%)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="goalTarget">Target Amount *</label>
+                                <input type="number" id="goalTarget" min="1" placeholder="e.g., 500">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="goalStartDate">Start Date</label>
+                                    <input type="date" id="goalStartDate">
+                                </div>
+                                <div class="form-group">
+                                    <label for="goalEndDate">End Date</label>
+                                    <input type="date" id="goalEndDate">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="goalDescription">Description</label>
+                                <textarea id="goalDescription" rows="2" placeholder="Optional description..."></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" onclick="closeAddGoalModal()">Cancel</button>
+                            <button class="btn btn-primary" onclick="createGoal()">Create Goal</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Nutrition Info Modal -->
+                <div id="nutritionModal" class="modal" style="display: none;">
+                    <div class="modal-content nutrition-modal">
+                        <div class="modal-header">
+                            <h3 id="nutritionCookieName">Cookie Name</h3>
+                            <button class="modal-close" onclick="closeNutritionModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="nutrition-facts">
+                                <h4>Nutrition Facts</h4>
+                                <p class="serving-size" id="nutritionServing">Serving Size: --</p>
+                                <div class="nutrition-divider thick"></div>
+                                <table class="nutrition-table">
+                                    <tbody id="nutritionTableBody">
+                                        <!-- Nutrition data injected here -->
+                                    </tbody>
+                                </table>
+                                <div class="nutrition-divider"></div>
+                                <div id="nutritionIngredients" class="ingredients">
+                                    <strong>Ingredients:</strong> <span id="ingredientsList">--</span>
+                                </div>
+                            </div>
+                            <div id="nutritionAttributes" class="nutrition-attributes">
+                                <!-- Attribute badges injected here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Invitations Modal -->
+                <div id="invitationsModal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Troop Invitations</h3>
+                            <button class="modal-close" onclick="closeInvitationsModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="invitationsList" class="invitations-list">
+                                <p class="empty-state">No pending invitations</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Send Invitation Modal -->
+                <div id="sendInviteModal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Invite Member to Troop</h3>
+                            <button class="modal-close" onclick="closeSendInviteModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label for="inviteEmail">Email Address *</label>
+                                <input type="email" id="inviteEmail" placeholder="Enter email address">
+                            </div>
+                            <div class="form-group">
+                                <label for="inviteRole">Role in Troop</label>
+                                <select id="inviteRole">
+                                    <option value="scout">Scout</option>
+                                    <option value="parent">Parent</option>
+                                    <option value="co-leader">Co-Leader</option>
+                                    <option value="assistant">Assistant</option>
+                                    <option value="cookie_leader">Cookie Leader</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" onclick="closeSendInviteModal()">Cancel</button>
+                            <button class="btn btn-primary" onclick="sendInvitation()">Send Invitation</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
 
         <footer>
-            <p>&copy; 2026 Girl Scout Cookie Tracker</p>
+            <p>&copy; 2026 Apex Scout Manager</p>
         </footer>
     </div>
 

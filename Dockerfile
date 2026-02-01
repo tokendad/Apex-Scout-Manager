@@ -15,6 +15,8 @@ RUN npm install --omit=dev
 # Copy server and static files
 COPY server.js ./
 COPY logger.js ./
+COPY auth.js ./
+COPY passport-config.js ./
 COPY public/ ./public/
 
 # Create entrypoint script to handle PUID, PGID, and UMASK

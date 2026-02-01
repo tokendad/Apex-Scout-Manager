@@ -1,5 +1,5 @@
 /**
- * GSCTracker Database Migration: v1.x to v2.0
+ * Apex Scout Manager Database Migration: v1.x to v2.0
  *
  * This script migrates the database schema to support multi-user functionality.
  * It creates new tables and adds foreign key relationships to existing data.
@@ -13,7 +13,7 @@ const path = require('path');
 const logger = require('../logger');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
-const DB_PATH = path.join(DATA_DIR, 'gsctracker.db');
+const DB_PATH = path.join(DATA_DIR, 'asm.db');
 const BACKUP_PATH = `${DB_PATH}.backup.${Date.now()}`;
 
 // Ensure data directory exists
@@ -25,7 +25,7 @@ let db;
 
 try {
     logger.info('='.repeat(60));
-    logger.info('Starting GSCTracker v2.0 Database Migration');
+    logger.info('Starting Apex Scout Manager v2.0 Database Migration');
     logger.info('='.repeat(60));
 
     // Step 1: Backup existing database
@@ -319,7 +319,7 @@ try {
         logger.info('  No users found, creating default admin user...');
 
         // Get existing profile data if it exists
-        let email = 'admin@gsctracker.local';
+        let email = 'admin@asm.local';
         let firstName = 'Admin';
         let troopNumber = '0000';
 

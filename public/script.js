@@ -1,4 +1,4 @@
-// Girl Scout Cookie Tracker - JavaScript
+// Apex Scout Manager - JavaScript
 
 // API base URL
 const API_BASE_URL = '/api';
@@ -6,11 +6,58 @@ const API_BASE_URL = '/api';
 // Price per box (can be adjusted)
 const PRICE_PER_BOX = 6;
 
-// Boxes per case (standard Girl Scout Cookie case)
+// Boxes per case (standard cookie case)
 const BOXES_PER_CASE = 12;
 
 // Maximum photo file size in bytes (5MB)
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+
+// Current user info
+let currentUser = null;
+
+// Helper function to handle API responses and check for auth errors
+async function handleApiResponse(response) {
+    if (response.status === 401) {
+        // Not authenticated - redirect to login
+        window.location.href = '/login.html';
+        throw new Error('Authentication required');
+    }
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(error.error || `HTTP ${response.status}`);
+    }
+    return response;
+}
+
+// Check authentication status and get current user
+async function checkAuth() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/me`);
+        if (response.status === 401) {
+            window.location.href = '/login.html';
+            return false;
+        }
+        if (response.ok) {
+            currentUser = await response.json();
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Auth check failed:', error);
+        window.location.href = '/login.html';
+        return false;
+    }
+}
+
+// Logout function
+async function logout() {
+    try {
+        await fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST' });
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
+    window.location.href = '/login.html';
+}
 
 // Helper function to convert sale quantity to boxes
 function convertToBoxes(sale) {
@@ -97,6 +144,15 @@ const eventsList = document.getElementById('eventsList');
 
 // Initialize app
 async function init() {
+    // Check authentication first
+    const isAuthenticated = await checkAuth();
+    if (!isAuthenticated) {
+        return; // Will redirect to login
+    }
+
+    // Display user info in the header (if user info element exists)
+    displayUserInfo();
+
     await Promise.all([loadSales(), loadDonations(), loadEvents(), loadProfile(), loadPaymentMethods()]);
     renderSales();
     renderDonations();
@@ -106,6 +162,21 @@ async function init() {
     updateBreakdown();
     updateGoalDisplay();
     setupEventListeners();
+}
+
+// Display current user info
+function displayUserInfo() {
+    const userInfoEl = document.getElementById('userInfo');
+    const userNameEl = document.getElementById('userName');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    if (currentUser && userNameEl) {
+        userNameEl.textContent = `${currentUser.firstName} ${currentUser.lastName}`;
+    }
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', logout);
+    }
 }
 
 // Setup event listeners
@@ -139,11 +210,10 @@ function setupEventListeners() {
 async function loadSales() {
     try {
         const response = await fetch(`${API_BASE_URL}/sales`);
-        if (!response.ok) {
-            throw new Error('Failed to fetch sales');
-        }
+        await handleApiResponse(response);
         sales = await response.json();
     } catch (error) {
+        if (error.message === 'Authentication required') return;
         console.error('Error loading sales:', error);
         alert('Error loading sales data. Please refresh the page.');
         sales = [];
@@ -154,11 +224,10 @@ async function loadSales() {
 async function loadDonations() {
     try {
         const response = await fetch(`${API_BASE_URL}/donations`);
-        if (!response.ok) {
-            throw new Error('Failed to fetch donations');
-        }
+        await handleApiResponse(response);
         donations = await response.json();
     } catch (error) {
+        if (error.message === 'Authentication required') return;
         console.error('Error loading donations:', error);
         donations = [];
     }
@@ -168,11 +237,10 @@ async function loadDonations() {
 async function loadEvents() {
     try {
         const response = await fetch(`${API_BASE_URL}/events`);
-        if (!response.ok) {
-            throw new Error('Failed to fetch events');
-        }
+        await handleApiResponse(response);
         events = await response.json();
     } catch (error) {
+        if (error.message === 'Authentication required') return;
         console.error('Error loading events:', error);
         events = [];
     }
@@ -182,9 +250,7 @@ async function loadEvents() {
 async function loadProfile() {
     try {
         const response = await fetch(`${API_BASE_URL}/profile`);
-        if (!response.ok) {
-            throw new Error('Failed to fetch profile');
-        }
+        await handleApiResponse(response);
         profile = await response.json();
 
         // Update Settings page UI with profile data
@@ -199,8 +265,9 @@ async function loadProfile() {
         // Update Profile tab display elements
         updateProfileDisplay();
     } catch (error) {
+        if (error.message === 'Authentication required') return;
         console.error('Error loading profile:', error);
-        profile = { id: 1, photoData: null, qrCodeUrl: null, paymentQrCodeUrl: null, goalBoxes: 0, goalAmount: 0 };
+        profile = { userId: null, photoData: null, qrCodeUrl: null, paymentQrCodeUrl: null, goalBoxes: 0, goalAmount: 0 };
     }
 }
 
@@ -422,13 +489,12 @@ async function handleUpdateQrCode() {
 async function loadPaymentMethods() {
     try {
         const response = await fetch(`${API_BASE_URL}/payment-methods`);
-        if (!response.ok) {
-            throw new Error('Failed to fetch payment methods');
-        }
+        await handleApiResponse(response);
         paymentMethods = await response.json();
         // Update profile display whenever methods change
         updateProfileDisplay();
     } catch (error) {
+        if (error.message === 'Authentication required') return;
         console.error('Error loading payment methods:', error);
         paymentMethods = [];
     }
@@ -2053,21 +2119,920 @@ function setupDangerZone() {
     }
 }
 
+// ============================================================================
+// Troop Management (Phase 2)
+// ============================================================================
+
+let selectedTroopId = null;
+let troopMembers = [];
+let troopGoals = [];
+let troopSalesData = null;
+
+// Setup role-based UI visibility
+function setupRoleBasedUI() {
+    const troopLeaderTab = document.getElementById('troopLeaderTab');
+    if (troopLeaderTab && currentUser) {
+        if (currentUser.role === 'troop_leader' || currentUser.role === 'council_admin') {
+            troopLeaderTab.style.display = '';
+        } else {
+            troopLeaderTab.style.display = 'none';
+        }
+    }
+}
+
+// Setup troop management
+function setupTroopManagement() {
+    const troopSelector = document.getElementById('troopSelector');
+    const createTroopBtn = document.getElementById('createTroopBtn');
+    const addMemberBtn = document.getElementById('addMemberBtn');
+    const addGoalBtn = document.getElementById('addGoalBtn');
+    const memberSearchEmail = document.getElementById('memberSearchEmail');
+
+    if (troopSelector) {
+        troopSelector.addEventListener('change', (e) => {
+            selectedTroopId = e.target.value;
+            if (selectedTroopId) {
+                loadTroopData(selectedTroopId);
+            } else {
+                showTroopEmptyState();
+            }
+        });
+    }
+
+    if (createTroopBtn) {
+        createTroopBtn.addEventListener('click', openCreateTroopModal);
+    }
+
+    if (addMemberBtn) {
+        addMemberBtn.addEventListener('click', openAddMemberModal);
+    }
+
+    if (addGoalBtn) {
+        addGoalBtn.addEventListener('click', openAddGoalModal);
+    }
+
+    if (memberSearchEmail) {
+        let searchTimeout;
+        memberSearchEmail.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => searchUsers(e.target.value), 300);
+        });
+    }
+
+    // Load troops on init
+    loadMyTroops();
+}
+
+// Load user's troops
+async function loadMyTroops() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/troop/my-troops`, {
+            credentials: 'include'
+        });
+        if (!response.ok) throw new Error('Failed to load troops');
+
+        const troops = await response.json();
+        const troopSelector = document.getElementById('troopSelector');
+
+        if (troopSelector) {
+            troopSelector.innerHTML = '<option value="">Select a troop...</option>';
+            troops.forEach(troop => {
+                const option = document.createElement('option');
+                option.value = troop.id;
+                option.textContent = `Troop ${troop.troopNumber} (${troop.troopType}) - ${troop.memberCount} members`;
+                troopSelector.appendChild(option);
+            });
+
+            // Auto-select if only one troop
+            if (troops.length === 1) {
+                troopSelector.value = troops[0].id;
+                selectedTroopId = troops[0].id;
+                loadTroopData(troops[0].id);
+            } else if (troops.length === 0) {
+                showTroopEmptyState();
+            }
+        }
+    } catch (error) {
+        console.error('Error loading troops:', error);
+    }
+}
+
+// Load all data for a specific troop
+async function loadTroopData(troopId) {
+    try {
+        const [membersRes, salesRes, goalsRes] = await Promise.all([
+            fetch(`${API_BASE_URL}/troop/${troopId}/members`, { credentials: 'include' }),
+            fetch(`${API_BASE_URL}/troop/${troopId}/sales`, { credentials: 'include' }),
+            fetch(`${API_BASE_URL}/troop/${troopId}/goals`, { credentials: 'include' })
+        ]);
+
+        if (!membersRes.ok || !salesRes.ok || !goalsRes.ok) {
+            throw new Error('Failed to load troop data');
+        }
+
+        troopMembers = await membersRes.json();
+        troopSalesData = await salesRes.json();
+        troopGoals = await goalsRes.json();
+
+        renderTroopDashboard();
+    } catch (error) {
+        console.error('Error loading troop data:', error);
+        showFeedback('Failed to load troop data', true);
+    }
+}
+
+// Render the troop dashboard
+function renderTroopDashboard() {
+    const summary = document.getElementById('troopSummary');
+    const emptyState = document.getElementById('troopEmptyState');
+
+    if (summary) summary.style.display = 'block';
+    if (emptyState) emptyState.style.display = 'none';
+
+    // Update summary cards
+    document.getElementById('troopTotalBoxes').textContent = troopSalesData?.totals?.totalBoxes || 0;
+    document.getElementById('troopTotalCollected').textContent = `$${(troopSalesData?.totals?.totalCollected || 0).toFixed(2)}`;
+    document.getElementById('troopMemberCount').textContent = troopMembers.length;
+
+    // Render members table
+    renderTroopMembers();
+
+    // Render goals
+    renderTroopGoals();
+
+    // Render sales by cookie
+    renderTroopSalesByCookie();
+}
+
+// Show empty state when no troop selected
+function showTroopEmptyState() {
+    const summary = document.getElementById('troopSummary');
+    const emptyState = document.getElementById('troopEmptyState');
+
+    if (summary) summary.style.display = 'none';
+    if (emptyState) emptyState.style.display = 'block';
+}
+
+// Render troop members table
+function renderTroopMembers() {
+    const tbody = document.getElementById('troopMembersTable');
+    if (!tbody) return;
+
+    if (troopMembers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No members yet. Add members to get started!</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = troopMembers.map(member => {
+        const lastSale = member.lastSaleDate ? new Date(member.lastSaleDate).toLocaleDateString() : 'No sales';
+        const roleDisplay = {
+            'member': 'Scout',
+            'co-leader': 'Co-Leader',
+            'assistant': 'Assistant'
+        }[member.troopRole] || member.troopRole;
+
+        return `
+            <tr>
+                <td>
+                    <div class="member-name">
+                        ${member.photoUrl ? `<img src="${member.photoUrl}" class="member-avatar" alt="">` : ''}
+                        <span>${member.firstName} ${member.lastName}</span>
+                    </div>
+                </td>
+                <td><span class="role-badge role-${member.troopRole}">${roleDisplay}</span></td>
+                <td>${member.totalBoxes}</td>
+                <td>$${(member.totalCollected || 0).toFixed(2)}</td>
+                <td>${lastSale}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="removeMember(${member.id})" title="Remove">
+                        ✕
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Render troop goals
+function renderTroopGoals() {
+    const container = document.getElementById('troopGoalsList');
+    if (!container) return;
+
+    if (troopGoals.length === 0) {
+        container.innerHTML = '<p class="empty-state">No goals set. Add a goal to track progress!</p>';
+        return;
+    }
+
+    container.innerHTML = troopGoals.map(goal => {
+        const progress = goal.targetAmount > 0 ? Math.min(100, (goal.actualAmount / goal.targetAmount) * 100) : 0;
+        const typeLabels = {
+            'boxes_sold': 'Boxes Sold',
+            'revenue': 'Revenue',
+            'participation': 'Participation'
+        };
+
+        return `
+            <div class="goal-card">
+                <div class="goal-header">
+                    <span class="goal-type">${typeLabels[goal.goalType] || goal.goalType}</span>
+                    <span class="goal-status status-${goal.status}">${goal.status.replace('_', ' ')}</span>
+                </div>
+                <div class="goal-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${progress}%"></div>
+                    </div>
+                    <span class="progress-text">${goal.actualAmount || 0} / ${goal.targetAmount}</span>
+                </div>
+                ${goal.description ? `<p class="goal-description">${goal.description}</p>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+// Render sales by cookie type
+function renderTroopSalesByCookie() {
+    const container = document.getElementById('troopSalesByCookie');
+    if (!container) return;
+
+    const salesByCookie = troopSalesData?.salesByCookie || [];
+
+    if (salesByCookie.length === 0) {
+        container.innerHTML = '<p class="empty-state">No sales data yet</p>';
+        return;
+    }
+
+    container.innerHTML = salesByCookie.map(item => `
+        <div class="cookie-sale-item">
+            <span class="cookie-name">${item.cookieType}</span>
+            <span class="cookie-quantity">${item.totalQuantity} boxes</span>
+            <span class="cookie-revenue">$${(item.totalCollected || 0).toFixed(2)}</span>
+        </div>
+    `).join('');
+}
+
+// Modal functions
+function openCreateTroopModal() {
+    document.getElementById('createTroopModal').style.display = 'flex';
+}
+
+function closeCreateTroopModal() {
+    document.getElementById('createTroopModal').style.display = 'none';
+    // Clear form
+    document.getElementById('newTroopNumber').value = '';
+    document.getElementById('newTroopType').value = '';
+    document.getElementById('newTroopMeetingLocation').value = '';
+    document.getElementById('newTroopMeetingDay').value = '';
+    document.getElementById('newTroopMeetingTime').value = '';
+}
+
+function openAddMemberModal() {
+    if (!selectedTroopId) {
+        showFeedback('Please select a troop first', true);
+        return;
+    }
+    document.getElementById('addMemberModal').style.display = 'flex';
+}
+
+function closeAddMemberModal() {
+    document.getElementById('addMemberModal').style.display = 'none';
+    document.getElementById('memberSearchEmail').value = '';
+    document.getElementById('memberSearchResults').innerHTML = '';
+    document.getElementById('confirmAddMemberBtn').disabled = true;
+}
+
+function openAddGoalModal() {
+    if (!selectedTroopId) {
+        showFeedback('Please select a troop first', true);
+        return;
+    }
+    // Set default dates
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('goalStartDate').value = today;
+    document.getElementById('addGoalModal').style.display = 'flex';
+}
+
+function closeAddGoalModal() {
+    document.getElementById('addGoalModal').style.display = 'none';
+    document.getElementById('goalType').value = '';
+    document.getElementById('goalTarget').value = '';
+    document.getElementById('goalStartDate').value = '';
+    document.getElementById('goalEndDate').value = '';
+    document.getElementById('goalDescription').value = '';
+}
+
+// Create a new troop
+async function createTroop() {
+    const troopNumber = document.getElementById('newTroopNumber').value.trim();
+    const troopType = document.getElementById('newTroopType').value;
+    const meetingLocation = document.getElementById('newTroopMeetingLocation').value.trim();
+    const meetingDay = document.getElementById('newTroopMeetingDay').value;
+    const meetingTime = document.getElementById('newTroopMeetingTime').value;
+
+    if (!troopNumber || !troopType) {
+        showFeedback('Please fill in required fields', true);
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/troop`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                troopNumber,
+                troopType,
+                meetingLocation,
+                meetingDay,
+                meetingTime
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to create troop');
+        }
+
+        const newTroop = await response.json();
+        showFeedback(`Troop ${troopNumber} created successfully!`);
+        closeCreateTroopModal();
+
+        // Reload troops and select the new one
+        await loadMyTroops();
+        document.getElementById('troopSelector').value = newTroop.id;
+        selectedTroopId = newTroop.id;
+        loadTroopData(newTroop.id);
+
+    } catch (error) {
+        console.error('Error creating troop:', error);
+        showFeedback(error.message, true);
+    }
+}
+
+// Search users for adding members
+let selectedMemberEmail = null;
+
+async function searchUsers(query) {
+    const resultsContainer = document.getElementById('memberSearchResults');
+    const confirmBtn = document.getElementById('confirmAddMemberBtn');
+
+    if (!query || query.length < 2) {
+        resultsContainer.innerHTML = '';
+        confirmBtn.disabled = true;
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/users/search?q=${encodeURIComponent(query)}`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Search failed');
+
+        const users = await response.json();
+
+        if (users.length === 0) {
+            resultsContainer.innerHTML = '<div class="search-no-results">No users found</div>';
+            confirmBtn.disabled = true;
+            return;
+        }
+
+        resultsContainer.innerHTML = users.map(user => `
+            <div class="search-result-item" onclick="selectMember('${user.email}', '${user.firstName} ${user.lastName}')">
+                <span class="result-name">${user.firstName} ${user.lastName}</span>
+                <span class="result-email">${user.email}</span>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        console.error('Search error:', error);
+        resultsContainer.innerHTML = '<div class="search-error">Search failed</div>';
+    }
+}
+
+function selectMember(email, name) {
+    selectedMemberEmail = email;
+    document.getElementById('memberSearchEmail').value = email;
+    document.getElementById('memberSearchResults').innerHTML = `<div class="search-selected">Selected: ${name}</div>`;
+    document.getElementById('confirmAddMemberBtn').disabled = false;
+}
+
+// Add member to troop
+async function addMemberToTroop() {
+    if (!selectedMemberEmail || !selectedTroopId) {
+        showFeedback('Please select a member to add', true);
+        return;
+    }
+
+    const role = document.getElementById('memberRole').value;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/troop/${selectedTroopId}/members`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                email: selectedMemberEmail,
+                role
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to add member');
+        }
+
+        showFeedback('Member added successfully!');
+        closeAddMemberModal();
+        selectedMemberEmail = null;
+
+        // Reload troop data
+        loadTroopData(selectedTroopId);
+
+    } catch (error) {
+        console.error('Error adding member:', error);
+        showFeedback(error.message, true);
+    }
+}
+
+// Remove member from troop
+async function removeMember(userId) {
+    if (!selectedTroopId) return;
+
+    const confirmed = confirm('Are you sure you want to remove this member from the troop?');
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/troop/${selectedTroopId}/members/${userId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to remove member');
+        }
+
+        showFeedback('Member removed');
+        loadTroopData(selectedTroopId);
+
+    } catch (error) {
+        console.error('Error removing member:', error);
+        showFeedback(error.message, true);
+    }
+}
+
+// Create troop goal
+async function createGoal() {
+    const goalType = document.getElementById('goalType').value;
+    const targetAmount = parseFloat(document.getElementById('goalTarget').value);
+    const startDate = document.getElementById('goalStartDate').value;
+    const endDate = document.getElementById('goalEndDate').value;
+    const description = document.getElementById('goalDescription').value.trim();
+
+    if (!goalType || !targetAmount || targetAmount <= 0) {
+        showFeedback('Please fill in required fields', true);
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/troop/${selectedTroopId}/goals`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                goalType,
+                targetAmount,
+                startDate: startDate || new Date().toISOString(),
+                endDate: endDate || null,
+                description
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to create goal');
+        }
+
+        showFeedback('Goal created successfully!');
+        closeAddGoalModal();
+
+        // Reload troop data
+        loadTroopData(selectedTroopId);
+
+    } catch (error) {
+        console.error('Error creating goal:', error);
+        showFeedback(error.message, true);
+    }
+}
+
+// ============================================================================
+// Phase 3: Cookie Catalog and Nutrition
+// ============================================================================
+
+let cookieCatalog = [];
+
+async function loadCookieCatalog() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/cookies`, { credentials: 'include' });
+        if (response.ok) {
+            cookieCatalog = await response.json();
+        }
+    } catch (error) {
+        console.error('Error loading cookie catalog:', error);
+        cookieCatalog = [];
+    }
+}
+
+function getAttributeIcon(value) {
+    const icons = {
+        'vegan': '🌱',
+        'gluten_free': 'GF',
+        'contains_peanuts': '🥜',
+        'contains_tree_nuts': '🌰',
+        'contains_coconut': '🥥',
+        'kosher': '✡️'
+    };
+    return icons[value] || '•';
+}
+
+async function showNutritionModal(cookieId) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/cookies/${cookieId}`, { credentials: 'include' });
+        if (!response.ok) throw new Error('Failed to load cookie data');
+
+        const cookie = await response.json();
+
+        document.getElementById('nutritionCookieName').textContent = cookie.cookieName;
+
+        if (cookie.nutrition) {
+            document.getElementById('nutritionServing').textContent =
+                `Serving Size: ${cookie.nutrition.servingSize || '--'} (${cookie.nutrition.servingsPerBox || '--'} servings per box)`;
+
+            document.getElementById('nutritionTableBody').innerHTML = `
+                <tr><td>Calories</td><td>${cookie.nutrition.calories || '--'}</td></tr>
+                <tr><td>Total Fat</td><td>${cookie.nutrition.totalFat || '--'}g</td></tr>
+                <tr class="nutrient-indent"><td>Saturated Fat</td><td>${cookie.nutrition.saturatedFat || '--'}g</td></tr>
+                <tr class="nutrient-indent"><td>Trans Fat</td><td>${cookie.nutrition.transFat || '--'}g</td></tr>
+                <tr><td>Cholesterol</td><td>${cookie.nutrition.cholesterol || '--'}mg</td></tr>
+                <tr><td>Sodium</td><td>${cookie.nutrition.sodium || '--'}mg</td></tr>
+                <tr><td>Total Carbs</td><td>${cookie.nutrition.totalCarbs || '--'}g</td></tr>
+                <tr class="nutrient-indent"><td>Dietary Fiber</td><td>${cookie.nutrition.dietaryFiber || '--'}g</td></tr>
+                <tr class="nutrient-indent"><td>Sugars</td><td>${cookie.nutrition.sugars || '--'}g</td></tr>
+                <tr><td>Protein</td><td>${cookie.nutrition.protein || '--'}g</td></tr>
+            `;
+
+            document.getElementById('ingredientsList').textContent =
+                cookie.nutrition.ingredients || 'Not available';
+        } else {
+            document.getElementById('nutritionServing').textContent = 'Nutrition information not available';
+            document.getElementById('nutritionTableBody').innerHTML = '';
+            document.getElementById('ingredientsList').textContent = '--';
+        }
+
+        // Show attributes
+        const attributesContainer = document.getElementById('nutritionAttributes');
+        if (cookie.attributes && cookie.attributes.length > 0) {
+            attributesContainer.innerHTML = cookie.attributes.map(attr =>
+                `<span class="cookie-badge ${attr.attributeType}">${getAttributeIcon(attr.attributeValue)} ${attr.displayLabel}</span>`
+            ).join('');
+        } else {
+            attributesContainer.innerHTML = '';
+        }
+
+        document.getElementById('nutritionModal').style.display = 'flex';
+    } catch (error) {
+        console.error('Error showing nutrition modal:', error);
+        showFeedback('Failed to load nutrition info', true);
+    }
+}
+
+function closeNutritionModal() {
+    document.getElementById('nutritionModal').style.display = 'none';
+}
+
+// ============================================================================
+// Phase 3: Invitation System
+// ============================================================================
+
+let pendingInvitations = [];
+
+async function loadInvitations() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/invitations`, { credentials: 'include' });
+        if (response.ok) {
+            pendingInvitations = await response.json();
+            updateInvitationBadge();
+        }
+    } catch (error) {
+        console.error('Error loading invitations:', error);
+        pendingInvitations = [];
+    }
+}
+
+function updateInvitationBadge() {
+    const btn = document.getElementById('invitationsBtn');
+    const badge = document.getElementById('invitationBadge');
+
+    if (pendingInvitations.length > 0) {
+        if (btn) btn.style.display = 'flex';
+        if (badge) badge.textContent = pendingInvitations.length;
+    } else {
+        if (btn) btn.style.display = 'none';
+    }
+}
+
+function openInvitationsModal() {
+    renderInvitations();
+    document.getElementById('invitationsModal').style.display = 'flex';
+}
+
+function closeInvitationsModal() {
+    document.getElementById('invitationsModal').style.display = 'none';
+}
+
+function renderInvitations() {
+    const container = document.getElementById('invitationsList');
+    if (!container) return;
+
+    if (pendingInvitations.length === 0) {
+        container.innerHTML = '<p class="empty-state">No pending invitations</p>';
+        return;
+    }
+
+    container.innerHTML = pendingInvitations.map(inv => `
+        <div class="invitation-item">
+            <h4>Troop ${inv.troopNumber}${inv.troopName ? ` - ${inv.troopName}` : ''}</h4>
+            <p>You've been invited to join as a <strong>${inv.invitedRole}</strong></p>
+            <div class="invitation-meta">
+                Invited by ${inv.inviterFirstName} ${inv.inviterLastName}
+            </div>
+            <div class="invitation-actions">
+                <button class="btn btn-primary btn-sm" onclick="acceptInvitation(${inv.id})">Accept</button>
+                <button class="btn btn-secondary btn-sm" onclick="declineInvitation(${inv.id})">Decline</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function acceptInvitation(invitationId) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/invitations/${invitationId}/accept`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to accept invitation');
+        }
+
+        showFeedback('Invitation accepted! You are now a member of the troop.');
+        await loadInvitations();
+        renderInvitations();
+        await loadMyTroops();
+    } catch (error) {
+        console.error('Error accepting invitation:', error);
+        showFeedback(error.message, true);
+    }
+}
+
+async function declineInvitation(invitationId) {
+    if (!confirm('Are you sure you want to decline this invitation?')) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/invitations/${invitationId}/decline`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to decline invitation');
+
+        showFeedback('Invitation declined');
+        await loadInvitations();
+        renderInvitations();
+    } catch (error) {
+        console.error('Error declining invitation:', error);
+        showFeedback('Failed to decline invitation', true);
+    }
+}
+
+function openSendInviteModal() {
+    document.getElementById('inviteEmail').value = '';
+    document.getElementById('inviteRole').value = 'scout';
+    document.getElementById('sendInviteModal').style.display = 'flex';
+}
+
+function closeSendInviteModal() {
+    document.getElementById('sendInviteModal').style.display = 'none';
+}
+
+async function sendInvitation() {
+    const email = document.getElementById('inviteEmail').value.trim();
+    const role = document.getElementById('inviteRole').value;
+
+    if (!email || !selectedTroopId) {
+        showFeedback('Please enter an email address', true);
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/troop/${selectedTroopId}/invite`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ email, role })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to send invitation');
+        }
+
+        showFeedback('Invitation sent successfully!');
+        closeSendInviteModal();
+    } catch (error) {
+        console.error('Error sending invitation:', error);
+        showFeedback(error.message, true);
+    }
+}
+
+// ============================================================================
+// Phase 3: Leaderboard
+// ============================================================================
+
+let leaderboardData = [];
+
+async function loadLeaderboard() {
+    if (!selectedTroopId) return;
+
+    const metricSelect = document.getElementById('leaderboardMetric');
+    const metric = metricSelect ? metricSelect.value : 'boxes';
+
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/troop/${selectedTroopId}/leaderboard?limit=10&metric=${metric}`,
+            { credentials: 'include' }
+        );
+
+        if (response.ok) {
+            leaderboardData = await response.json();
+            renderLeaderboard();
+        }
+    } catch (error) {
+        console.error('Error loading leaderboard:', error);
+        leaderboardData = [];
+    }
+}
+
+function renderLeaderboard() {
+    const container = document.getElementById('leaderboardList');
+    if (!container) return;
+
+    if (leaderboardData.length === 0) {
+        container.innerHTML = '<p class="empty-state">No sales data yet</p>';
+        return;
+    }
+
+    const metricSelect = document.getElementById('leaderboardMetric');
+    const metric = metricSelect ? metricSelect.value : 'boxes';
+
+    container.innerHTML = leaderboardData.map((member, index) => `
+        <div class="leaderboard-item ${index < 3 ? 'top-three' : ''}">
+            <span class="rank">${member.rank}</span>
+            <div class="member-info">
+                <span class="member-name">${member.firstName} ${member.lastName}</span>
+            </div>
+            <span class="score">${metric === 'revenue' ? '$' + member.totalRevenue.toFixed(2) : member.totalBoxes + ' boxes'}</span>
+        </div>
+    `).join('');
+}
+
+// ============================================================================
+// Phase 3: Enhanced Goal Management
+// ============================================================================
+
+async function loadGoalProgress() {
+    if (!selectedTroopId) return;
+
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/troop/${selectedTroopId}/goals/progress`,
+            { credentials: 'include' }
+        );
+
+        if (response.ok) {
+            const goalsWithProgress = await response.json();
+            renderTroopGoalsWithProgress(goalsWithProgress);
+        }
+    } catch (error) {
+        console.error('Error loading goal progress:', error);
+    }
+}
+
+function renderTroopGoalsWithProgress(goals) {
+    const container = document.getElementById('troopGoalsList');
+    if (!container) return;
+
+    if (!goals || goals.length === 0) {
+        container.innerHTML = '<p class="empty-state">No goals set. Add a goal to track progress!</p>';
+        return;
+    }
+
+    const goalTypeLabels = {
+        'boxes_sold': 'Boxes Sold',
+        'total_boxes': 'Total Boxes',
+        'revenue': 'Revenue',
+        'total_revenue': 'Total Revenue',
+        'participation': 'Participation',
+        'events': 'Events',
+        'event_count': 'Event Count',
+        'donations': 'Donations'
+    };
+
+    container.innerHTML = goals.map(goal => {
+        const formatValue = (type, value) => {
+            if (type.includes('revenue') || type === 'donations') return '$' + value.toFixed(2);
+            if (type === 'participation') return value.toFixed(1) + '%';
+            return value;
+        };
+
+        return `
+            <div class="goal-card">
+                <div class="goal-header">
+                    <span class="goal-type">${goalTypeLabels[goal.goalType] || goal.goalType}</span>
+                    <span class="goal-progress-text">${formatValue(goal.goalType, goal.actualAmount)} / ${formatValue(goal.goalType, goal.targetAmount)}</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${Math.min(goal.progress, 100)}%"></div>
+                </div>
+                <div class="goal-dates">
+                    ${goal.startDate ? new Date(goal.startDate).toLocaleDateString() : ''} - ${goal.endDate ? new Date(goal.endDate).toLocaleDateString() : 'Ongoing'}
+                </div>
+                ${goal.description ? `<p style="font-size: 0.8rem; color: #666; margin-top: 0.5rem;">${goal.description}</p>` : ''}
+                <div class="goal-actions">
+                    <button class="btn btn-sm btn-secondary" onclick="deleteGoal(${goal.id})">Delete</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function deleteGoal(goalId) {
+    if (!confirm('Are you sure you want to delete this goal?')) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/troop/${selectedTroopId}/goals/${goalId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete goal');
+
+        showFeedback('Goal deleted');
+        loadGoalProgress();
+    } catch (error) {
+        console.error('Error deleting goal:', error);
+        showFeedback('Failed to delete goal', true);
+    }
+}
+
+// Override renderTroopGoals to use progress data
+const originalRenderTroopGoals = typeof renderTroopGoals !== 'undefined' ? renderTroopGoals : null;
+
+// Hook into loadTroopData to also load leaderboard and goal progress
+const originalLoadTroopData = loadTroopData;
+loadTroopData = async function(troopId) {
+    await originalLoadTroopData(troopId);
+    loadLeaderboard();
+    loadGoalProgress();
+};
+
 // Initialize app when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        init();
+    document.addEventListener('DOMContentLoaded', async () => {
+        await init();
+        setupRoleBasedUI();
         setupNavigation();
         setupTheme();
         setupImport();
         setupCookieTableListeners();
         setupDangerZone();
+        setupTroopManagement();
+        loadInvitations();
+        loadCookieCatalog();
     });
 } else {
-    init();
-    setupNavigation();
-    setupTheme();
-    setupImport();
-    setupCookieTableListeners();
-    setupDangerZone();
+    (async () => {
+        await init();
+        setupRoleBasedUI();
+        setupNavigation();
+        setupTheme();
+        setupImport();
+        setupCookieTableListeners();
+        setupDangerZone();
+        setupTroopManagement();
+        loadInvitations();
+        loadCookieCatalog();
+    })();
 }
