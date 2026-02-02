@@ -2,14 +2,17 @@
 
 **Status:** ✅ IMPLEMENTED
 **Completed:** 2026-02-01
-**Focus:** Troop-level features and cookie catalog management
+**Focus:** Troop-level features, role-based access control, and cookie catalog management
 **Prerequisites:** Phase 1 (Foundation), Phase 2 (Compliance & Security)
 
 ---
 
 ## Overview
 
-Phase 3 implements the organizational hierarchy for troops and introduces a flexible cookie product catalog system. This phase transforms GSCTracker from an individual scout tool into a troop-level management platform.
+Phase 3 implements the organizational hierarchy for troops and introduces a flexible cookie product catalog system. This phase transforms GSCTracker from an individual scout tool into a troop-level management platform with **role-based access control** supporting multiple user types at the troop level.
+
+**Key Reference Document:**
+See `/docs/v2 Implementation/Hierarchy Definitions.md` for the complete role hierarchy, permissions matrix, and access control architecture that drives this phase.
 
 ---
 
@@ -17,16 +20,39 @@ Phase 3 implements the organizational hierarchy for troops and introduces a flex
 
 ### 3.1 Troop Hierarchy and Organization
 
-**Goal:** Support organizational structure at the troop level
+**Goal:** Support organizational structure at the troop level with role-based access control
+
+**Reference Architecture:**
+This phase implements the organizational structure defined in `/docs/v2 Implementation/Hierarchy Definitions.md` Sections 2-4. See that document for:
+- Complete role definitions (Levels 2-5)
+- Detailed sub-roles for Troop Assistant positions
+- Comprehensive permissions matrix by feature
+- Access control philosophy ("The Cascade")
 
 **Hierarchy Model:**
 ```
 Troop
-├── Cookie Leader(s)      - Manages inventory, fulfillment orders
-├── Troop Leader(s)       - Manages scouts, events, reports
-├── Scouts (Children)     - Records sales, tracks personal goals
-└── Parents/Guardians     - Views linked scout data, assists with sales
+├── Troop Leader (Level 2)      - Full Read/Write access to troop
+│   └── Can assign Troop Assistant roles:
+│       ├── Treasurer            - Full Finance module access
+│       ├── Product Manager      - Full Sales/Inventory module access
+│       ├── First Aider          - Medical/Emergency records (view-only)
+│       ├── Camping Coordinator  - Events/Trips module access
+│       └── Activity Helper      - Calendar/Roster (read-only), attendance
+│
+├── Scouts (Level 5)            - Records sales, tracks personal goals
+└── Parents/Guardians (Level 4) - Views linked scout data, assists with sales
 ```
+
+**Role Assignment & Permission Rules:**
+- **Troop Leader:** Can view all scouts' profiles, edit troop settings, assign assistant roles
+- **Treasurer:** Full access to finances, read-only for scout advancement/medical
+- **Product Manager:** Full access to sales/inventory, can edit scout sales numbers
+- **First Aider:** View-only access to medical records, no roster/finance access
+- **Camping Coordinator:** Full access to events/trips, manage permission slips
+- **Activity Helper:** Read-only calendar/roster (PII hidden), can take attendance
+- **Parent:** Restricted to data linked to their FamilyID, can edit own contact/medical info
+- **Scout:** Read-only access to own profile
 
 **Database Schema - `troops` table:**
 ```sql
@@ -72,7 +98,11 @@ CREATE TABLE troop_members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     troopId INTEGER NOT NULL,
     userId INTEGER NOT NULL,
-    role TEXT NOT NULL,                   -- scout, parent, troop_leader, cookie_leader
+    role TEXT NOT NULL,                   -- Based on Hierarchy Definitions:
+                                          -- troop_leader, scout, parent,
+                                          -- treasurer, product_manager,
+                                          -- first_aider, camping_coordinator,
+                                          -- activity_helper
     scoutLevel TEXT,                      -- For scouts: Daisy, Brownie, Junior, Cadette, Senior, Ambassador
     linkedScoutId INTEGER,                -- For parents: which scout they're linked to
     joinDate TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -89,7 +119,20 @@ CREATE INDEX idx_troop_members_troop ON troop_members(troopId);
 CREATE INDEX idx_troop_members_user ON troop_members(userId);
 CREATE INDEX idx_troop_members_status ON troop_members(status);
 CREATE INDEX idx_troop_members_level ON troop_members(scoutLevel);
+CREATE INDEX idx_troop_members_role ON troop_members(role);
 ```
+
+**Role Values in troop_members:**
+| Role | Level | Hierarchy Ref | Scope |
+|------|-------|---------------|-------|
+| `troop_leader` | 2 | Level 2 | Troop Admin |
+| `treasurer` | 3 | Level 3, Sub-role | Limited Troop |
+| `product_manager` | 3 | Level 3, Sub-role | Limited Troop |
+| `first_aider` | 3 | Level 3, Sub-role | Limited Troop |
+| `camping_coordinator` | 3 | Level 3, Sub-role | Limited Troop |
+| `activity_helper` | 3 | Level 3, Sub-role | Limited Troop |
+| `parent` | 4 | Level 4 | Family |
+| `scout` | 5 | Level 5 | Self |
 
 **API Endpoints - Troop Management:**
 ```
@@ -100,11 +143,15 @@ GET    /api/troops/:id                - Get troop details
 PUT    /api/troops/:id                - Update troop
 DELETE /api/troops/:id                - Deactivate troop
 
-# Member Management
-GET    /api/troops/:id/members        - List troop members
+# Member Management (with Role Assignment)
+GET    /api/troops/:id/members        - List troop members with roles
 POST   /api/troops/:id/members        - Add member to troop
 PUT    /api/troops/:id/members/:uid   - Update member role/status
 DELETE /api/troops/:id/members/:uid   - Remove member from troop
+
+## Role Assignment (Troop Leader Only)
+PUT    /api/troops/:id/members/:uid/role - Assign role (treasurer, product_manager, etc.)
+GET    /api/roles                     - List available role definitions
 
 # Invitations
 POST   /api/troops/:id/invite         - Send invitation to join troop
@@ -113,7 +160,19 @@ POST   /api/invitations/:id/accept    - Accept invitation
 POST   /api/invitations/:id/decline   - Decline invitation
 ```
 
-### 3.2 Troop Dashboard for Leaders
+### 3.2 Role-Specific Dashboards with UI/UX Customization
+
+**Goal:** Provide role-appropriate dashboards based on user's assignment and permissions
+
+**UI/UX Customization Strategy** (from Hierarchy Definitions):
+- **Troop Leader Dashboard:** Show "Quick Actions" for emailing roster, editing meeting details, and financial overview
+- **Treasurer Dashboard:** Highlight the "Finances" tab prominently; hide "Edit Troop Settings" gear icon
+- **Product Manager Dashboard:** Highlight "Sales/Inventory" tab with quick access to scout sales editing
+- **Activity Helper Dashboard:** Show simplified "Calendar" and "Roster" views with PII hidden (names/parents only)
+- **Parent Dashboard:** Default to "My Family" view with cards for each linked scout showing upcoming events and badge progress
+- **Scout Dashboard:** Show personal sales goals, calendar, and badge progress (read-only)
+
+**2. Troop Leader Dashboard
 
 **Goal:** Centralized view for troop leaders to manage their troop
 
@@ -127,10 +186,10 @@ POST   /api/invitations/:id/decline   - Decline invitation
 
 **2. Scout Roster**
 ```
-| Scout Name | Sales (Boxes) | Goal Progress | Last Activity | Status |
-|------------|---------------|---------------|---------------|--------|
-| Jane Doe   | 150           | 75%           | Today         | Active |
-| Sarah S.   | 89            | 44%           | 2 days ago    | Active |
+| Scout Name | Level | Sales (Boxes) | Goal Progress | Last Activity | Status |
+|------------|-------|---------------|---------------|---------------|--------|
+| Jane Doe   | Brownie | 150         | 75%           | Today         | Active |
+| Sarah S.   | Junior | 89           | 44%           | 2 days ago    | Active |
 ```
 
 **3. Leaderboard**
@@ -147,20 +206,44 @@ POST   /api/invitations/:id/decline   - Decline invitation
 - Pending approvals
 - Low inventory warnings
 
-**6. Quick Actions**
-- Add sale for scout
-- Schedule event
+**6. Quick Actions Panel**
+- ✅ Visible to: Troop Leader
+- Email entire roster
+- Edit meeting location/time
+- Financial overview button
+- Create new event
 - Send troop announcement
-- Generate report
+
+**3. Treasurer-Specific Dashboard**
+- **Highlighted Module:** Finances tab (bold/colored)
+- **Quick Links:** Bank accounts, ledger, dues tracking
+- **Restrictions Applied:** "Edit Troop Settings" gear icon hidden
+- **Read-Only Sections:** Scout advancement/medical (view-only)
+
+**4. Product Manager (Cookie Sales) Dashboard**
+- **Highlighted Module:** Sales/Inventory tab
+- **Quick Edit:** Inline scout sales number editing
+- **Analytics:** Cookie type breakdown, sales trends
+- **Inventory Tracking:** Current stock levels
+
+**5. Activity Helper Dashboard**
+- **Simplified Views:** Calendar and Roster (PII-masked - names/parents only, no contact info)
+- **Quick Action:** Attendance taking form
+- **Hidden Elements:** Finance, advanced settings, detailed medical records
 
 **Frontend Components:**
 ```
 /public/
-├── troop-dashboard.html      - Main troop dashboard
+├── troop-dashboard.html      - Main troop dashboard (role-aware)
 ├── troop-roster.html         - Scout roster management
-├── troop-settings.html       - Troop configuration
+├── troop-settings.html       - Troop configuration (hidden from assistants)
+├── troop-finances.html       - Finances module (treasurer-focused)
+├── troop-sales.html          - Sales/inventory (product manager-focused)
+├── parent-dashboard.html     - Parent "My Family" view
+├── scout-dashboard.html      - Scout personal view (read-only)
 └── js/
-    ├── troop-dashboard.js    - Dashboard logic
+    ├── troop-dashboard.js    - Dashboard logic with role detection
+    ├── role-ui-handler.js    - Dynamic UI hiding/showing based on role
     └── troop-components.js   - Reusable troop UI components
 ```
 
@@ -228,7 +311,58 @@ async function calculateTotalBoxesProgress(troopId, startDate, endDate) {
 }
 ```
 
-### 3.4 Scout Level Selection
+### 3.4 Role Assignment & Permission Control for Troop Assistants
+
+**Goal:** Enable Troop Leaders to assign specialized roles to parents/volunteers with granular permissions
+
+**Role Assignment Process:**
+
+1. **Troop Leader** navigates to Troop Members page
+2. Selects a parent or volunteer member
+3. Opens "Assign Role" modal
+4. Chooses from available assistant roles:
+   - Treasurer (Finance module)
+   - Product Manager (Sales/Inventory module)
+   - First Aider (Medical/Emergency records)
+   - Camping Coordinator (Events/Trips module)
+   - Activity Helper (Attendance, read-only roster)
+5. System updates member's role in `troop_members` table
+6. UI automatically reflects new role with customized dashboard
+
+**Role Assignment Rules:**
+- Only **Troop Leader** can assign/remove roles
+- A member can have **only one primary role per troop** (scout, parent, or a specific assistant role)
+- Member cannot change their own role
+- Role assignment is **scoped to the troop** - a parent can be treasurer in Troop A and activity helper in Troop B
+
+**Permission Enforcement:**
+Once a role is assigned, the system enforces permissions per `Hierarchy Definitions.md` Section 4 (Permissions Matrix):
+- API endpoints check `troop_members.role` before allowing access
+- Frontend hides UI elements based on user's role
+- Middleware blocks unauthorized resource access
+
+**API Endpoint - Role Assignment:**
+```
+PUT /api/troops/:troopId/members/:userId/role
+
+Request Body:
+{
+  "role": "treasurer"  // or: product_manager, first_aider, etc.
+}
+
+Response:
+{
+  "id": 123,
+  "userId": 456,
+  "troopId": 789,
+  "role": "treasurer",
+  "updatedAt": "2026-02-01T10:30:00Z"
+}
+```
+
+---
+
+### 3.5 Scout Level Selection
 
 **Goal:** Allow parents or troop leaders to select the appropriate Girl Scout level for each scout
 
@@ -293,7 +427,7 @@ When a scout bridges to the next level:
 
 ---
 
-### 3.5 Troop Roster Management with Parent Linking
+### 3.6 Troop Roster Management with Parent Linking
 
 **Goal:** Comprehensive scout and parent management
 
@@ -340,7 +474,7 @@ GET    /api/troops/:id/scouts/:uid    - Individual scout detail
 PUT    /api/troops/:id/scouts/:uid    - Update scout info
 ```
 
-### 3.6 Cookie Product Catalog Management
+### 3.7 Cookie Product Catalog Management
 
 **Goal:** Flexible cookie catalog that can be updated yearly
 
@@ -458,7 +592,7 @@ POST   /api/cookies/seasons/:year/copy    - Copy catalog from another season
 PUT    /api/cookies/seasons/:year/price   - Bulk update prices for season
 ```
 
-### 3.7 Nutrition and Dietary Attribute Tracking
+### 3.8 Nutrition and Dietary Attribute Tracking
 
 **Goal:** Display allergen and dietary information for customers
 
@@ -497,7 +631,7 @@ PUT    /api/cookies/seasons/:year/price   - Bulk update prices for season
 </div>
 ```
 
-### 3.8 Season/Year-Based Cookie Catalog
+### 3.9 Season/Year-Based Cookie Catalog
 
 **Goal:** Support different cookie offerings per selling season
 
@@ -546,6 +680,41 @@ GET    /api/seasons/:year/summary         - Season sales summary
 |-------|---------|
 | `sales` | Add `season` column |
 | `events` | Ensure `troopId` FK is used |
+
+**Future Enhancement (Phase 4+): User_Assignments Table for Full Scope + Role Model**
+
+For future implementation, the system should add a `user_assignments` table to support the full Scope + Role architecture from `Hierarchy Definitions.md`:
+
+```sql
+CREATE TABLE user_assignments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    scopeId INTEGER NOT NULL,        -- FK to Troop ID, Council ID, or Family ID
+    scopeType TEXT NOT NULL,         -- Enum: 'COUNCIL', 'TROOP', 'FAMILY'
+    roleId INTEGER NOT NULL,         -- FK to roles table
+    assignedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    assignedBy INTEGER,              -- FK to users(id) - who assigned this role
+    status TEXT DEFAULT 'active',    -- active, inactive
+    FOREIGN KEY (userId) REFERENCES users(id),
+    FOREIGN KEY (roleId) REFERENCES roles(id),
+    FOREIGN KEY (assignedBy) REFERENCES users(id),
+    UNIQUE(userId, scopeId, scopeType)
+);
+
+CREATE TABLE roles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,       -- e.g., 'troop_leader', 'treasurer', 'parent'
+    scope TEXT NOT NULL,             -- e.g., 'TROOP', 'FAMILY', 'SELF'
+    permissions TEXT,                -- JSON blob with granular permissions
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+This architecture enables:
+- One user having multiple roles across different scopes (parent in Troop A, treasurer in Troop B)
+- Granular permission control at the feature level
+- Inheritance cascade (Council Admin → all troops)
+- Easy role-to-permission mapping for UI customization
 
 ---
 

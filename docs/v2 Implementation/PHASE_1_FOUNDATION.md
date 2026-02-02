@@ -74,17 +74,32 @@ GET  /api/auth/google           - Initiate Google OAuth flow
 GET  /api/auth/google/callback  - Handle OAuth callback
 ```
 
-### 1.3 Role-Based Access Control (RBAC)
+### 1.3 Role-Based Access Control (RBAC) - Foundation Layer
 
-**Goal:** Implement granular permissions for different user types
+**Goal:** Implement foundational RBAC with Scope + Role architecture for granular permissions
 
-**Roles Implemented:**
-| Role | Description | Permissions |
-|------|-------------|-------------|
-| `scout` | Girl Scout member | Manage own data only |
-| `parent` | Parent/Guardian | View/assist linked scout's data |
-| `troop_leader` | Troop Leader | Manage all troop members |
-| `council_admin` | Council Admin | Full system access |
+**Architecture Overview:**
+The system uses a **Scope + Role** model (detailed in `/docs/v2 Implementation/Hierarchy Definitions.md`):
+- **Scope:** Defines *where* a user has power (Council-wide, Troop-specific, Family, Self)
+- **Role:** Defines *what* a user can do within that scope
+
+This flexible design allows users to have multiple roles across different scopes (e.g., a parent in one troop and a treasurer in another troop).
+
+**Roles Implemented (Phase 1):**
+| Role | Scope | Description | Future Sub-Roles (Phase 3+) |
+|------|-------|-------------|---------------------------|
+| `scout` | Self | Girl Scout member | (None - read-only access to own data) |
+| `parent` | Family | Parent/Guardian | (Linked to scout's family unit) |
+| `troop_leader` | Troop | Troop Leader/Admin | Full troop management |
+| `council_admin` | Council | Council Administrator | Full system access (v3+) |
+
+**Future Sub-Roles (Phase 3+ - Troop Assistant roles):**
+See `/docs/v2 Implementation/Hierarchy Definitions.md` Section 2, Level 3 for detailed sub-roles:
+- Treasurer (Finance module access)
+- Product Manager (Sales/Inventory module access)
+- First Aider (Medical/Emergency records)
+- Camping Coordinator (Events/Trips module access)
+- Troop Support / Activity Helper (Attendance, read-only roster)
 
 **Authorization Middleware:**
 ```javascript
@@ -97,6 +112,9 @@ auth.hasRole('troop_leader', 'council_admin')
 // Resource ownership check
 auth.canAccessResource('sales')
 ```
+
+**Permission Model Foundation:**
+All API endpoints implement access control based on user's role and scope. See `/docs/v2 Implementation/Hierarchy Definitions.md` Section 4 (Permissions Matrix) for complete feature-level access control.
 
 ### 1.4 Session Management
 
