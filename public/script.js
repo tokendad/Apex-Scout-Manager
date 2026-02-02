@@ -2395,9 +2395,30 @@ function openAddMemberModal() {
 
 function closeAddMemberModal() {
     document.getElementById('addMemberModal').style.display = 'none';
+
+    // Clear new scout form fields
+    document.getElementById('scoutFirstName').value = '';
+    document.getElementById('scoutLastName').value = '';
+    document.getElementById('scoutLevel').value = '';
+    document.getElementById('scoutDateOfBirth').value = '';
+    document.getElementById('parentFirstName').value = '';
+    document.getElementById('parentLastName').value = '';
+    document.getElementById('parentEmail').value = '';
+    document.getElementById('parentPhone').value = '';
+    document.getElementById('parentRole').value = '';
+    document.getElementById('secondaryParentFirstName').value = '';
+    document.getElementById('secondaryParentLastName').value = '';
+    document.getElementById('secondaryParentEmail').value = '';
+    document.getElementById('secondaryParentPhone').value = '';
+    document.getElementById('secondaryParentRole').value = '';
+
+    // Clear existing user form fields
     document.getElementById('memberSearchEmail').value = '';
     document.getElementById('memberSearchResults').innerHTML = '';
-    document.getElementById('confirmAddMemberBtn').disabled = true;
+    selectedMemberEmail = null;
+
+    // Reset to new scout tab
+    switchToNewScoutTab();
 }
 
 function openAddGoalModal() {
@@ -2468,6 +2489,21 @@ async function createTroop() {
     }
 }
 
+// Tab switching for Add Member modal
+function switchToNewScoutTab() {
+    document.getElementById('tabNewScout').classList.add('active');
+    document.getElementById('tabExistingUser').classList.remove('active');
+    document.getElementById('tabContentNewScout').style.display = 'block';
+    document.getElementById('tabContentExistingUser').style.display = 'none';
+}
+
+function switchToExistingUserTab() {
+    document.getElementById('tabExistingUser').classList.add('active');
+    document.getElementById('tabNewScout').classList.remove('active');
+    document.getElementById('tabContentExistingUser').style.display = 'block';
+    document.getElementById('tabContentNewScout').style.display = 'none';
+}
+
 // Search users for adding members
 let selectedMemberEmail = null;
 
@@ -2514,6 +2550,87 @@ function selectMember(email, name) {
     document.getElementById('memberSearchEmail').value = email;
     document.getElementById('memberSearchResults').innerHTML = `<div class="search-selected">Selected: ${name}</div>`;
     document.getElementById('confirmAddMemberBtn').disabled = false;
+}
+
+// Route to correct add function based on active tab
+async function submitAddMember() {
+    const activeTab = document.querySelector('.tab-btn.active').id;
+
+    if (activeTab === 'tabNewScout') {
+        await addNewScoutToTroop();
+    } else {
+        await addMemberToTroop();
+    }
+}
+
+// Add new scout with parent information to troop
+async function addNewScoutToTroop() {
+    if (!selectedTroopId) {
+        showFeedback('Please select a troop first', true);
+        return;
+    }
+
+    // Validate required fields
+    const scoutFirstName = document.getElementById('scoutFirstName').value.trim();
+    const scoutLastName = document.getElementById('scoutLastName').value.trim();
+    const parentFirstName = document.getElementById('parentFirstName').value.trim();
+    const parentLastName = document.getElementById('parentLastName').value.trim();
+    const parentRole = document.getElementById('parentRole').value;
+
+    if (!scoutFirstName || !scoutLastName) {
+        showFeedback('Scout name is required', true);
+        return;
+    }
+
+    if (!parentFirstName || !parentLastName) {
+        showFeedback('Parent name is required', true);
+        return;
+    }
+
+    if (!parentRole) {
+        showFeedback('Parent role is required', true);
+        return;
+    }
+
+    // Build request body
+    const requestData = {
+        scoutFirstName,
+        scoutLastName,
+        scoutLevel: document.getElementById('scoutLevel').value || null,
+        scoutDateOfBirth: document.getElementById('scoutDateOfBirth').value || null,
+        parentFirstName,
+        parentLastName,
+        parentEmail: document.getElementById('parentEmail').value.trim() || null,
+        parentPhone: document.getElementById('parentPhone').value.trim() || null,
+        parentRole,
+        secondaryParentFirstName: document.getElementById('secondaryParentFirstName').value.trim() || null,
+        secondaryParentLastName: document.getElementById('secondaryParentLastName').value.trim() || null,
+        secondaryParentEmail: document.getElementById('secondaryParentEmail').value.trim() || null,
+        secondaryParentPhone: document.getElementById('secondaryParentPhone').value.trim() || null,
+        secondaryParentRole: document.getElementById('secondaryParentRole').value || null
+    };
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/troop/${selectedTroopId}/members/scout`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(requestData)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to add scout');
+        }
+
+        showFeedback('Scout and parent added successfully!');
+        closeAddMemberModal();
+        loadTroopData(selectedTroopId);
+
+    } catch (error) {
+        console.error('Error adding scout:', error);
+        showFeedback(error.message, true);
+    }
 }
 
 // Add member to troop

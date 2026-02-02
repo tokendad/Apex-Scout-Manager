@@ -768,29 +768,130 @@
 
                 <!-- Add Member Modal -->
                 <div id="addMemberModal" class="modal" style="display: none;">
-                    <div class="modal-content">
+                    <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
                         <div class="modal-header">
-                            <h3>Add Member to Troop</h3>
+                            <h3>Add Scout to Troop</h3>
                             <button class="modal-close" onclick="closeAddMemberModal()">&times;</button>
                         </div>
                         <div class="modal-body">
-                            <div class="form-group">
-                                <label for="memberSearchEmail">Search by Email *</label>
-                                <input type="email" id="memberSearchEmail" placeholder="Enter member's email address">
-                                <div id="memberSearchResults" class="search-results"></div>
+
+                            <!-- Tab selector -->
+                            <div class="tab-selector">
+                                <button id="tabNewScout" class="tab-btn active" onclick="switchToNewScoutTab()">Add New Scout</button>
+                                <button id="tabExistingUser" class="tab-btn" onclick="switchToExistingUserTab()">Add Existing User</button>
                             </div>
-                            <div class="form-group">
-                                <label for="memberRole">Role in Troop</label>
-                                <select id="memberRole">
-                                    <option value="member">Member (Scout)</option>
-                                    <option value="co-leader">Co-Leader</option>
-                                    <option value="assistant">Assistant</option>
-                                </select>
+
+                            <!-- Tab 1: Add New Scout -->
+                            <div id="tabContentNewScout" class="tab-content active">
+
+                                <h4>Scout Information</h4>
+                                <div class="form-group">
+                                    <label for="scoutFirstName">Scout First Name *</label>
+                                    <input type="text" id="scoutFirstName" placeholder="e.g., Jane" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="scoutLastName">Scout Last Name *</label>
+                                    <input type="text" id="scoutLastName" placeholder="e.g., Doe" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="scoutLevel">Girl Scout Level (optional)</label>
+                                    <select id="scoutLevel">
+                                        <option value="">Select Level...</option>
+                                        <option value="Daisy">Daisy (Grades K-1, Ages 5-7)</option>
+                                        <option value="Brownie">Brownie (Grades 2-3, Ages 7-9)</option>
+                                        <option value="Junior">Junior (Grades 4-5, Ages 9-11)</option>
+                                        <option value="Cadette">Cadette (Grades 6-8, Ages 11-14)</option>
+                                        <option value="Senior">Senior (Grades 9-10, Ages 14-16)</option>
+                                        <option value="Ambassador">Ambassador (Grades 11-12, Ages 16-18)</option>
+                                    </select>
+                                    <small class="help-text">Based on grade as of October 1st</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="scoutDateOfBirth">Date of Birth (optional)</label>
+                                    <input type="date" id="scoutDateOfBirth">
+                                </div>
+
+                                <h4>Primary Parent/Guardian *</h4>
+                                <div class="form-group">
+                                    <label for="parentFirstName">First Name *</label>
+                                    <input type="text" id="parentFirstName" placeholder="e.g., Mary" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="parentLastName">Last Name *</label>
+                                    <input type="text" id="parentLastName" placeholder="e.g., Doe" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="parentRole">Role *</label>
+                                    <select id="parentRole" required>
+                                        <option value="">Select Role...</option>
+                                        <option value="Mom">Mom</option>
+                                        <option value="Dad">Dad</option>
+                                        <option value="Caregiver">Caregiver</option>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="parentEmail">Email (optional)</label>
+                                        <input type="email" id="parentEmail" placeholder="parent@example.com">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="parentPhone">Phone (optional)</label>
+                                        <input type="tel" id="parentPhone" placeholder="(555) 123-4567">
+                                    </div>
+                                </div>
+
+                                <h4>Secondary Parent/Guardian (optional)</h4>
+                                <div class="form-group">
+                                    <label for="secondaryParentFirstName">First Name</label>
+                                    <input type="text" id="secondaryParentFirstName" placeholder="e.g., John">
+                                </div>
+                                <div class="form-group">
+                                    <label for="secondaryParentLastName">Last Name</label>
+                                    <input type="text" id="secondaryParentLastName" placeholder="e.g., Doe">
+                                </div>
+                                <div class="form-group">
+                                    <label for="secondaryParentRole">Role</label>
+                                    <select id="secondaryParentRole">
+                                        <option value="">Select Role...</option>
+                                        <option value="Mom">Mom</option>
+                                        <option value="Dad">Dad</option>
+                                        <option value="Caregiver">Caregiver</option>
+                                    </select>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="secondaryParentEmail">Email</label>
+                                        <input type="email" id="secondaryParentEmail" placeholder="parent2@example.com">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="secondaryParentPhone">Phone</label>
+                                        <input type="tel" id="secondaryParentPhone" placeholder="(555) 123-4567">
+                                    </div>
+                                </div>
+
                             </div>
+
+                            <!-- Tab 2: Add Existing User -->
+                            <div id="tabContentExistingUser" class="tab-content" style="display: none;">
+                                <div class="form-group">
+                                    <label for="memberSearchEmail">Search by Email *</label>
+                                    <input type="email" id="memberSearchEmail" placeholder="Enter user's email address">
+                                    <div id="memberSearchResults" class="search-results"></div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="memberRole">Role in Troop</label>
+                                    <select id="memberRole">
+                                        <option value="member">Member (Scout)</option>
+                                        <option value="co-leader">Co-Leader</option>
+                                        <option value="assistant">Assistant</option>
+                                    </select>
+                                </div>
+                            </div>
+
                         </div>
                         <div class="modal-footer">
                             <button class="btn btn-secondary" onclick="closeAddMemberModal()">Cancel</button>
-                            <button class="btn btn-primary" id="confirmAddMemberBtn" onclick="addMemberToTroop()" disabled>Add Member</button>
+                            <button class="btn btn-primary" id="confirmAddMemberBtn" onclick="submitAddMember()">Add to Troop</button>
                         </div>
                     </div>
                 </div>

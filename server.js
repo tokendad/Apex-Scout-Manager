@@ -83,7 +83,7 @@ try {
     db.exec(`
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE,
             password_hash TEXT,
             firstName TEXT NOT NULL,
             lastName TEXT NOT NULL,
@@ -166,12 +166,16 @@ try {
             troopId INTEGER NOT NULL,
             userId INTEGER NOT NULL,
             role TEXT NOT NULL DEFAULT 'member',
+            scoutLevel TEXT,
+            linkedParentId INTEGER,
+            parentRole TEXT,
             joinDate TEXT DEFAULT CURRENT_TIMESTAMP,
             leaveDate TEXT,
             status TEXT DEFAULT 'active',
             FOREIGN KEY (troopId) REFERENCES troops(id) ON DELETE CASCADE,
             FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
-            CONSTRAINT role_check CHECK (role IN ('member', 'co-leader', 'assistant')),
+            FOREIGN KEY (linkedParentId) REFERENCES users(id) ON DELETE SET NULL,
+            CONSTRAINT role_check CHECK (role IN ('member', 'co-leader', 'assistant', 'parent')),
             CONSTRAINT status_check CHECK (status IN ('active', 'inactive', 'transferred')),
             UNIQUE(troopId, userId)
         )
@@ -2157,6 +2161,172 @@ app.post('/api/troop/:troopId/members', auth.isAuthenticated, (req, res) => {
     } catch (error) {
         logger.error('Error adding troop member', { error: error.message });
         res.status(500).json({ error: 'Failed to add member' });
+    }
+});
+
+// Add new scout with parent information to troop
+app.post('/api/troop/:troopId/members/scout', auth.isAuthenticated, (req, res) => {
+    try {
+        const { troopId } = req.params;
+        const {
+            scoutFirstName,
+            scoutLastName,
+            scoutLevel,
+            scoutDateOfBirth,
+            parentFirstName,
+            parentLastName,
+            parentEmail,
+            parentPhone,
+            parentRole,
+            secondaryParentFirstName,
+            secondaryParentLastName,
+            secondaryParentEmail,
+            secondaryParentPhone,
+            secondaryParentRole
+        } = req.body;
+
+        // Validate required fields
+        if (!scoutFirstName || !scoutLastName) {
+            return res.status(400).json({ error: 'Scout first and last name are required' });
+        }
+        if (!parentFirstName || !parentLastName) {
+            return res.status(400).json({ error: 'Parent first and last name are required' });
+        }
+        if (!parentRole) {
+            return res.status(400).json({ error: 'Parent role is required' });
+        }
+
+        // Verify user has access to manage this troop
+        const troop = db.prepare('SELECT * FROM troops WHERE id = ?').get(troopId);
+        if (!troop) {
+            return res.status(404).json({ error: 'Troop not found' });
+        }
+        if (troop.leaderId !== req.session.userId && req.session.userRole !== 'council_admin') {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        // Use transaction for multi-step operation
+        const transaction = db.transaction(() => {
+            let parentUserId = null;
+            let secondaryParentUserId = null;
+
+            // Create or find primary parent account
+            if (parentEmail) {
+                // Check if parent already exists by email
+                const existingParent = db.prepare('SELECT id FROM users WHERE email = ?').get(parentEmail);
+                if (existingParent) {
+                    parentUserId = existingParent.id;
+                } else {
+                    // Create new parent account
+                    const insertParent = db.prepare(`
+                        INSERT INTO users (firstName, lastName, email, role, isActive, createdAt)
+                        VALUES (?, ?, ?, 'parent', 1, datetime('now'))
+                    `);
+                    const parentResult = insertParent.run(parentFirstName, parentLastName, parentEmail);
+                    parentUserId = parentResult.lastInsertRowid;
+                }
+            } else {
+                // Create parent account without email (can't login until email added)
+                const insertParent = db.prepare(`
+                    INSERT INTO users (firstName, lastName, email, role, isActive, createdAt)
+                    VALUES (?, ?, NULL, 'parent', 1, datetime('now'))
+                `);
+                const parentResult = insertParent.run(parentFirstName, parentLastName);
+                parentUserId = parentResult.lastInsertRowid;
+            }
+
+            // Create secondary parent if provided
+            if (secondaryParentFirstName && secondaryParentLastName) {
+                if (secondaryParentEmail) {
+                    // Check if secondary parent already exists by email
+                    const existingSecondary = db.prepare('SELECT id FROM users WHERE email = ?').get(secondaryParentEmail);
+                    if (existingSecondary) {
+                        secondaryParentUserId = existingSecondary.id;
+                    } else {
+                        // Create new secondary parent account
+                        const insertSecondary = db.prepare(`
+                            INSERT INTO users (firstName, lastName, email, role, isActive, createdAt)
+                            VALUES (?, ?, ?, 'parent', 1, datetime('now'))
+                        `);
+                        const secondaryResult = insertSecondary.run(secondaryParentFirstName, secondaryParentLastName, secondaryParentEmail);
+                        secondaryParentUserId = secondaryResult.lastInsertRowid;
+                    }
+                } else {
+                    // Create secondary parent account without email
+                    const insertSecondary = db.prepare(`
+                        INSERT INTO users (firstName, lastName, email, role, isActive, createdAt)
+                        VALUES (?, ?, NULL, 'parent', 1, datetime('now'))
+                    `);
+                    const secondaryResult = insertSecondary.run(secondaryParentFirstName, secondaryParentLastName);
+                    secondaryParentUserId = secondaryResult.lastInsertRowid;
+                }
+            }
+
+            // Create scout account (no email required)
+            const insertScout = db.prepare(`
+                INSERT INTO users (firstName, lastName, email, role, dateOfBirth, isActive, createdAt)
+                VALUES (?, ?, NULL, 'scout', ?, 1, datetime('now'))
+            `);
+            const scoutResult = insertScout.run(scoutFirstName, scoutLastName, scoutDateOfBirth || null);
+            const scoutUserId = scoutResult.lastInsertRowid;
+
+            // Add scout to troop
+            const insertScoutMember = db.prepare(`
+                INSERT INTO troop_members (troopId, userId, role, scoutLevel, linkedParentId, parentRole, joinDate, status)
+                VALUES (?, ?, 'member', ?, ?, ?, datetime('now'), 'active')
+            `);
+            insertScoutMember.run(troopId, scoutUserId, scoutLevel || null, parentUserId, parentRole);
+
+            // Add primary parent to troop
+            const insertParentMember = db.prepare(`
+                INSERT INTO troop_members (troopId, userId, role, linkedParentId, parentRole, joinDate, status)
+                VALUES (?, ?, 'parent', ?, ?, datetime('now'), 'active')
+            `);
+            insertParentMember.run(troopId, parentUserId, scoutUserId, parentRole);
+
+            // Add secondary parent to troop if provided
+            if (secondaryParentUserId) {
+                insertParentMember.run(troopId, secondaryParentUserId, scoutUserId, secondaryParentRole || 'parent');
+            }
+
+            logger.info('Scout and parent(s) added to troop', {
+                troopId,
+                scoutId: scoutUserId,
+                parentId: parentUserId,
+                secondaryParentId: secondaryParentUserId,
+                addedBy: req.session.userId
+            });
+
+            return {
+                success: true,
+                scout: {
+                    id: scoutUserId,
+                    firstName: scoutFirstName,
+                    lastName: scoutLastName,
+                    level: scoutLevel
+                },
+                parent: {
+                    id: parentUserId,
+                    firstName: parentFirstName,
+                    lastName: parentLastName,
+                    role: parentRole,
+                    email: parentEmail
+                },
+                secondaryParent: secondaryParentUserId ? {
+                    id: secondaryParentUserId,
+                    firstName: secondaryParentFirstName,
+                    lastName: secondaryParentLastName,
+                    role: secondaryParentRole
+                } : null
+            };
+        });
+
+        const result = transaction();
+        res.status(201).json(result);
+
+    } catch (error) {
+        logger.error('Error adding scout to troop', { error: error.message });
+        res.status(500).json({ error: 'Failed to add scout' });
     }
 });
 

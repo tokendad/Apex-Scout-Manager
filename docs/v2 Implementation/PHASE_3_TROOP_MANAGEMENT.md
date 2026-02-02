@@ -669,7 +669,9 @@ GET    /api/seasons/:year/summary         - Season sales summary
 7. **Cookie catalog is fully configurable per season**
 8. **Nutrition and dietary information is accessible**
 
----
+---Developer notes:
+The following website contains a list of badges and awards the girls can be given.  Its not a full list of all badges, but very Comprehensive. Will need to update the database to allow these badges to be assigned to girls as they recieve them.
+ https://www.girlscouts.org/content/dam/gsusa/forms-and-documents/members/highest-awards/Cadette_GSUSA_BadgesAwardsAndPins.pdf  
 
 ## Next Phase
 
