@@ -114,6 +114,28 @@ header h1 {
     padding: 0.5rem 0;
 }
 .troop-tab-panel.hidden { display: none; }
+.membership-subnav {
+    display: flex;
+    gap: 0.5rem;
+    margin: 0.75rem 0 1rem 0;
+    flex-wrap: wrap;
+}
+.membership-subtab {
+    padding: 0.35rem 0.65rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--card-background);
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+.membership-subtab.active {
+    background: linear-gradient(90deg, var(--primary-color), var(--deep-color));
+    color: white;
+    border-color: transparent;
+}
+.membership-subpanel { padding: 0; }
+.membership-subpanel.hidden { display: none; }
+.membership-subpanels .membership-table { margin-top: 0; }
 .membership-actions { display:flex; gap:0.5rem; align-items:center; margin-bottom:0.75rem; }
 .membership-table { width:100%; border-collapse:collapse; }
 .membership-table th, .membership-table td { border:1px solid var(--border-color); padding:0.5rem; text-align:left; }
@@ -3698,4 +3720,45 @@ footer {
         margin-left: 0;
         width: 100%;
     }
+}
+
+/* Scout Level Color-Coded Select Options */
+#memberRoles option[value="Daisy"]      { background-color: #a0def1; color: #333; }
+#memberRoles option[value="Brownie"]    { background-color: #d5ca9f; color: #333; }
+#memberRoles option[value="Junior"]     { background-color: #00b2be; color: #fff; }
+#memberRoles option[value="Cadette"]    { background-color: #ee3124; color: #fff; }
+#memberRoles option[value="Senior"]     { background-color: #ff7818; color: #fff; }
+#memberRoles option[value="Ambassador"] { background-color: #ee3124; color: #fff; }
+
+/* Council View */
+.council-section {
+    padding: 1rem;
+}
+
+.council-section .section-description {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+}
+
+.council-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.council-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.5rem;
+}
+
+.council-card h3 {
+    margin: 0 0 0.5rem 0;
+}
+
+.council-card p {
+    color: var(--text-secondary);
+    margin: 0 0 1rem 0;
+    font-size: 0.9rem;
 }

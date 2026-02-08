@@ -181,15 +181,21 @@ function displayUserInfo() {
 
 // Setup event listeners
 function setupEventListeners() {
-    saleForm.addEventListener('submit', handleAddSale);
+    if (saleForm) {
+        saleForm.addEventListener('submit', handleAddSale);
+    }
     if (clearAllButton) {
         clearAllButton.addEventListener('click', handleClearAll);
     }
 
     // Profile listeners
-    uploadPhotoBtn.addEventListener('click', () => photoInput.click());
-    photoInput.addEventListener('change', handlePhotoUpload);
-    updateQrBtn.addEventListener('click', handleUpdateQrCode);
+    if (uploadPhotoBtn && photoInput) {
+        uploadPhotoBtn.addEventListener('click', () => photoInput.click());
+        photoInput.addEventListener('change', handlePhotoUpload);
+    }
+    if (updateQrBtn) {
+        updateQrBtn.addEventListener('click', handleUpdateQrCode);
+    }
     
     // Payment Method listeners
     if (addPaymentMethodBtn) {
@@ -197,13 +203,19 @@ function setupEventListeners() {
     }
 
     // Goal listeners
-    setGoalBtn.addEventListener('click', handleSetGoal);
+    if (setGoalBtn) {
+        setGoalBtn.addEventListener('click', handleSetGoal);
+    }
 
     // Donation listeners
-    donationForm.addEventListener('submit', handleAddDonation);
+    if (donationForm) {
+        donationForm.addEventListener('submit', handleAddDonation);
+    }
 
     // Event listeners
-    eventForm.addEventListener('submit', handleAddEvent);
+    if (eventForm) {
+        eventForm.addEventListener('submit', handleAddEvent);
+    }
 }
 
 // Load sales from API
@@ -1037,6 +1049,7 @@ async function handleDeleteEvent(id) {
 
 // Render events list
 function renderEvents() {
+    if (!eventsList) return;
     if (events.length === 0) {
         eventsList.innerHTML = '<p class="empty-message">No events recorded yet.</p>';
         return;
@@ -1081,7 +1094,7 @@ function renderEvents() {
                     ${event.donationsReceived > 0 ? `
                     <div class="event-stat">
                         <span class="stat-label">Donations:</span>
-                        <span class="stat-value">$${event.donationsReceived.toFixed(2)}</span>
+                        <span class="stat-value">$${parseFloat(event.donationsReceived || 0).toFixed(2)}</span>
                     </div>
                     ` : ''}
                 </div>
@@ -1258,8 +1271,8 @@ function showOrderDetails(orderKey) {
     const totalBoxes = orderSales.reduce((sum, s) => sum + convertToBoxes(s), 0);
 
     // Calculate payment totals
-    const totalCollected = orderSales.reduce((sum, s) => sum + (s.amountCollected || 0), 0);
-    const totalDue = orderSales.reduce((sum, s) => sum + (s.amountDue || 0), 0);
+    const totalCollected = orderSales.reduce((sum, s) => sum + parseFloat(s.amountCollected || 0), 0);
+    const totalDue = orderSales.reduce((sum, s) => sum + parseFloat(s.amountDue || 0), 0);
     const orderTotal = totalBoxes * PRICE_PER_BOX;
     const remainingBalance = orderTotal - totalCollected;
 
@@ -1462,11 +1475,11 @@ function showEditOrderForm(orderKey) {
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Amount Collected</label>
-                                <input type="number" id="editAmountCollected" value="${orderSales.reduce((sum, s) => sum + (s.amountCollected || 0), 0).toFixed(2)}" min="0" step="0.01">
+                                <input type="number" id="editAmountCollected" value="${orderSales.reduce((sum, s) => sum + parseFloat(s.amountCollected || 0), 0).toFixed(2)}" min="0" step="0.01">
                             </div>
                             <div class="form-group">
                                 <label>Amount Due</label>
-                                <input type="number" id="editAmountDue" value="${orderSales.reduce((sum, s) => sum + (s.amountDue || 0), 0).toFixed(2)}" min="0" step="0.01">
+                                <input type="number" id="editAmountDue" value="${orderSales.reduce((sum, s) => sum + parseFloat(s.amountDue || 0), 0).toFixed(2)}" min="0" step="0.01">
                             </div>
                         </div>
                     </div>
@@ -1748,6 +1761,7 @@ async function deleteOrder(orderKey) {
 
 // Render donations list
 function renderDonations() {
+    if (!donationsList) return;
     if (donations.length === 0) {
         donationsList.innerHTML = '<p class="empty-message">No donations recorded yet.</p>';
         return;
@@ -1765,7 +1779,7 @@ function renderDonations() {
         return `
             <div class="donation-item">
                 <div class="donation-info">
-                    <div class="donation-amount">$${donation.amount.toFixed(2)}</div>
+                    <div class="donation-amount">$${parseFloat(donation.amount || 0).toFixed(2)}</div>
                     <div class="donation-details">
                         ${donation.donorName} • ${formattedDate}
                     </div>
@@ -1792,7 +1806,7 @@ function updateSummary() {
     const eventBoxes = sales.filter(s => s.saleType === 'event').reduce((sum, sale) => sum + convertToBoxes(sale), 0);
     
     const salesRevenue = salesBoxes * PRICE_PER_BOX;
-    const totalDonationAmount = donations.reduce((sum, donation) => sum + donation.amount, 0);
+    const totalDonationAmount = donations.reduce((sum, donation) => sum + parseFloat(donation.amount || 0), 0);
     
     const totalRevenue = salesRevenue + totalDonationAmount;
     
@@ -1961,14 +1975,33 @@ function setupTroopNavigation() {
         });
     });
 
-    // Membership search behavior (filter rows)
+    // Membership search behavior (filter rows across sub-panels)
     const memberSearch = document.getElementById('memberSearch');
-    const membershipBody = document.getElementById('membershipTableBody');
-    if (memberSearch && membershipBody) {
+    if (memberSearch) {
         memberSearch.addEventListener('input', () => {
             const q = memberSearch.value.toLowerCase();
-            Array.from(membershipBody.querySelectorAll('tr')).forEach(tr => {
-                tr.style.display = q ? (tr.textContent.toLowerCase().includes(q) ? '' : 'none') : '';
+            const bodies = document.querySelectorAll('[id^="membershipTableBody_"]');
+            bodies.forEach(body => {
+                Array.from(body.querySelectorAll('tr')).forEach(tr => {
+                    tr.style.display = q ? (tr.textContent.toLowerCase().includes(q) ? '' : 'none') : '';
+                });
+            });
+        });
+    }
+
+    // Membership sub-tab switching
+    const subTabs = document.querySelectorAll('.membership-subtab');
+    const subPanels = document.querySelectorAll('.membership-subpanel');
+    if (subTabs.length) {
+        subTabs.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = btn.dataset.sub;
+                subTabs.forEach(t => t.classList.toggle('active', t === btn));
+                subPanels.forEach(p => {
+                    if (p.id === 'membership-sub-' + target) p.classList.remove('hidden'); else p.classList.add('hidden');
+                });
+                // Update add-member button label when switching subtabs
+                try { updateAddMemberButtonLabel(); } catch (e) { /* ignore */ }
             });
         });
     }
@@ -2198,11 +2231,21 @@ let troopSalesData = null;
 // Setup role-based UI visibility
 function setupRoleBasedUI() {
     const troopLeaderTab = document.getElementById('troopLeaderTab');
+    const councilTab = document.getElementById('councilTab');
+
     if (troopLeaderTab && currentUser) {
         if (currentUser.role === 'troop_leader' || currentUser.role === 'council_admin') {
             troopLeaderTab.style.display = '';
         } else {
             troopLeaderTab.style.display = 'none';
+        }
+    }
+
+    if (councilTab && currentUser) {
+        if (currentUser.role === 'council_admin') {
+            councilTab.style.display = '';
+        } else {
+            councilTab.style.display = 'none';
         }
     }
 }
@@ -2211,9 +2254,13 @@ function setupRoleBasedUI() {
 function setupTroopManagement() {
     const troopSelector = document.getElementById('troopSelector');
     const createTroopBtn = document.getElementById('createTroopBtn');
-    const addMemberBtn = document.getElementById('addMemberBtn');
     const addGoalBtn = document.getElementById('addGoalBtn');
     const memberSearchEmail = document.getElementById('memberSearchEmail');
+
+    // Attach click handler to all add-member buttons
+    document.querySelectorAll('.add-member-btn').forEach(btn => {
+        btn.addEventListener('click', openAddMemberModal);
+    });
 
     if (troopSelector) {
         troopSelector.addEventListener('change', (e) => {
@@ -2228,10 +2275,6 @@ function setupTroopManagement() {
 
     if (createTroopBtn) {
         createTroopBtn.addEventListener('click', openCreateTroopModal);
-    }
-
-    if (addMemberBtn) {
-        addMemberBtn.addEventListener('click', openAddMemberModal);
     }
 
     if (addGoalBtn) {
@@ -2288,9 +2331,18 @@ async function loadMyTroops() {
 async function loadTroopData(troopId) {
     try {
         const [membersRes, salesRes, goalsRes] = await Promise.all([
-            fetch(`${API_BASE_URL}/troop/${troopId}/members`, { credentials: 'include' }),
-            fetch(`${API_BASE_URL}/troop/${troopId}/sales`, { credentials: 'include' }),
-            fetch(`${API_BASE_URL}/troop/${troopId}/goals`, { credentials: 'include' })
+            fetch(`${API_BASE_URL}/troop/${troopId}/members`, { 
+                credentials: 'include',
+                cache: 'no-cache'
+            }),
+            fetch(`${API_BASE_URL}/troop/${troopId}/sales`, { 
+                credentials: 'include',
+                cache: 'no-cache'
+            }),
+            fetch(`${API_BASE_URL}/troop/${troopId}/goals`, { 
+                credentials: 'include',
+                cache: 'no-cache'
+            })
         ]);
 
         if (!membersRes.ok || !salesRes.ok || !goalsRes.ok) {
@@ -2310,15 +2362,20 @@ async function loadTroopData(troopId) {
 
 // Render the troop dashboard
 function renderTroopDashboard() {
-    const summary = document.getElementById('troopSummary');
+    const dashboardTab = document.getElementById('troop-tab-dashboard');
     const emptyState = document.getElementById('troopEmptyState');
 
-    if (summary) summary.style.display = 'block';
+    // Show dashboard content within the tab
+    if (dashboardTab) {
+        // Remove the inline display:none if it was set
+        const summaryCards = dashboardTab.querySelector('.summary-cards');
+        if (summaryCards) summaryCards.style.display = '';
+    }
     if (emptyState) emptyState.style.display = 'none';
 
     // Update summary cards
     document.getElementById('troopTotalBoxes').textContent = troopSalesData?.totals?.totalBoxes || 0;
-    document.getElementById('troopTotalCollected').textContent = `$${(troopSalesData?.totals?.totalCollected || 0).toFixed(2)}`;
+    document.getElementById('troopTotalCollected').textContent = `$${parseFloat(troopSalesData?.totals?.totalCollected || 0).toFixed(2)}`;
     document.getElementById('troopMemberCount').textContent = troopMembers.length;
 
     // Render members table
@@ -2335,10 +2392,8 @@ function renderTroopDashboard() {
 
 // Show empty state when no troop selected
 function showTroopEmptyState() {
-    const summary = document.getElementById('troopSummary');
     const emptyState = document.getElementById('troopEmptyState');
 
-    if (summary) summary.style.display = 'none';
     if (emptyState) emptyState.style.display = 'block';
 }
 
@@ -2370,10 +2425,10 @@ function renderTroopMembers() {
                 </td>
                 <td><span class="role-badge role-${member.troopRole}">${roleDisplay}</span></td>
                 <td>${member.totalBoxes}</td>
-                <td>$${(member.totalCollected || 0).toFixed(2)}</td>
+                <td>$${parseFloat(member.totalCollected || 0).toFixed(2)}</td>
                 <td>${lastSale}</td>
                 <td>
-                    <button class="btn btn-sm btn-danger" onclick="removeMember(${member.id})" title="Remove">
+                    <button class="btn btn-sm btn-danger" onclick="removeMember('${member.id}')" title="Remove">
                         ✕
                     </button>
                 </td>
@@ -2393,7 +2448,9 @@ function renderTroopGoals() {
     }
 
     container.innerHTML = troopGoals.map(goal => {
-        const progress = goal.targetAmount > 0 ? Math.min(100, (goal.actualAmount / goal.targetAmount) * 100) : 0;
+        const targetAmount = parseFloat(goal.targetAmount || 0);
+        const actualAmount = parseFloat(goal.actualAmount || 0);
+        const progress = targetAmount > 0 ? Math.min(100, (actualAmount / targetAmount) * 100) : 0;
         const typeLabels = {
             'boxes_sold': 'Boxes Sold',
             'revenue': 'Revenue',
@@ -2410,7 +2467,7 @@ function renderTroopGoals() {
                     <div class="progress-bar">
                         <div class="progress-fill" style="width: ${progress}%"></div>
                     </div>
-                    <span class="progress-text">${goal.actualAmount || 0} / ${goal.targetAmount}</span>
+                    <span class="progress-text">${actualAmount} / ${targetAmount}</span>
                 </div>
                 ${goal.description ? `<p class="goal-description">${goal.description}</p>` : ''}
             </div>
@@ -2420,29 +2477,106 @@ function renderTroopGoals() {
 
 // Render the simple membership tab table (top-nav view)
 function renderMembershipTab() {
-    const tbody = document.getElementById('membershipTableBody');
-    if (!tbody) return;
+    // Populate sub-panels: scout, family, leadership, volunteer
+    const scoutBody = document.getElementById('membershipTableBody_scout');
+    const familyBody = document.getElementById('membershipTableBody_family');
+    const leadershipBody = document.getElementById('membershipTableBody_leadership');
+    const volunteerBody = document.getElementById('membershipTableBody_volunteer');
 
-    if (!troopMembers || troopMembers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No members yet.</td></tr>';
-        return;
+    const members = troopMembers || [];
+
+    // Scouts: treat troopRole 'member' as scouts
+    const scouts = members.filter(m => !m.troopRole || m.troopRole === 'member' || m.troopRole === 'scout');
+    if (scoutBody) {
+        if (scouts.length === 0) {
+            scoutBody.innerHTML = '<tr><td colspan="5" class="empty-state">No scouts yet.</td></tr>';
+        } else {
+            scoutBody.innerHTML = scouts.map(m => {
+                const name = `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.email || 'Unknown';
+                const level = m.scoutLevel || '-';
+                const status = m.status || 'Active';
+                return `
+                    <tr>
+                        <td>${name}</td>
+                        <td>${m.troopRole || 'Scout'}</td>
+                        <td>${level}</td>
+                        <td>${status}</td>
+                        <td><button class="btn" onclick="viewMember('${m.id}')">View</button></td>
+                    </tr>
+                `;
+            }).join('');
+        }
     }
 
-    tbody.innerHTML = troopMembers.map(m => {
-        const name = `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.email || 'Unknown';
-        const level = m.scoutLevel || '-';
-        const role = (m.troopRole === 'member' ? 'Scout' : (m.troopRole || '-'));
-        const status = m.status || 'Active';
-        return `
-            <tr>
-                <td>${name}</td>
-                <td>${role}</td>
-                <td>${level}</td>
-                <td>${status}</td>
-                <td><button class="btn" onclick="viewMember(${m.id})">View</button></td>
-            </tr>
-        `;
-    }).join('');
+    // Family: show distinct last names for members with parent role
+    if (familyBody) {
+        const families = members.filter(m => m.troopRole === 'parent' || m.troopRole === 'guardian');
+        if (families.length === 0) {
+            familyBody.innerHTML = '<tr><td class="empty-state">No family records yet.</td></tr>';
+        } else {
+            const lastNames = [...new Set(families.map(f => (f.lastName || '').trim()).filter(Boolean))];
+            familyBody.innerHTML = lastNames.map(ln => `<tr><td>${ln}</td></tr>`).join('');
+        }
+    }
+
+    // Leadership: co-leader, assistant, troop_leader
+    if (leadershipBody) {
+        const leads = members.filter(m => ['co-leader', 'assistant', 'troop_leader'].includes(m.troopRole));
+        if (leads.length === 0) {
+            leadershipBody.innerHTML = '<tr><td colspan="5" class="empty-state">No leadership members</td></tr>';
+        } else {
+            leadershipBody.innerHTML = leads.map(m => {
+                const name = `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.email || 'Unknown';
+                return `
+                    <tr>
+                        <td>${name}</td>
+                        <td>${m.troopRole}</td>
+                        <td>${m.scoutLevel || '-'}</td>
+                        <td>${m.status || 'Active'}</td>
+                        <td><button class="btn" onclick="viewMember('${m.id}')">View</button></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    }
+
+    // Volunteers
+    if (volunteerBody) {
+        const vols = members.filter(m => m.troopRole === 'volunteer' || m.troopRole === 'parent');
+        if (vols.length === 0) {
+            volunteerBody.innerHTML = '<tr><td colspan="5" class="empty-state">No volunteers</td></tr>';
+        } else {
+            volunteerBody.innerHTML = vols.map(m => {
+                const name = `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.email || 'Unknown';
+                return `
+                    <tr>
+                        <td>${name}</td>
+                        <td>${m.troopRole}</td>
+                        <td>${m.scoutLevel || '-'}</td>
+                        <td>${m.status || 'Active'}</td>
+                        <td><button class="btn" onclick="viewMember('${m.id}')">View</button></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    }
+
+    // Update Add Member button label based on active subtab
+    updateAddMemberButtonLabel();
+}
+
+function updateAddMemberButtonLabel() {
+    const active = document.querySelector('.membership-subtab.active');
+    const addBtn = document.getElementById('addMemberBtnMembership');
+    if (!addBtn) return;
+    const map = {
+        scout: 'Add Scout',
+        family: 'Add Family',
+        leadership: 'Add Leadership',
+        volunteer: 'Add Volunteer'
+    };
+    const label = active ? map[active.dataset.sub] || 'Add Member' : 'Add Member';
+    addBtn.textContent = label;
 }
 
 // Simple view member handler (placeholder - can open detailed modal)
@@ -2468,7 +2602,7 @@ function renderTroopSalesByCookie() {
         <div class="cookie-sale-item">
             <span class="cookie-name">${item.cookieType}</span>
             <span class="cookie-quantity">${item.totalQuantity} boxes</span>
-            <span class="cookie-revenue">$${(item.totalCollected || 0).toFixed(2)}</span>
+            <span class="cookie-revenue">$${parseFloat(item.totalCollected || 0).toFixed(2)}</span>
         </div>
     `).join('');
 }
@@ -2493,8 +2627,36 @@ function openAddMemberModal() {
         showFeedback('Please select a troop first', true);
         return;
     }
-    // Populate roles and show modal
-    populateMemberRolesSelect();
+    // Determine active membership subtab to set modal defaults
+    const activeSub = document.querySelector('.membership-subtab.active');
+    const subtype = activeSub ? activeSub.dataset.sub : null;
+    const header = document.querySelector('#addMemberModal .modal-header h3');
+    const confirmBtn = document.getElementById('confirmAddMemberBtn');
+
+    let defaultPosition = '';
+    let headerLabel = 'Add Member';
+    if (subtype === 'scout') {
+        defaultPosition = 'Scout';
+        headerLabel = 'Add Scout';
+    } else if (subtype === 'family') {
+        defaultPosition = 'Troop Volunteer';
+        headerLabel = 'Add Family';
+    } else if (subtype === 'leadership') {
+        defaultPosition = 'Co-Leader';
+        headerLabel = 'Add Leadership';
+    } else if (subtype === 'volunteer') {
+        defaultPosition = 'Troop Volunteer';
+        headerLabel = 'Add Volunteer';
+    }
+
+    if (header) header.textContent = headerLabel;
+    if (confirmBtn) confirmBtn.textContent = 'Save';
+
+    // Populate roles based on current position selection and show modal
+    const memberLevelSelect = document.getElementById('memberLevel');
+    if (memberLevelSelect && defaultPosition) memberLevelSelect.value = defaultPosition;
+    const currentPosition = document.getElementById('memberLevel')?.value || '';
+    populateMemberRolesSelect(currentPosition);
     document.getElementById('addMemberModal').style.display = 'flex';
 }
 
@@ -2647,27 +2809,144 @@ function selectMember(email, name) {
 
 // Submit Add Member (generic form)
 async function submitAddMember() {
-    return addGenericMemberToTroop();
+    // Determine which subtab is active and map to position/role
+    if (!selectedTroopId) return showFeedback('Please select a troop first', true);
+
+    const activeSub = document.querySelector('.membership-subtab.active');
+    const subtype = activeSub ? activeSub.dataset.sub : null;
+
+    // Collect form values
+    const firstName = (document.getElementById('memberFirstName')?.value || '').trim();
+    const lastName = (document.getElementById('memberLastName')?.value || '').trim();
+    const email = (document.getElementById('memberEmail')?.value || '').trim();
+    const address = (document.getElementById('memberAddress')?.value || '').trim();
+    const birthdate = document.getElementById('memberBirthdate')?.value || null;
+    const familyInfo = (document.getElementById('memberFamilyInfo')?.value || '').trim();
+    const position = document.getElementById('memberLevel')?.value || '';
+
+    if (!firstName || !lastName) {
+        return showFeedback('First and last name are required', true);
+    }
+
+    // For family tab, prefer creating a parent/guardian record
+    let payload = {
+        firstName,
+        lastName,
+        email: email || null,
+        address: address || null,
+        dateOfBirth: birthdate || null,
+        familyInfo: familyInfo || null,
+        position: position || null
+    };
+
+    // If subtype indicates family, set position to a parent/volunteer role if not already
+    if (subtype === 'family') payload.position = payload.position || 'Troop Volunteer';
+    if (subtype === 'leadership') payload.position = payload.position || 'Co-Leader';
+    if (subtype === 'volunteer') payload.position = payload.position || 'Troop Volunteer';
+    if (subtype === 'scout') payload.position = payload.position || 'Scout';
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/troop/${selectedTroopId}/members`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Failed to add member');
+        }
+
+        showFeedback('Member added successfully');
+        closeAddMemberModal();
+        // Refresh troop data
+        await loadTroopData(selectedTroopId);
+    } catch (error) {
+        console.error('Add member error:', error);
+        showFeedback(error.message || 'Failed to add member', true);
+    }
 }
 
 // Roles to populate the roles multi-select (based on Resources doc)
-const MEMBER_ROLE_OPTIONS = [
-    'Troop Leader', 'Co-Leader', 'Troop Treasurer', 'Troop Cookie Manager', 'Troop Admin',
-    'Program Coordinator', 'Outdoor / Camp-Trained Adult', 'President', 'Vice President',
-    'Secretary', 'Treasurer', 'Patrol Leader', 'Assistant'
+const ADULT_ROLE_OPTIONS = [
+    'Troop Treasurer', 'Troop Cookie Manager', 'Troop Admin',
+    'Program Coordinator', 'Outdoor / Camp-Trained Adult'
 ];
 
-function populateMemberRolesSelect() {
+const SCOUT_LEVEL_OPTIONS = [
+    { value: 'Daisy',      label: 'Girl Scout Daisy (K–1)',       color: '#a0def1' },
+    { value: 'Brownie',    label: 'Brownie Girl Scout (2–3)',     color: '#d5ca9f' },
+    { value: 'Junior',     label: 'Junior Girl Scout (4–5)',      color: '#00b2be' },
+    { value: 'Cadette',    label: 'Cadette Girl Scout (6–8)',     color: '#ee3124' },
+    { value: 'Senior',     label: 'Senior Girl Scout (9–10)',     color: '#ff7818' },
+    { value: 'Ambassador', label: 'Ambassador Girl Scout (11–12)', color: '#ee3124' }
+];
+
+function onPositionChange() {
+    const position = document.getElementById('memberLevel')?.value;
+    populateMemberRolesSelect(position);
+}
+
+function populateMemberRolesSelect(position) {
     const select = document.getElementById('memberRoles');
+    const label = document.getElementById('rolesLabel');
+    const group = document.getElementById('rolesGroup');
     if (!select) return;
-    // Clear any existing
+
     select.innerHTML = '';
-    MEMBER_ROLE_OPTIONS.forEach(role => {
-        const opt = document.createElement('option');
-        opt.value = role;
-        opt.textContent = role;
-        select.appendChild(opt);
-    });
+
+    if (!position) {
+        if (label) label.textContent = 'Roles';
+        select.multiple = true;
+        select.size = 6;
+        if (group) group.style.display = '';
+        return;
+    }
+
+    if (position === 'Scout') {
+        // Single-select scout levels, color-coded
+        if (label) label.textContent = 'Scout Level';
+        select.multiple = false;
+        select.size = 1;
+
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = 'Select level...';
+        select.appendChild(defaultOpt);
+
+        SCOUT_LEVEL_OPTIONS.forEach(level => {
+            const opt = document.createElement('option');
+            opt.value = level.value;
+            opt.textContent = level.label;
+            opt.style.backgroundColor = level.color;
+            opt.style.color = isLightColor(level.color) ? '#333' : '#fff';
+            opt.style.fontWeight = '600';
+            opt.style.padding = '4px 8px';
+            select.appendChild(opt);
+        });
+    } else {
+        // Multi-select adult roles for Leader / Co-Leader / Volunteer
+        if (label) label.textContent = 'Roles (select one or more)';
+        select.multiple = true;
+        select.size = 5;
+
+        ADULT_ROLE_OPTIONS.forEach(role => {
+            const opt = document.createElement('option');
+            opt.value = role;
+            opt.textContent = role;
+            select.appendChild(opt);
+        });
+    }
+}
+
+// Helper: determine if a hex color is light (for text contrast)
+function isLightColor(hex) {
+    const c = hex.replace('#', '');
+    const r = parseInt(c.substring(0, 2), 16);
+    const g = parseInt(c.substring(2, 4), 16);
+    const b = parseInt(c.substring(4, 6), 16);
+    return (r * 299 + g * 587 + b * 114) / 1000 > 150;
 }
 
 // Add a generic member to the troop
@@ -2684,17 +2963,23 @@ async function addGenericMemberToTroop() {
     const dateOfBirth = (document.getElementById('memberBirthdate')?.value || '') || null;
     const den = (document.getElementById('memberDen')?.value || '').trim();
     const familyInfo = (document.getElementById('memberFamilyInfo')?.value || '').trim();
-    const level = (document.getElementById('memberLevel')?.value || '').trim() || null;
+    const position = (document.getElementById('memberLevel')?.value || '').trim() || null;
 
-    // Collect selected roles
+    // Collect selected roles/level
     const rolesSelect = document.getElementById('memberRoles');
     const roles = [];
+    let scoutLevel = null;
     if (rolesSelect) {
-        Array.from(rolesSelect.selectedOptions).forEach(o => roles.push(o.value));
+        if (position === 'Scout') {
+            // Single select = scout level
+            scoutLevel = rolesSelect.value || null;
+        } else {
+            Array.from(rolesSelect.selectedOptions).forEach(o => roles.push(o.value));
+        }
     }
 
-    if (!firstName && !lastName && !email) {
-        showFeedback('Please provide at least a name or email', true);
+    if (!firstName || !lastName) {
+        showFeedback('First name and last name are required', true);
         return;
     }
 
@@ -2706,7 +2991,8 @@ async function addGenericMemberToTroop() {
         dateOfBirth: dateOfBirth,
         den: den || null,
         familyInfo: familyInfo || null,
-        level: level || null,
+        level: scoutLevel,
+        position: position,
         roles: roles
     };
 
@@ -3189,7 +3475,7 @@ function renderLeaderboard() {
             <div class="member-info">
                 <span class="member-name">${member.firstName} ${member.lastName}</span>
             </div>
-            <span class="score">${metric === 'revenue' ? '$' + member.totalRevenue.toFixed(2) : member.totalBoxes + ' boxes'}</span>
+            <span class="score">${metric === 'revenue' ? '$' + parseFloat(member.totalRevenue || 0).toFixed(2) : member.totalBoxes + ' boxes'}</span>
         </div>
     `).join('');
 }
@@ -3238,9 +3524,10 @@ function renderTroopGoalsWithProgress(goals) {
 
     container.innerHTML = goals.map(goal => {
         const formatValue = (type, value) => {
-            if (type.includes('revenue') || type === 'donations') return '$' + value.toFixed(2);
-            if (type === 'participation') return value.toFixed(1) + '%';
-            return value;
+            const numValue = parseFloat(value || 0);
+            if (type.includes('revenue') || type === 'donations') return '$' + numValue.toFixed(2);
+            if (type === 'participation') return numValue.toFixed(1) + '%';
+            return numValue;
         };
 
         return `
@@ -3321,6 +3608,7 @@ if (document.readyState === 'loading') {
         setupCookieTableListeners();
         setupDangerZone();
         setupTroopManagement();
+        setupTroopNavigation();
         loadInvitations();
         loadCookieCatalog();
     })();

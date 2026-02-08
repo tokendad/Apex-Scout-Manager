@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <title>Apex Scout Manager</title>
-    <link rel="stylesheet" href="styles.css?v=4">
+    <link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
     <div class="container">
@@ -48,6 +48,10 @@
                 <span class="tab-icon">👥</span>
                 <span class="tab-label">Troop</span>
             </button>
+            <button class="tab-btn" data-view="council" id="councilTab" style="display: none;">
+                <span class="tab-icon">🏛️</span>
+                <span class="tab-label">Council</span>
+            </button>
             <div class="sidebar-divider"></div>
             <button id="logoutBtn" class="tab-btn logout-btn-sidebar">
                 <span class="tab-icon">↪</span>
@@ -59,7 +63,7 @@
             <!-- Profile View -->
                 <!-- Add Sale Form -->
                 <section class="add-sale-section">
-                    <h2>Record a Sale</h2>
+                    <h2>Troop Management</h2>
             <div id="view-profile" class="view-section">
                 <section class="profile-display-section">
                     <div class="profile-card">
@@ -418,93 +422,6 @@
                                 </div>
                             </div>
                         </div>
-                    </form>
-                </section>
-            </div>
-
-            <!-- Troop Management View -->
-            <div id="view-troopLeader" class="view-section hidden">
-                <section class="troop-management-section">
-                    <div class="troop-top-nav" role="tablist">
-                        <button class="troop-tab active" data-tab="membership">Membership</button>
-                        <button class="troop-tab" data-tab="financials">Financials</button>
-                        <button class="troop-tab" data-tab="equipment">Equipment</button>
-                        <button class="troop-tab" data-tab="events">Events</button>
-                        <button class="troop-tab" data-tab="media">Media</button>
-                        <button class="troop-tab" data-tab="library">Library</button>
-                    </div>
-
-                    <div id="troop-content" class="troop-content">
-                        <!-- Membership (focused) -->
-                        <div id="troop-tab-membership" class="troop-tab-panel">
-                            <h2>Membership</h2>
-                            <div class="membership-actions">
-                                <button id="addMemberBtn" class="btn btn-primary">Add Member</button>
-                                <input id="memberSearch" type="search" placeholder="Search members..." />
-                            </div>
-                            <table class="membership-table">
-                                <thead>
-                                    <tr><th>Name</th><th>Role</th><th>Level</th><th>Status</th><th>Actions</th></tr>
-                                </thead>
-                                <tbody id="membershipTableBody">
-                                    <tr><td>Jane Doe</td><td>Scout</td><td>Brownie</td><td>Active</td><td><button class="btn">View</button></td></tr>
-                                    <tr><td>Mary Leader</td><td>Troop Leader</td><td>-</td><td>Active</td><td><button class="btn">Manage</button></td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <!-- Financials placeholder -->
-                        <div id="troop-tab-financials" class="troop-tab-panel hidden">
-                            <h2>Financials</h2>
-                            <p>Financial summary and transactions will appear here (placeholder).</p>
-                        </div>
-
-                        <!-- Equipment placeholder -->
-                        <div id="troop-tab-equipment" class="troop-tab-panel hidden">
-                            <h2>Equipment</h2>
-                            <p>Equipment inventory and loan tracking (placeholder).</p>
-                        </div>
-
-                        <!-- Events placeholder -->
-                        <div id="troop-tab-events" class="troop-tab-panel hidden">
-                            <h2>Events</h2>
-                            <p>Troop events and booth schedule (placeholder).</p>
-                        </div>
-
-                        <!-- Media placeholder -->
-                        <div id="troop-tab-media" class="troop-tab-panel hidden">
-                            <h2>Media</h2>
-                            <p>Photos and uploaded files (placeholder).</p>
-                        </div>
-
-                        <!-- Library placeholder -->
-                        <div id="troop-tab-library" class="troop-tab-panel hidden">
-                            <h2>Library</h2>
-                            <p>Document library and resources (placeholder).</p>
-                        </div>
-                    </div>
-                </section>
-            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="paymentMethod">Payment Method</label>
-                                    <select id="paymentMethod">
-                                        <option value="">Select...</option>
-                                        <option value="cash">Cash</option>
-                                        <option value="check">Check</option>
-                                        <option value="venmo">Venmo</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="amountCollected">Collected ($)</label>
-                                    <input type="number" id="amountCollected" min="0" step="0.01" value="0">
-                                </div>
-                                <div class="form-group">
-                                    <label for="amountDue">Due ($)</label>
-                                    <input type="number" id="amountDue" min="0" step="0.01" value="0">
-                                </div>
-                            </div>
-                        </div>
 
                         <input type="hidden" id="saleType" value="individual">
                         <button type="submit" class="btn btn-primary btn-large">Add Sale</button>
@@ -522,77 +439,87 @@
 
             <!-- Events View -->
             <div id="view-events" class="view-section hidden">
-                <!-- Event Sales Section -->
-                <section class="event-sales-section">
-                    <h2>Event Sales</h2>
+                <!-- Add Event Form -->
+                <section class="add-event-section">
+                    <h2>Record a Booth/Event</h2>
                     <form id="eventForm">
-                        <div class="form-group">
-                            <label for="eventName">Event Name</label>
-                            <input type="text" id="eventName" placeholder="e.g., Walmart Cookie Booth" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="eventDate">Event Date</label>
-                            <input type="datetime-local" id="eventDate" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="eventDescription">Description (optional)</label>
-                            <textarea id="eventDescription" placeholder="Brief description of the event" rows="2"></textarea>
-                        </div>
-                        <div class="form-row">
+                        <div class="form-section">
                             <div class="form-group">
-                                <label for="initialBoxes">Initial Boxes</label>
-                                <input type="number" id="initialBoxes" min="0" value="0" placeholder="0">
+                                <label for="eventName">Event Name *</label>
+                                <input type="text" id="eventName" placeholder="e.g., Cookie Booth at Walmart" required>
                             </div>
-                            <div class="form-group">
-                                <label for="initialCases">Initial Cases</label>
-                                <input type="number" id="initialCases" min="0" value="0" placeholder="0">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="eventDate">Date *</label>
+                                    <input type="datetime-local" id="eventDate" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="eventDescription">Description</label>
+                                    <input type="text" id="eventDescription" placeholder="Optional description">
+                                </div>
                             </div>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="remainingBoxes">Remaining Boxes</label>
-                                <input type="number" id="remainingBoxes" min="0" value="0" placeholder="0">
+
+                        <div class="form-section">
+                            <h3>Inventory</h3>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="initialBoxes">Initial Boxes</label>
+                                    <input type="number" id="initialBoxes" min="0" value="0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="initialCases">Initial Cases</label>
+                                    <input type="number" id="initialCases" min="0" value="0">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="remainingBoxes">Remaining Boxes</label>
+                                    <input type="number" id="remainingBoxes" min="0" value="0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="remainingCases">Remaining Cases</label>
+                                    <input type="number" id="remainingCases" min="0" value="0">
+                                </div>
                             </div>
                             <div class="form-group">
-                                <label for="remainingCases">Remaining Cases</label>
-                                <input type="number" id="remainingCases" min="0" value="0" placeholder="0">
+                                <label for="eventDonations">Donations Received ($)</label>
+                                <input type="number" id="eventDonations" min="0" step="0.01" value="0">
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label for="eventDonations">Donations Received ($)</label>
-                            <input type="number" id="eventDonations" min="0" step="0.01" value="0" placeholder="0.00">
-                            <small>Donations are tracked separately from sales</small>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Save Event</button>
+
+                        <button type="submit" class="btn btn-primary btn-large">Save Event</button>
                     </form>
+                </section>
+
+                <!-- Events List -->
+                <section class="events-list-section">
+                    <h2>Events</h2>
                     <div id="eventsList" class="events-list">
                         <p class="empty-message">No events recorded yet.</p>
                     </div>
                 </section>
-            </div>
 
-            <!-- Donations View -->
-            <div id="view-donations" class="view-section hidden">
                 <!-- Donations Section -->
                 <section class="donations-section">
                     <h2>Donations</h2>
+                    <div class="donations-summary">
+                        <span>Total Donations: </span>
+                        <span id="totalDonations">$0.00</span>
+                    </div>
                     <form id="donationForm">
-                        <div class="form-group">
-                            <label for="donationAmount">Amount ($)</label>
-                            <input type="number" id="donationAmount" min="0.01" step="0.01" placeholder="e.g., 25.00" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="donorName">Donor Name (optional)</label>
-                            <input type="text" id="donorName" placeholder="e.g., Mr. Johnson">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="donorName">Donor Name</label>
+                                <input type="text" id="donorName" placeholder="e.g., Anonymous">
+                            </div>
+                            <div class="form-group">
+                                <label for="donationAmount">Amount ($) *</label>
+                                <input type="number" id="donationAmount" min="0.01" step="0.01" required placeholder="0.00">
+                            </div>
                         </div>
                         <button type="submit" class="btn btn-primary">Add Donation</button>
                     </form>
-                    <div class="donations-summary">
-                        <div class="summary-item">
-                            <span class="summary-label">Total Donations</span>
-                            <span class="summary-value" id="totalDonations">$0</span>
-                        </div>
-                    </div>
                     <div id="donationsList" class="donations-list">
                         <p class="empty-message">No donations recorded yet.</p>
                     </div>
@@ -604,92 +531,47 @@
                 <section class="settings-section">
                     <h2>Settings</h2>
 
-                    <!-- Profile & Store Settings -->
-                    <div class="settings-group">
-                        <h3>Profile & Store</h3>
-                        <input type="file" id="photoInput" accept="image/*" style="display:none;">
-                        <button id="uploadPhotoBtn" class="btn btn-secondary">Upload Profile Photo</button>
-                        <div class="form-group">
-                            <label for="qrCodeUrl">Store URL: Your Digital Cookie store link for customers to order online</label>
-                            <input type="url" id="qrCodeUrl" placeholder="https://digitalcookie.girlscouts.org/...">
-                        </div>
-                        <button id="updateQrBtn" class="btn btn-secondary">Update Store QR</button>
-                    </div>
-
                     <!-- Payment Methods -->
                     <div class="settings-group">
                         <h3>Payment Methods</h3>
-                        <p class="import-description">Add payment options (Venmo, PayPal, etc.) for customers to scan</p>
-                        
-                        <div id="settingsPaymentMethodsList" class="settings-payment-list">
-                            <!-- List items injected here -->
+                        <p class="settings-description">Add your digital payment links so customers can pay online.</p>
+                        <div id="settingsPaymentMethodsList" class="payment-methods-list">
+                            <p class="empty-message">No payment methods added yet.</p>
                         </div>
-
-                        <div class="add-payment-form">
-                            <h4>Add New Payment Method</h4>
-                            <div class="form-group">
-                                <label for="newPaymentName">Provider Name</label>
-                                <input type="text" id="newPaymentName" placeholder="e.g., Venmo, PayPal, CashApp">
-                            </div>
-                            <div class="form-group">
-                                <label for="newPaymentUrl">Payment Link / URL</label>
-                                <input type="url" id="newPaymentUrl" placeholder="https://venmo.com/u/username">
+                        <div class="add-payment-method">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="newPaymentName">Method Name</label>
+                                    <input type="text" id="newPaymentName" placeholder="e.g., Venmo">
+                                </div>
+                                <div class="form-group">
+                                    <label for="newPaymentUrl">Payment URL</label>
+                                    <input type="url" id="newPaymentUrl" placeholder="e.g., https://venmo.com/yourname">
+                                </div>
                             </div>
                             <button id="addPaymentMethodBtn" class="btn btn-secondary">Add Payment Method</button>
                         </div>
                     </div>
 
-                    <!-- Appearance -->
+                    <!-- Clear Data -->
                     <div class="settings-group">
-                        <h3>Appearance</h3>
-                        <div class="theme-selector">
-                            <label>Theme</label>
-                            <div class="theme-options">
-                                <button class="theme-btn" data-theme="light">
-                                    <span class="theme-icon">☀️</span>
-                                    <span class="theme-label">Light</span>
-                                </button>
-                                <button class="theme-btn" data-theme="dark">
-                                    <span class="theme-icon">🌙</span>
-                                    <span class="theme-label">Dark</span>
-                                </button>
-                                <button class="theme-btn active" data-theme="system">
-                                    <span class="theme-icon">💻</span>
-                                    <span class="theme-label">System</span>
-                                </button>
-                            </div>
-                        </div>
+                        <h3>Data Management</h3>
+                        <button id="clearAll" class="btn btn-danger">Clear All Sales</button>
                     </div>
+                </section>
+            </div>
 
-                    <!-- Import Data -->
-                    <div class="settings-group">
-                        <h3>Import Data</h3>
-                        <div class="import-section">
-                            <label>Import Sales from XLSX</label>
-                            <p class="import-description">Import cookie orders from Digital Cookie export files (.xlsx format)</p>
-                            <div class="import-controls">
-                                <input type="file" id="importFile" accept=".xlsx" style="display:none;">
-                                <button id="selectFileBtn" class="btn btn-secondary import-btn">Select File</button>
-                                <span id="selectedFileName" class="selected-file"></span>
-                            </div>
-                            <button id="importBtn" class="btn btn-primary" disabled>Import Sales</button>
-                            <div id="importStatus" class="import-status"></div>
-                        </div>
-                    </div>
+            <!-- Council View -->
+            <div id="view-council" class="view-section hidden">
+                <section class="council-section">
+                    <h2>Council Administration</h2>
+                    <p class="section-description">Manage troops across your council. More features coming in a future phase.</p>
 
-
-
-                    <!-- Danger Zone -->
-                    <div class="settings-group danger-zone">
-                        <h3>Danger Zone</h3>
-                        <div class="danger-section">
-                            <div class="danger-item">
-                                <div class="danger-info">
-                                    <strong>Delete All Data</strong>
-                                    <p>Permanently delete all sales and donation records. This cannot be undone.</p>
-                                </div>
-                                <button id="deleteAllDataBtn" class="btn btn-danger">Delete All Data</button>
-                            </div>
+                    <div class="council-actions">
+                        <div class="council-card">
+                            <h3>Troop Management</h3>
+                            <p>Create and manage troops within your council.</p>
+                            <button id="createTroopBtn" class="btn btn-primary">+ New Troop</button>
                         </div>
                     </div>
                 </section>
@@ -699,17 +581,92 @@
             <div id="view-troopLeader" class="view-section hidden">
                 <section class="troop-section">
                     <div class="troop-header">
-                        <h2>Troop Management</h2>
+                        <h2>Troop Selection</h2>
                         <div class="troop-controls">
                             <select id="troopSelector" class="troop-select">
                                 <option value="">Select a troop...</option>
                             </select>
-                            <button id="createTroopBtn" class="btn btn-primary">+ New Troop</button>
                         </div>
                     </div>
 
-                    <!-- Troop Summary Cards -->
-                    <div id="troopSummary" class="troop-summary" style="display: none;">
+                    <!-- Troop Top Navigation -->
+                    <div class="troop-top-nav" role="tablist">
+                        <button class="troop-tab active" data-tab="membership">Membership</button>
+                        <button class="troop-tab" data-tab="dashboard">Cookies</button>
+                        <button class="troop-tab" data-tab="financials">Financials</button>
+                        <button class="troop-tab" data-tab="equipment">Equipment</button>
+                        <button class="troop-tab" data-tab="events">Events</button>
+                        <button class="troop-tab" data-tab="media">Media</button>
+                        <button class="troop-tab" data-tab="library">Library</button>
+                    </div>
+
+                    <div id="troop-content" class="troop-content">
+                        <!-- Membership Tab -->
+                        <div id="troop-tab-membership" class="troop-tab-panel">
+                            <h2>Membership</h2>
+                            <div class="membership-actions">
+                                <button id="addMemberBtnMembership" class="btn btn-primary add-member-btn" onclick="openAddMemberModal()">Add Member</button>
+                                <input id="memberSearch" type="search" placeholder="Search members..." />
+                            </div>
+
+                            <!-- Membership Sub-Tab Navigation -->
+                            <div class="membership-subnav" role="tablist">
+                                <button class="membership-subtab active" data-sub="scout">Scout</button>
+                                <button class="membership-subtab" data-sub="family">Family</button>
+                                <button class="membership-subtab" data-sub="leadership">Leadership</button>
+                                <button class="membership-subtab" data-sub="volunteer">Volunteer</button>
+                            </div>
+
+                            <!-- Membership Sub-Panels -->
+                            <div class="membership-subpanels">
+                                <div id="membership-sub-scout" class="membership-subpanel">
+                                    <table class="membership-table">
+                                        <thead>
+                                            <tr><th>Name</th><th>Role</th><th>Level</th><th>Status</th><th>Actions</th></tr>
+                                        </thead>
+                                        <tbody id="membershipTableBody_scout">
+                                            <tr><td colspan="5" class="empty-state">Select a troop to view members</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div id="membership-sub-family" class="membership-subpanel hidden">
+                                    <table class="membership-table">
+                                        <thead>
+                                            <tr><th>Last Name</th></tr>
+                                        </thead>
+                                        <tbody id="membershipTableBody_family">
+                                            <tr><td class="empty-state">Select a troop to view families</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div id="membership-sub-leadership" class="membership-subpanel hidden">
+                                    <table class="membership-table">
+                                        <thead>
+                                            <tr><th>Name</th><th>Role</th><th>Level</th><th>Status</th><th>Actions</th></tr>
+                                        </thead>
+                                        <tbody id="membershipTableBody_leadership">
+                                            <tr><td colspan="5" class="empty-state">No leadership members</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div id="membership-sub-volunteer" class="membership-subpanel hidden">
+                                    <table class="membership-table">
+                                        <thead>
+                                            <tr><th>Name</th><th>Role</th><th>Level</th><th>Status</th><th>Actions</th></tr>
+                                        </thead>
+                                        <tbody id="membershipTableBody_volunteer">
+                                            <tr><td colspan="5" class="empty-state">No volunteers</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dashboard Tab -->
+                        <div id="troop-tab-dashboard" class="troop-tab-panel hidden">
                         <div class="summary-cards">
                             <div class="summary-card">
                                 <span class="summary-icon">📦</span>
@@ -766,7 +723,7 @@
                         <div class="troop-members-section">
                             <div class="section-header">
                                 <h3>Member Performance</h3>
-                                <button id="addMemberBtn" class="btn btn-secondary btn-sm">+ Add Member</button>
+                                <button id="addMemberBtn" class="btn btn-secondary btn-sm add-member-btn" onclick="openAddMemberModal()">+ Add Member</button>
                             </div>
                             <div class="members-table-container">
                                 <table class="members-table">
@@ -794,7 +751,38 @@
                                 <p class="empty-state">No sales data yet</p>
                             </div>
                         </div>
-                    </div>
+                        </div><!-- end troop-tab-dashboard -->
+
+                        <!-- Financials placeholder -->
+                        <div id="troop-tab-financials" class="troop-tab-panel hidden">
+                            <h2>Financials</h2>
+                            <p>Financial summary and transactions will appear here (placeholder).</p>
+                        </div>
+
+                        <!-- Equipment placeholder -->
+                        <div id="troop-tab-equipment" class="troop-tab-panel hidden">
+                            <h2>Equipment</h2>
+                            <p>Equipment inventory and loan tracking (placeholder).</p>
+                        </div>
+
+                        <!-- Events placeholder -->
+                        <div id="troop-tab-events" class="troop-tab-panel hidden">
+                            <h2>Events</h2>
+                            <p>Troop events and booth schedule (placeholder).</p>
+                        </div>
+
+                        <!-- Media placeholder -->
+                        <div id="troop-tab-media" class="troop-tab-panel hidden">
+                            <h2>Media</h2>
+                            <p>Photos and uploaded files (placeholder).</p>
+                        </div>
+
+                        <!-- Library placeholder -->
+                        <div id="troop-tab-library" class="troop-tab-panel hidden">
+                            <h2>Library</h2>
+                            <p>Document library and resources (placeholder).</p>
+                        </div>
+                    </div><!-- end troop-content -->
 
                     <!-- Empty State (no troop selected) -->
                     <div id="troopEmptyState" class="troop-empty-state">
@@ -910,18 +898,19 @@
 
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label for="memberLevel">Current Level</label>
-                                        <select id="memberLevel">
-                                            <option value="">Select level...</option>
+                                        <label for="memberLevel">Position</label>
+                                        <select id="memberLevel" onchange="onPositionChange()">
+                                            <option value="">Select position...</option>
                                             <option value="Scout">Scout</option>
                                             <option value="Troop Leader">Troop Leader</option>
+                                            <option value="Co-Leader">Co-Leader</option>
                                             <option value="Troop Volunteer">Troop Volunteer</option>
                                         </select>
                                     </div>
-                                    <div class="form-group">
-                                        <label for="memberRoles">Roles (select one or more)</label>
+                                    <div class="form-group" id="rolesGroup">
+                                        <label for="memberRoles" id="rolesLabel">Roles</label>
                                         <select id="memberRoles" multiple size="6">
-                                            <!-- Options populated dynamically -->
+                                            <!-- Options populated dynamically based on position -->
                                         </select>
                                     </div>
                                 </div>
@@ -929,7 +918,7 @@
                         </div>
                         <div class="modal-footer">
                             <button class="btn btn-secondary" onclick="closeAddMemberModal()">Cancel</button>
-                            <button class="btn btn-primary" id="confirmAddMemberBtn" onclick="submitAddMember()">Add Member</button>
+                            <button class="btn btn-primary" id="confirmAddMemberBtn" onclick="submitAddMember()">Save</button>
                         </div>
                     </div>
                 </div>
@@ -1058,6 +1047,6 @@
         </footer>
     </div>
 
-    <script src="script.js?v=3"></script>
+    <script src="script.js?v=11"></script>
 </body>
 </html>
