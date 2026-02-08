@@ -1845,7 +1845,7 @@ function showFeedback(message) {
         top: 20px;
         left: 50%;
         transform: translateX(-50%);
-        background-color: #1e7b3c;
+        background-color: var(--primary-color);
         color: white;
         padding: 12px 24px;
         border-radius: 12px;
@@ -1938,6 +1938,40 @@ function setupNavigation() {
     // Load last view or default to profile
     let lastView = localStorage.getItem('lastView') || 'profile';
     switchView(lastView);
+}
+
+// Troop top navigation (Membership / placeholders)
+function setupTroopNavigation() {
+    const troopTabs = document.querySelectorAll('.troop-tab');
+    const panels = document.querySelectorAll('.troop-tab-panel');
+
+    if (!troopTabs.length) return;
+
+    troopTabs.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = btn.dataset.tab;
+
+            // Toggle active on tabs
+            troopTabs.forEach(t => t.classList.toggle('active', t === btn));
+
+            // Show matching panel
+            panels.forEach(p => {
+                if (p.id === 'troop-tab-' + target) p.classList.remove('hidden'); else p.classList.add('hidden');
+            });
+        });
+    });
+
+    // Membership search behavior (filter rows)
+    const memberSearch = document.getElementById('memberSearch');
+    const membershipBody = document.getElementById('membershipTableBody');
+    if (memberSearch && membershipBody) {
+        memberSearch.addEventListener('input', () => {
+            const q = memberSearch.value.toLowerCase();
+            Array.from(membershipBody.querySelectorAll('tr')).forEach(tr => {
+                tr.style.display = q ? (tr.textContent.toLowerCase().includes(q) ? '' : 'none') : '';
+            });
+        });
+    }
 }
 
 // Mobile Menu Management
@@ -2289,6 +2323,8 @@ function renderTroopDashboard() {
 
     // Render members table
     renderTroopMembers();
+    // Render membership tab (top-nav) if present
+    renderMembershipTab();
 
     // Render goals
     renderTroopGoals();
@@ -2382,6 +2418,40 @@ function renderTroopGoals() {
     }).join('');
 }
 
+// Render the simple membership tab table (top-nav view)
+function renderMembershipTab() {
+    const tbody = document.getElementById('membershipTableBody');
+    if (!tbody) return;
+
+    if (!troopMembers || troopMembers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No members yet.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = troopMembers.map(m => {
+        const name = `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.email || 'Unknown';
+        const level = m.scoutLevel || '-';
+        const role = (m.troopRole === 'member' ? 'Scout' : (m.troopRole || '-'));
+        const status = m.status || 'Active';
+        return `
+            <tr>
+                <td>${name}</td>
+                <td>${role}</td>
+                <td>${level}</td>
+                <td>${status}</td>
+                <td><button class="btn" onclick="viewMember(${m.id})">View</button></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Simple view member handler (placeholder - can open detailed modal)
+function viewMember(memberId) {
+    const member = troopMembers.find(m => m.id === memberId);
+    if (!member) return showFeedback('Member not found', true);
+    alert(`Member:\n\nName: ${member.firstName} ${member.lastName}\nRole: ${member.troopRole || '-'}\nLevel: ${member.scoutLevel || '-'}\nEmail: ${member.email || '--'}`);
+}
+
 // Render sales by cookie type
 function renderTroopSalesByCookie() {
     const container = document.getElementById('troopSalesByCookie');
@@ -2423,35 +2493,25 @@ function openAddMemberModal() {
         showFeedback('Please select a troop first', true);
         return;
     }
+    // Populate roles and show modal
+    populateMemberRolesSelect();
     document.getElementById('addMemberModal').style.display = 'flex';
 }
 
 function closeAddMemberModal() {
     document.getElementById('addMemberModal').style.display = 'none';
-
-    // Clear new scout form fields
-    document.getElementById('scoutFirstName').value = '';
-    document.getElementById('scoutLastName').value = '';
-    document.getElementById('scoutLevel').value = '';
-    document.getElementById('scoutDateOfBirth').value = '';
-    document.getElementById('parentFirstName').value = '';
-    document.getElementById('parentLastName').value = '';
-    document.getElementById('parentEmail').value = '';
-    document.getElementById('parentPhone').value = '';
-    document.getElementById('parentRole').value = '';
-    document.getElementById('secondaryParentFirstName').value = '';
-    document.getElementById('secondaryParentLastName').value = '';
-    document.getElementById('secondaryParentEmail').value = '';
-    document.getElementById('secondaryParentPhone').value = '';
-    document.getElementById('secondaryParentRole').value = '';
-
-    // Clear existing user form fields
-    document.getElementById('memberSearchEmail').value = '';
-    document.getElementById('memberSearchResults').innerHTML = '';
-    selectedMemberEmail = null;
-
-    // Reset to new scout tab
-    switchToNewScoutTab();
+    // Clear generic add-member form fields
+    const fields = [
+        'memberFirstName','memberLastName','memberEmail','memberAddress','memberBirthdate','memberDen','memberFamilyInfo','memberLevel'
+    ];
+    fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
+    });
+    // Clear roles options
+    const rolesSelect = document.getElementById('memberRoles');
+    if (rolesSelect) rolesSelect.innerHTML = '';
 }
 
 function openAddGoalModal() {
@@ -2585,14 +2645,90 @@ function selectMember(email, name) {
     document.getElementById('confirmAddMemberBtn').disabled = false;
 }
 
-// Route to correct add function based on active tab
+// Submit Add Member (generic form)
 async function submitAddMember() {
-    const activeTab = document.querySelector('.tab-btn.active').id;
+    return addGenericMemberToTroop();
+}
 
-    if (activeTab === 'tabNewScout') {
-        await addNewScoutToTroop();
-    } else {
-        await addMemberToTroop();
+// Roles to populate the roles multi-select (based on Resources doc)
+const MEMBER_ROLE_OPTIONS = [
+    'Troop Leader', 'Co-Leader', 'Troop Treasurer', 'Troop Cookie Manager', 'Troop Admin',
+    'Program Coordinator', 'Outdoor / Camp-Trained Adult', 'President', 'Vice President',
+    'Secretary', 'Treasurer', 'Patrol Leader', 'Assistant'
+];
+
+function populateMemberRolesSelect() {
+    const select = document.getElementById('memberRoles');
+    if (!select) return;
+    // Clear any existing
+    select.innerHTML = '';
+    MEMBER_ROLE_OPTIONS.forEach(role => {
+        const opt = document.createElement('option');
+        opt.value = role;
+        opt.textContent = role;
+        select.appendChild(opt);
+    });
+}
+
+// Add a generic member to the troop
+async function addGenericMemberToTroop() {
+    if (!selectedTroopId) {
+        showFeedback('Please select a troop first', true);
+        return;
+    }
+
+    const firstName = (document.getElementById('memberFirstName')?.value || '').trim();
+    const lastName = (document.getElementById('memberLastName')?.value || '').trim();
+    const email = (document.getElementById('memberEmail')?.value || '').trim();
+    const address = (document.getElementById('memberAddress')?.value || '').trim();
+    const dateOfBirth = (document.getElementById('memberBirthdate')?.value || '') || null;
+    const den = (document.getElementById('memberDen')?.value || '').trim();
+    const familyInfo = (document.getElementById('memberFamilyInfo')?.value || '').trim();
+    const level = (document.getElementById('memberLevel')?.value || '').trim() || null;
+
+    // Collect selected roles
+    const rolesSelect = document.getElementById('memberRoles');
+    const roles = [];
+    if (rolesSelect) {
+        Array.from(rolesSelect.selectedOptions).forEach(o => roles.push(o.value));
+    }
+
+    if (!firstName && !lastName && !email) {
+        showFeedback('Please provide at least a name or email', true);
+        return;
+    }
+
+    const payload = {
+        firstName: firstName || null,
+        lastName: lastName || null,
+        email: email || null,
+        address: address || null,
+        dateOfBirth: dateOfBirth,
+        den: den || null,
+        familyInfo: familyInfo || null,
+        level: level || null,
+        roles: roles
+    };
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/troop/${selectedTroopId}/members`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || 'Failed to add member');
+        }
+
+        showFeedback('Member added successfully!');
+        closeAddMemberModal();
+        await loadTroopData(selectedTroopId);
+    } catch (error) {
+        console.error('Error adding member:', error);
+        showFeedback(error.message || 'Failed to add member', true);
     }
 }
 
@@ -3170,6 +3306,7 @@ if (document.readyState === 'loading') {
         setupCookieTableListeners();
         setupDangerZone();
         setupTroopManagement();
+        setupTroopNavigation();
         loadInvitations();
         loadCookieCatalog();
     });

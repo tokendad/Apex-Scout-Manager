@@ -1,0 +1,97 @@
+/**
+ * Cub Scout Rank Colors - Official Color Palette
+ *
+ * Source: Scouting America Brand Guidelines
+ * Updated: 2026-02-07
+ *
+ * Each rank has three color variations:
+ * - Primary: Main rank color for badges, headers, primary identification
+ * - Secondary: Light/background color for cards, subtle highlights
+ * - Tertiary: Accent color for borders, emphasis elements
+ */
+
+:root {
+    /* Lion Rank - Gold */
+    --rank-lion-primary: #FFD700;           /* Gold - Primary/Top */
+    --rank-lion-secondary: #FFF2CC;         /* Light Gold - Secondary/Middle */
+    --rank-lion-tertiary: #BC8C00;          /* Dark Gold - Tertiary/Bottom */
+
+    /* Tiger Rank - Orange */
+    --rank-tiger-primary: #E55D00;          /* Orange - Primary/Top */
+    --rank-tiger-secondary: #FBE5D6;        /* Light Orange - Secondary/Middle */
+    --rank-tiger-tertiary: #AE5A21;         /* Dark Orange - Tertiary/Bottom */
+
+    /* Wolf Rank - Red */
+    --rank-wolf-primary: #BD0300;           /* Red - Primary/Top */
+    --rank-wolf-secondary: #FF7C80;         /* Light Red - Secondary/Middle */
+    --rank-wolf-tertiary: #AE5A21;          /* Dark Orange/Brown - Tertiary/Bottom */
+
+    /* Bear Rank - Blue */
+    --rank-bear-primary: #4472C4;           /* Blue - Primary/Top */
+    --rank-bear-secondary: #DEEBF7;         /* Light Blue - Secondary/Middle */
+    --rank-bear-tertiary: #4472C4;          /* Blue - Tertiary/Bottom (same as primary) */
+
+    /* Webelos Rank - Green */
+    --rank-webelos-primary: #385723;        /* Green - Primary/Top */
+    --rank-webelos-secondary: #E2F0D9;      /* Light Green - Secondary/Middle */
+    --rank-webelos-tertiary: #385723;       /* Green - Tertiary/Bottom (same as primary) */
+
+    /* Arrow of Light (AoL) Rank - Brown */
+    --rank-aol-primary: #582800;            /* Brown - Primary/Top */
+    --rank-aol-secondary: #ECDEAA;          /* Light Brown - Secondary/Middle */
+    --rank-aol-tertiary: #582800;           /* Brown - Tertiary/Bottom (same as primary) */
+}
+
+/* Example Usage */
+
+/* Rank Badge with Primary Color */
+.badge-lion {
+    background-color: var(--rank-lion-primary);
+    color: white;
+}
+
+/* Rank Card with Secondary (Light) Background */
+.card-tiger {
+    background-color: var(--rank-tiger-secondary);
+    border-left: 4px solid var(--rank-tiger-primary);
+}
+
+/* Rank Border/Accent with Tertiary Color */
+.accent-wolf {
+    border: 2px solid var(--rank-wolf-tertiary);
+}
+
+/* Rank-specific Section Headers */
+.header-bear {
+    background: linear-gradient(135deg, var(--rank-bear-primary), var(--rank-bear-tertiary));
+    color: white;
+}
+
+/* Rank Badge List Item */
+.scout-item[data-rank="webelos"] {
+    border-left: 4px solid var(--rank-webelos-primary);
+    background-color: var(--rank-webelos-secondary);
+}
+
+.scout-item[data-rank="aol"] {
+    border-left: 4px solid var(--rank-aol-primary);
+    background-color: var(--rank-aol-secondary);
+}
+
+/* Progress Bar with Rank Colors */
+.progress-bar.rank-lion {
+    background: linear-gradient(90deg, var(--rank-lion-tertiary), var(--rank-lion-primary));
+}
+
+/* Hover States */
+.rank-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Accessibility Note:
+ * Always verify color contrast ratios meet WCAG AA standards (4.5:1 for normal text, 3:1 for large text)
+ * Test primary colors against white and dark backgrounds
+ * Use tertiary colors for better contrast when needed
+ */

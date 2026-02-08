@@ -2,10 +2,13 @@
 
 /* CSS Variables for consistent theming */
 :root {
-    --primary-color: #1e7b3c;
-    --secondary-color: #f8b500;
-    --background-color: #f5f5f5;
-    --card-background: #ffffff;
+    /* Driftwood Pearl Morning (exact provided) */
+    --primary-color: #A76D55;   /* Dusty Rose */
+    --secondary-color: #D9B23F; /* Secondary/gold accent */
+    --accent-color: #A0C0A1;    /* Muted green/contrast */
+    --deep-color: #8E5B3A;      /* Deep chocolate fallback */
+    --background-color: #F3E3D3; /* Soft Pearl / neutral background */
+    --card-background: #FFFFFF;  /* Card background (keep white for contrast) */
     --text-color: #333333;
     --border-color: #dddddd;
     --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -28,18 +31,9 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* Container */
-.container {
-    max-width: none;
-    margin: 0 auto;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-}
-
 /* Header */
 header {
-    background: linear-gradient(135deg, var(--primary-color), #15562a);
+    background: linear-gradient(135deg, var(--primary-color), var(--deep-color));
     color: white;
     padding: 1rem 1rem;
     text-align: center;
@@ -62,7 +56,6 @@ header h1 {
     position: absolute;
     left: 1rem;
     background: rgba(255, 255, 255, 0.2);
-    color: white;
     border: 1px solid rgba(255, 255, 255, 0.3);
     padding: 0.5rem;
     border-radius: 12px;
@@ -97,6 +90,33 @@ header h1 {
     opacity: 0;
     transition: opacity 0.3s ease;
 }
+
+/* Troop management top nav */
+.troop-top-nav {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+.troop-tab {
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--card-background);
+    cursor: pointer;
+}
+.troop-tab.active {
+    background: linear-gradient(90deg, var(--primary-color), var(--deep-color));
+    color: white;
+    border-color: transparent;
+}
+.troop-tab-panel {
+    padding: 0.5rem 0;
+}
+.troop-tab-panel.hidden { display: none; }
+.membership-actions { display:flex; gap:0.5rem; align-items:center; margin-bottom:0.75rem; }
+.membership-table { width:100%; border-collapse:collapse; }
+.membership-table th, .membership-table td { border:1px solid var(--border-color); padding:0.5rem; text-align:left; }
 
 .sidebar-overlay.active {
     display: block;
@@ -212,7 +232,7 @@ section h2 {
 }
 
 .btn-primary:active {
-    background-color: #15562a;
+    background-color: var(--deep-color);
     transform: scale(0.98);
 }
 
@@ -319,7 +339,7 @@ section h2 {
 }
 
 .summary-item {
-    background: linear-gradient(135deg, var(--primary-color), #15562a);
+    background: linear-gradient(135deg, var(--primary-color), var(--deep-color));
     color: white;
     padding: 1.25rem;
     border-radius: 16px;
@@ -534,7 +554,7 @@ section h2 {
 }
 
 .profile-photo-placeholder {
-    background: linear-gradient(135deg, var(--primary-color), #15562a);
+    background: linear-gradient(135deg, var(--primary-color), var(--deep-color));
     color: white;
     font-size: 4rem;
     display: flex;
@@ -833,7 +853,7 @@ section h2 {
 }
 
 .sales-table tr.status-complete a {
-    color: #1e7b3c !important;
+    color: var(--primary-color) !important;
 }
 
 .sales-table tr.status-shipped {
@@ -954,15 +974,15 @@ section h2 {
 }
 
 .btn-order-status.btn-complete:hover:not(:disabled) {
-    background-color: rgba(40, 167, 69, 0.2);
-    border-color: #28a745;
-    color: #1e7b3c;
+    background-color: rgba(167, 109, 85, 0.2);
+    border-color: var(--deep-color);
+    color: var(--primary-color);
 }
 
 .btn-order-status.btn-complete-done {
-    background-color: rgba(40, 167, 69, 0.2);
-    color: #1e7b3c;
-    border: 1px solid #28a745;
+    background-color: rgba(167, 109, 85, 0.2);
+    color: var(--primary-color);
+    border: 1px solid var(--deep-color);
 }
 
 .btn-order-status.btn-complete-done:hover:not(:disabled) {
@@ -1368,7 +1388,7 @@ footer {
 
 .event-stat.highlight {
     padding: 0.5rem;
-    background: linear-gradient(135deg, var(--primary-color), #15562a);
+    background: linear-gradient(135deg, var(--primary-color), var(--deep-color));
     color: white;
     border-radius: 12px;
     margin-top: 0.25rem;
@@ -1732,7 +1752,7 @@ footer {
     align-items: center;
     padding: 1rem 1.5rem;
     border-bottom: 1px solid var(--border-color);
-    background: linear-gradient(135deg, var(--primary-color), #15562a);
+    background: linear-gradient(135deg, var(--primary-color), var(--deep-color));
     border-radius: 16px 16px 0 0;
 }
 

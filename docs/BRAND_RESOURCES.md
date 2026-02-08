@@ -143,13 +143,26 @@ Each rank has three color levels for design flexibility:
 
 ### Existing Colors (to be updated)
 ```css
---primary-color: #1e7b3c;      /* Current green */
---secondary-color: #f8b500;    /* Current gold */
---background-color: #f5f5f5;   /* Light gray */
+--primary-color: #1e7b3c;      /* Current green (legacy) */
+--secondary-color: #f8b500;    /* Current gold (legacy) */
+--background-color: #f5f5f5;   /* Light gray (legacy) */
 --card-background: #ffffff;    /* White */
 --text-color: #333333;         /* Dark gray */
 --border-color: #dddddd;       /* Light gray */
 --danger-color: #dc3545;       /* Red for alerts */
+```
+
+### Updated Default Palette (Driftwood Pearl Morning - exact)
+```css
+--primary-color: #A76D55;   /* Dusty Rose */
+--secondary-color: #D9B23F; /* Secondary/gold accent */
+--accent-color: #A0C0A1;    /* Muted green/contrast */
+--deep-color: #8E5B3A;      /* Deep chocolate fallback */
+--background-color: #F3E3D3; /* Soft Pearl / neutral background */
+--card-background: #FFFFFF;  /* Card background */
+--text-color: #333333;       /* Dark gray */
+--border-color: #dddddd;     /* Light gray */
+--danger-color: #dc3545;     /* Red for alerts */
 ```
 
 ### Recommended Updates

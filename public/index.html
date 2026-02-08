@@ -57,6 +57,9 @@
 
         <main>
             <!-- Profile View -->
+                <!-- Add Sale Form -->
+                <section class="add-sale-section">
+                    <h2>Record a Sale</h2>
             <div id="view-profile" class="view-section">
                 <section class="profile-display-section">
                     <div class="profile-card">
@@ -395,6 +398,93 @@
                         <!-- Payment Information -->
                         <div class="form-section">
                             <h3>Payment</h3>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="paymentMethod">Payment Method</label>
+                                    <select id="paymentMethod">
+                                        <option value="">Select...</option>
+                                        <option value="cash">Cash</option>
+                                        <option value="check">Check</option>
+                                        <option value="venmo">Venmo</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="amountCollected">Collected ($)</label>
+                                    <input type="number" id="amountCollected" min="0" step="0.01" value="0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="amountDue">Due ($)</label>
+                                    <input type="number" id="amountDue" min="0" step="0.01" value="0">
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </section>
+            </div>
+
+            <!-- Troop Management View -->
+            <div id="view-troopLeader" class="view-section hidden">
+                <section class="troop-management-section">
+                    <div class="troop-top-nav" role="tablist">
+                        <button class="troop-tab active" data-tab="membership">Membership</button>
+                        <button class="troop-tab" data-tab="financials">Financials</button>
+                        <button class="troop-tab" data-tab="equipment">Equipment</button>
+                        <button class="troop-tab" data-tab="events">Events</button>
+                        <button class="troop-tab" data-tab="media">Media</button>
+                        <button class="troop-tab" data-tab="library">Library</button>
+                    </div>
+
+                    <div id="troop-content" class="troop-content">
+                        <!-- Membership (focused) -->
+                        <div id="troop-tab-membership" class="troop-tab-panel">
+                            <h2>Membership</h2>
+                            <div class="membership-actions">
+                                <button id="addMemberBtn" class="btn btn-primary">Add Member</button>
+                                <input id="memberSearch" type="search" placeholder="Search members..." />
+                            </div>
+                            <table class="membership-table">
+                                <thead>
+                                    <tr><th>Name</th><th>Role</th><th>Level</th><th>Status</th><th>Actions</th></tr>
+                                </thead>
+                                <tbody id="membershipTableBody">
+                                    <tr><td>Jane Doe</td><td>Scout</td><td>Brownie</td><td>Active</td><td><button class="btn">View</button></td></tr>
+                                    <tr><td>Mary Leader</td><td>Troop Leader</td><td>-</td><td>Active</td><td><button class="btn">Manage</button></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Financials placeholder -->
+                        <div id="troop-tab-financials" class="troop-tab-panel hidden">
+                            <h2>Financials</h2>
+                            <p>Financial summary and transactions will appear here (placeholder).</p>
+                        </div>
+
+                        <!-- Equipment placeholder -->
+                        <div id="troop-tab-equipment" class="troop-tab-panel hidden">
+                            <h2>Equipment</h2>
+                            <p>Equipment inventory and loan tracking (placeholder).</p>
+                        </div>
+
+                        <!-- Events placeholder -->
+                        <div id="troop-tab-events" class="troop-tab-panel hidden">
+                            <h2>Events</h2>
+                            <p>Troop events and booth schedule (placeholder).</p>
+                        </div>
+
+                        <!-- Media placeholder -->
+                        <div id="troop-tab-media" class="troop-tab-panel hidden">
+                            <h2>Media</h2>
+                            <p>Photos and uploaded files (placeholder).</p>
+                        </div>
+
+                        <!-- Library placeholder -->
+                        <div id="troop-tab-library" class="troop-tab-panel hidden">
+                            <h2>Library</h2>
+                            <p>Document library and resources (placeholder).</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="paymentMethod">Payment Method</label>
@@ -776,128 +866,70 @@
                 <div id="addMemberModal" class="modal" style="display: none;">
                     <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
                         <div class="modal-header">
-                            <h3>Add Scout to Troop</h3>
+                            <h3>Add Member</h3>
                             <button class="modal-close" onclick="closeAddMemberModal()">&times;</button>
                         </div>
                         <div class="modal-body">
-
-                            <!-- Tab selector -->
-                            <div class="tab-selector">
-                                <button id="tabNewScout" class="tab-btn active" onclick="switchToNewScoutTab()">Add New Scout</button>
-                                <button id="tabExistingUser" class="tab-btn" onclick="switchToExistingUserTab()">Add Existing User</button>
-                            </div>
-
-                            <!-- Tab 1: Add New Scout -->
-                            <div id="tabContentNewScout" class="tab-content active">
-
-                                <h4>Scout Information</h4>
-                                <div class="form-group">
-                                    <label for="scoutFirstName">Scout First Name *</label>
-                                    <input type="text" id="scoutFirstName" placeholder="e.g., Jane" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="scoutLastName">Scout Last Name *</label>
-                                    <input type="text" id="scoutLastName" placeholder="e.g., Doe" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="scoutLevel">Girl Scout Level (optional)</label>
-                                    <select id="scoutLevel">
-                                        <option value="">Select Level...</option>
-                                        <option value="Daisy">Daisy (Grades K-1, Ages 5-7)</option>
-                                        <option value="Brownie">Brownie (Grades 2-3, Ages 7-9)</option>
-                                        <option value="Junior">Junior (Grades 4-5, Ages 9-11)</option>
-                                        <option value="Cadette">Cadette (Grades 6-8, Ages 11-14)</option>
-                                        <option value="Senior">Senior (Grades 9-10, Ages 14-16)</option>
-                                        <option value="Ambassador">Ambassador (Grades 11-12, Ages 16-18)</option>
-                                    </select>
-                                    <small class="help-text">Based on grade as of October 1st</small>
-                                </div>
-                                <div class="form-group">
-                                    <label for="scoutDateOfBirth">Date of Birth (optional)</label>
-                                    <input type="date" id="scoutDateOfBirth">
-                                </div>
-
-                                <h4>Primary Parent/Guardian *</h4>
-                                <div class="form-group">
-                                    <label for="parentFirstName">First Name *</label>
-                                    <input type="text" id="parentFirstName" placeholder="e.g., Mary" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="parentLastName">Last Name *</label>
-                                    <input type="text" id="parentLastName" placeholder="e.g., Doe" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="parentRole">Role *</label>
-                                    <select id="parentRole" required>
-                                        <option value="">Select Role...</option>
-                                        <option value="Mom">Mom</option>
-                                        <option value="Dad">Dad</option>
-                                        <option value="Caregiver">Caregiver</option>
-                                    </select>
-                                </div>
+                            <form id="addMemberForm">
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label for="parentEmail">Email (optional)</label>
-                                        <input type="email" id="parentEmail" placeholder="parent@example.com">
+                                        <label for="memberFirstName">First Name *</label>
+                                        <input type="text" id="memberFirstName" placeholder="First name">
                                     </div>
                                     <div class="form-group">
-                                        <label for="parentPhone">Phone (optional)</label>
-                                        <input type="tel" id="parentPhone" placeholder="(555) 123-4567">
+                                        <label for="memberLastName">Last Name *</label>
+                                        <input type="text" id="memberLastName" placeholder="Last name">
                                     </div>
                                 </div>
 
-                                <h4>Secondary Parent/Guardian (optional)</h4>
                                 <div class="form-group">
-                                    <label for="secondaryParentFirstName">First Name</label>
-                                    <input type="text" id="secondaryParentFirstName" placeholder="e.g., John">
+                                    <label for="memberEmail">Email</label>
+                                    <input type="email" id="memberEmail" placeholder="email@example.com">
                                 </div>
+
                                 <div class="form-group">
-                                    <label for="secondaryParentLastName">Last Name</label>
-                                    <input type="text" id="secondaryParentLastName" placeholder="e.g., Doe">
+                                    <label for="memberAddress">Address</label>
+                                    <input type="text" id="memberAddress" placeholder="Street address, city, state">
                                 </div>
-                                <div class="form-group">
-                                    <label for="secondaryParentRole">Role</label>
-                                    <select id="secondaryParentRole">
-                                        <option value="">Select Role...</option>
-                                        <option value="Mom">Mom</option>
-                                        <option value="Dad">Dad</option>
-                                        <option value="Caregiver">Caregiver</option>
-                                    </select>
-                                </div>
+
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label for="secondaryParentEmail">Email</label>
-                                        <input type="email" id="secondaryParentEmail" placeholder="parent2@example.com">
+                                        <label for="memberBirthdate">Birthdate</label>
+                                        <input type="date" id="memberBirthdate">
                                     </div>
                                     <div class="form-group">
-                                        <label for="secondaryParentPhone">Phone</label>
-                                        <input type="tel" id="secondaryParentPhone" placeholder="(555) 123-4567">
+                                        <label for="memberDen">Den</label>
+                                        <input type="text" id="memberDen" placeholder="Den name/number">
                                     </div>
                                 </div>
 
-                            </div>
-
-                            <!-- Tab 2: Add Existing User -->
-                            <div id="tabContentExistingUser" class="tab-content" style="display: none;">
                                 <div class="form-group">
-                                    <label for="memberSearchEmail">Search by Email *</label>
-                                    <input type="email" id="memberSearchEmail" placeholder="Enter user's email address">
-                                    <div id="memberSearchResults" class="search-results"></div>
+                                    <label for="memberFamilyInfo">Family Info</label>
+                                    <textarea id="memberFamilyInfo" rows="2" placeholder="Optional family notes or contact info"></textarea>
                                 </div>
-                                <div class="form-group">
-                                    <label for="memberRole">Role in Troop</label>
-                                    <select id="memberRole">
-                                        <option value="member">Member (Scout)</option>
-                                        <option value="co-leader">Co-Leader</option>
-                                        <option value="assistant">Assistant</option>
-                                    </select>
-                                </div>
-                            </div>
 
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="memberLevel">Current Level</label>
+                                        <select id="memberLevel">
+                                            <option value="">Select level...</option>
+                                            <option value="Scout">Scout</option>
+                                            <option value="Troop Leader">Troop Leader</option>
+                                            <option value="Troop Volunteer">Troop Volunteer</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="memberRoles">Roles (select one or more)</label>
+                                        <select id="memberRoles" multiple size="6">
+                                            <!-- Options populated dynamically -->
+                                        </select>
+                                    </div>
+                                </div>
+                            </form>
                         </div>
                         <div class="modal-footer">
                             <button class="btn btn-secondary" onclick="closeAddMemberModal()">Cancel</button>
-                            <button class="btn btn-primary" id="confirmAddMemberBtn" onclick="submitAddMember()">Add to Troop</button>
+                            <button class="btn btn-primary" id="confirmAddMemberBtn" onclick="submitAddMember()">Add Member</button>
                         </div>
                     </div>
                 </div>
