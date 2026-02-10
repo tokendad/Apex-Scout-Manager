@@ -109,13 +109,15 @@ header {
     position: relative;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
 }
 
 header h1 {
     font-size: var(--text-3xl);
     font-weight: var(--font-semibold);
     margin-bottom: 0.5rem;
+    flex: 1;
+    text-align: center;
 }
 
 /* Mobile Menu Button */
