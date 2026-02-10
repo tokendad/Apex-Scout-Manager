@@ -3125,12 +3125,14 @@ footer {
     padding: var(--space-md);
     box-shadow: var(--shadow);
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: var(--space-sm);
+    text-align: center;
 }
 
 .summary-icon {
-    font-size: 1.5rem;
+    font-size: 2rem;
     flex-shrink: 0;
 }
 
@@ -3138,26 +3140,31 @@ footer {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    width: 100%;
 }
 
 .summary-value {
-    font-size: 1.1rem;
-    font-weight: 700;
+    font-size: 1.2rem;
+    font-weight: var(--font-bold);
     color: var(--primary-color);
 }
 
 .summary-label {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     color: #666;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
 }
 
-/* Tablet and up - larger summary cards */
+/* Tablet and up - horizontal layout */
 @media (min-width: 768px) {
     .summary-card {
         padding: 1rem;
         gap: var(--space-md);
+        flex-direction: row;
+        align-items: flex-start;
+        text-align: left;
     }
 
     .summary-icon {
