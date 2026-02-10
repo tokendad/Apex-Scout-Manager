@@ -597,50 +597,55 @@ textarea:focus-visible,
 /* Summary Section */
 .summary-card {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+    grid-template-columns: 1fr;
+    gap: var(--space-lg);
 }
 
-.summary-revenue {
-    grid-column: 1 / -1;
+/* Tablet: 2 columns */
+@media (min-width: 768px) {
+    .summary-card {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .summary-revenue {
+        grid-column: auto;
+    }
+}
+
+/* Desktop: 4 columns */
+@media (min-width: 1024px) {
+    .summary-card {
+        grid-template-columns: repeat(4, 1fr);
+    }
 }
 
 .summary-item {
-    background: linear-gradient(135deg, var(--primary-color), var(--deep-color));
-    color: white;
-    padding: var(--space-md);
-    border-radius: 16px;
-    text-align: center;
+    background: var(--card-background);
+    color: var(--text-color);
+    padding: var(--space-lg);
+    border-radius: var(--radius-lg);
+    text-align: left;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
 }
 
 .summary-label {
     display: block;
-    font-size: 0.75rem;
-    margin-bottom: 0.25rem;
-    opacity: 0.9;
+    font-size: 0.85rem;
+    margin-bottom: var(--space-sm);
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: var(--font-medium);
 }
 
 .summary-value {
     display: block;
-    font-size: 1.25rem;
-    font-weight: 700;
-}
-
-/* Mobile compact summary items */
-@media (max-width: 767px) {
-    .summary-item {
-        padding: var(--space-sm) var(--space-md);
-        border-radius: 12px;
-    }
-
-    .summary-label {
-        font-size: 0.7rem;
-        margin-bottom: 0.2rem;
-    }
-
-    .summary-value {
-        font-size: 1rem;
-    }
+    font-size: 1.5rem;
+    font-weight: var(--font-bold);
+    color: var(--primary-color);
 }
 
 /* Payment Methods List (Settings) */
@@ -3613,12 +3618,18 @@ footer {
     color: #fff;
 }
 
-[data-theme="dark"] .summary-card {
+[data-theme="dark"] .summary-item {
     background: #2a2a2a;
+    border-color: #444;
+    color: #fff;
 }
 
 [data-theme="dark"] .summary-label {
-    color: #aaa;
+    color: #999;
+}
+
+[data-theme="dark"] .summary-value {
+    color: #7cb890;
 }
 
 [data-theme="dark"] .troop-members-section,
