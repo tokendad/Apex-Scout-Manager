@@ -184,17 +184,28 @@ header h1 {
 .troop-tab-panel.hidden { display: none; }
 .membership-subnav {
     display: flex;
-    gap: 0.5rem;
-    margin: 0.75rem 0 1rem 0;
+    gap: var(--space-sm);
+    margin: var(--space-md) 0 var(--space-lg) 0;
     flex-wrap: wrap;
+    overflow-x: auto;
 }
+
 .membership-subtab {
-    padding: 0.35rem 0.65rem;
-    border-radius: 8px;
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
     background: var(--card-background);
     cursor: pointer;
-    font-size: 0.95rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+    .membership-subtab {
+        padding: 0.35rem 0.65rem;
+        font-size: 0.95rem;
+    }
 }
 .membership-subtab.active {
     background: linear-gradient(90deg, var(--primary-color), var(--deep-color));
@@ -204,9 +215,66 @@ header h1 {
 .membership-subpanel { padding: 0; }
 .membership-subpanel.hidden { display: none; }
 .membership-subpanels .membership-table { margin-top: 0; }
-.membership-actions { display:flex; gap:0.5rem; align-items:center; margin-bottom:0.75rem; }
-.membership-table { width:100%; border-collapse:collapse; }
-.membership-table th, .membership-table td { border:1px solid var(--border-color); padding:0.5rem; text-align:left; }
+.membership-actions {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
+    margin-bottom: var(--space-md);
+    flex-wrap: wrap;
+}
+
+.membership-actions button {
+    flex: 1;
+    min-width: 120px;
+}
+
+.membership-actions input {
+    flex: 1;
+    min-width: 150px;
+}
+
+@media (max-width: 767px) {
+    .membership-actions {
+        flex-direction: column;
+    }
+
+    .membership-actions button,
+    .membership-actions input {
+        width: 100%;
+        min-width: auto;
+    }
+}
+.membership-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.membership-table th,
+.membership-table td {
+    border: 1px solid var(--border-color);
+    padding: 0.5rem;
+    text-align: left;
+    font-size: 0.85rem;
+}
+
+.membership-table th {
+    font-weight: var(--font-semibold);
+    background-color: var(--background-color);
+}
+
+/* Mobile: Hide less critical columns */
+@media (max-width: 767px) {
+    .membership-table th:nth-child(n+4),
+    .membership-table td:nth-child(n+4) {
+        display: none;
+    }
+
+    .membership-table th,
+    .membership-table td {
+        padding: 0.4rem;
+        font-size: 0.8rem;
+    }
+}
 
 .sidebar-overlay.active {
     display: block;
@@ -540,22 +608,39 @@ textarea:focus-visible,
 .summary-item {
     background: linear-gradient(135deg, var(--primary-color), var(--deep-color));
     color: white;
-    padding: var(--space-xl);
+    padding: var(--space-md);
     border-radius: 16px;
     text-align: center;
 }
 
 .summary-label {
     display: block;
-    font-size: 0.875rem;
-    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
     opacity: 0.9;
 }
 
 .summary-value {
     display: block;
-    font-size: 2rem;
+    font-size: 1.25rem;
     font-weight: 700;
+}
+
+/* Mobile compact summary items */
+@media (max-width: 767px) {
+    .summary-item {
+        padding: var(--space-sm) var(--space-md);
+        border-radius: 12px;
+    }
+
+    .summary-label {
+        font-size: 0.7rem;
+        margin-bottom: 0.2rem;
+    }
+
+    .summary-value {
+        font-size: 1rem;
+    }
 }
 
 /* Payment Methods List (Settings) */
@@ -3032,33 +3117,55 @@ footer {
 .summary-card {
     background: var(--card-background);
     border-radius: 12px;
-    padding: 1rem;
+    padding: var(--space-md);
     box-shadow: var(--shadow);
     display: flex;
     align-items: center;
-    gap: var(--space-md);
+    gap: var(--space-sm);
 }
 
 .summary-icon {
-    font-size: 2rem;
+    font-size: 1.5rem;
+    flex-shrink: 0;
 }
 
 .summary-data {
     display: flex;
     flex-direction: column;
+    min-width: 0;
 }
 
 .summary-value {
-    font-size: 1.5rem;
+    font-size: 1.1rem;
     font-weight: 700;
     color: var(--primary-color);
 }
 
 .summary-label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: #666;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+/* Tablet and up - larger summary cards */
+@media (min-width: 768px) {
+    .summary-card {
+        padding: 1rem;
+        gap: var(--space-md);
+    }
+
+    .summary-icon {
+        font-size: 2rem;
+    }
+
+    .summary-value {
+        font-size: 1.5rem;
+    }
+
+    .summary-label {
+        font-size: 0.75rem;
+    }
 }
 
 /* Section Headers */
