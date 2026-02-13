@@ -80,12 +80,12 @@ const PRIVILEGE_DEFINITIONS = [
     { code: 'view_events', name: 'View events', category: 'Calendar & Events' },
     { code: 'manage_events', name: 'Manage events', category: 'Calendar & Events' },
     { code: 'export_calendar', name: 'Export calendar', category: 'Calendar & Events' },
-    { code: 'view_sales', name: 'View sales data', category: 'Fundraising & Sales', future: true },
-    { code: 'record_sales', name: 'Record sales', category: 'Fundraising & Sales', future: true },
-    { code: 'manage_fundraisers', name: 'Manage fundraisers', category: 'Fundraising & Sales', future: true },
-    { code: 'view_troop_sales', name: 'View troop sales', category: 'Fundraising & Sales', future: true },
-    { code: 'view_financials', name: 'View financial accounts', category: 'Fundraising & Sales', future: true },
-    { code: 'manage_financials', name: 'Manage financial accounts', category: 'Fundraising & Sales', future: true },
+    { code: 'view_sales', name: 'View sales data', category: 'Fundraising & Sales' },
+    { code: 'record_sales', name: 'Record sales', category: 'Fundraising & Sales' },
+    { code: 'manage_fundraisers', name: 'Manage fundraisers', category: 'Fundraising & Sales' },
+    { code: 'view_troop_sales', name: 'View troop sales', category: 'Fundraising & Sales' },
+    { code: 'view_financials', name: 'View financial accounts', category: 'Fundraising & Sales' },
+    { code: 'manage_financials', name: 'Manage financial accounts', category: 'Fundraising & Sales' },
     { code: 'view_donations', name: 'View donations', category: 'Donations' },
     { code: 'record_donations', name: 'Record donations', category: 'Donations' },
     { code: 'delete_donations', name: 'Delete donations', category: 'Donations' },
@@ -107,6 +107,7 @@ const ROLE_PRIVILEGE_DEFAULTS = {
     cookie_leader: { view_roster:'T', manage_members:'none', manage_troop_settings:'none', send_invitations:'none', import_roster:'none', manage_member_roles:'none', manage_privileges:'none', view_scout_profiles:'none', edit_scout_level:'none', edit_scout_status:'none', award_badges:'none', view_badge_progress:'none', edit_personal_info:'none', view_events:'T', manage_events:'none', export_calendar:'T', view_sales:'T', record_sales:'T', manage_fundraisers:'T', view_troop_sales:'T', view_financials:'T', manage_financials:'T', view_donations:'T', record_donations:'S', delete_donations:'none', view_goals:'T', manage_goals:'none', view_leaderboard:'T', manage_payment_methods:'S', import_data:'T', export_data:'T', delete_own_data:'S' },
     troop_leader:  { view_roster:'T', manage_members:'T', manage_troop_settings:'T', send_invitations:'T', import_roster:'T', manage_member_roles:'T', manage_privileges:'T', view_scout_profiles:'T', edit_scout_level:'T', edit_scout_status:'T', award_badges:'T', view_badge_progress:'T', edit_personal_info:'T', view_events:'T', manage_events:'T', export_calendar:'T', view_sales:'T', record_sales:'T', manage_fundraisers:'T', view_troop_sales:'T', view_financials:'T', manage_financials:'T', view_donations:'T', record_donations:'T', delete_donations:'T', view_goals:'T', manage_goals:'T', view_leaderboard:'T', manage_payment_methods:'S', import_data:'T', export_data:'T', delete_own_data:'S' },
     council_admin: { view_roster:'T', manage_members:'T', manage_troop_settings:'T', send_invitations:'T', import_roster:'T', manage_member_roles:'T', manage_privileges:'T', view_scout_profiles:'T', edit_scout_level:'T', edit_scout_status:'T', award_badges:'T', view_badge_progress:'T', edit_personal_info:'T', view_events:'T', manage_events:'T', export_calendar:'T', view_sales:'T', record_sales:'T', manage_fundraisers:'T', view_troop_sales:'T', view_financials:'T', manage_financials:'T', view_donations:'T', record_donations:'T', delete_donations:'T', view_goals:'T', manage_goals:'T', view_leaderboard:'T', manage_payment_methods:'S', import_data:'T', export_data:'T', delete_own_data:'S' },
+    cookie_manager:{ view_roster:'T', manage_members:'none', manage_troop_settings:'none', send_invitations:'none', import_roster:'none', manage_member_roles:'none', manage_privileges:'none', view_scout_profiles:'T', edit_scout_level:'none', edit_scout_status:'none', award_badges:'none', view_badge_progress:'T', edit_personal_info:'none', view_events:'T', manage_events:'none', export_calendar:'T', view_sales:'T', record_sales:'T', manage_fundraisers:'T', view_troop_sales:'T', view_financials:'T', manage_financials:'T', view_donations:'T', record_donations:'T', delete_donations:'none', view_goals:'T', manage_goals:'T', view_leaderboard:'T', manage_payment_methods:'S', import_data:'T', export_data:'T', delete_own_data:'S' },
 };
 
 const SCOPE_ORDER = ['T', 'D', 'H', 'S', 'none'];
@@ -1100,6 +1101,11 @@ function switchView(viewId) {
 
     // Save preference
     localStorage.setItem('lastView', viewId);
+
+    // Load cookie dashboard data when switching to cookies view
+    if (viewId === 'cookies') {
+        loadCookieDashboard();
+    }
 }
 
 // Navigation Logic
@@ -1676,7 +1682,7 @@ function renderMembershipTab() {
                         <td>${m.troopRole || 'Scout'}</td>
                         <td>${level}</td>
                         <td>${status}</td>
-                        <td><button class="btn" onclick="viewMember('${m.id}')">View</button></td>
+                        <td><button class="btn" onclick="viewMember('${m.id}')">Edit</button></td>
                     </tr>
                 `;
             }).join('');
@@ -1708,7 +1714,7 @@ function renderMembershipTab() {
                         <td>${m.troopRole}</td>
                         <td>${m.scoutLevel || '-'}</td>
                         <td>${m.status || 'Active'}</td>
-                        <td><button class="btn" onclick="viewMember('${m.id}')">View</button></td>
+                        <td><button class="btn" onclick="viewMember('${m.id}')">Edit</button></td>
                     </tr>
                 `;
             }).join('');
@@ -1729,7 +1735,7 @@ function renderMembershipTab() {
                         <td>${m.troopRole}</td>
                         <td>${m.scoutLevel || '-'}</td>
                         <td>${m.status || 'Active'}</td>
-                        <td><button class="btn" onclick="viewMember('${m.id}')">View</button></td>
+                        <td><button class="btn" onclick="viewMember('${m.id}')">Edit</button></td>
                     </tr>
                 `;
             }).join('');
@@ -2963,6 +2969,764 @@ function setupScrollIndicators() {
     });
 }
 
+// ============================================================================
+// Cookie Dashboard (Phase B)
+// ============================================================================
+
+let cookieDashboardData = null;
+let cookieDashboardTroopId = null;
+let currentBoothId = null;
+let orderCardProducts = [];
+
+async function loadCookieDashboard() {
+    try {
+        // Find the user's troop
+        const troopsRes = await fetch(`${API_BASE_URL}/troop/my-troops`, { credentials: 'include' });
+        if (!troopsRes.ok) return;
+        const troops = await troopsRes.json();
+        if (!troops.length) return;
+
+        const troop = troops[0]; // Use first troop
+        cookieDashboardTroopId = troop.id;
+
+        // Load dashboard data
+        const dashRes = await fetch(`${API_BASE_URL}/troop/${troop.id}/cookie-dashboard`, { credentials: 'include' });
+        if (!dashRes.ok) return;
+        cookieDashboardData = await dashRes.json();
+
+        // Set dynamic tab label
+        const tabLabel = document.getElementById('cookiesTabLabel');
+        const dashTitle = document.getElementById('cookieDashTitle');
+        const orgCode = cookieDashboardData.orgCode;
+        let productLabel = 'Products';
+        if (orgCode === 'gsusa') productLabel = 'Cookies';
+        else if (orgCode === 'sa_cub' || orgCode === 'sa_bsa') productLabel = 'Popcorn';
+        if (tabLabel) tabLabel.textContent = productLabel;
+        if (dashTitle) dashTitle.textContent = `${productLabel} Dashboard`;
+
+        renderCookieDashboard();
+        loadQuickSaleProducts(troop.id);
+        loadBoothEvents(troop.id);
+        loadTroopProceeds(troop.id);
+        loadSeasonMilestones(troop.id);
+    } catch (error) {
+        console.error('Error loading cookie dashboard:', error);
+    }
+}
+
+function renderCookieDashboard() {
+    const data = cookieDashboardData;
+    if (!data) return;
+
+    // Summary cards
+    document.getElementById('myTotalBoxes').textContent = data.mySales?.totalBoxes || 0;
+    document.getElementById('myTotalCollected').textContent = `$${parseFloat(data.mySales?.totalCollected || 0).toFixed(2)}`;
+
+    // Goal progress
+    const goalBoxes = data.myGoal?.goalBoxes || 0;
+    const totalBoxes = parseInt(data.mySales?.totalBoxes || 0);
+    const goalPct = goalBoxes > 0 ? Math.min(100, Math.round((totalBoxes / goalBoxes) * 100)) : 0;
+    document.getElementById('myGoalProgress').textContent = goalBoxes > 0 ? `${goalPct}%` : '--';
+
+    // Product breakdown
+    const breakdownEl = document.getElementById('cookieProductBreakdown');
+    if (data.myProductBreakdown?.length) {
+        breakdownEl.innerHTML = data.myProductBreakdown.map(p => `
+            <div class="cookie-product-item">
+                <div class="cookie-product-name">${p.cookieName}${p.shortName ? ` (${p.shortName})` : ''}</div>
+                <div class="cookie-product-stats">
+                    <span class="cookie-product-qty">${p.totalQuantity} boxes</span>
+                    <span class="cookie-product-rev">$${parseFloat(p.totalCollected || 0).toFixed(2)}</span>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        breakdownEl.innerHTML = '<p class="empty-state">No sales recorded yet</p>';
+    }
+
+    // Inventory
+    const invEl = document.getElementById('cookieInventoryGrid');
+    if (data.myInventory?.length) {
+        invEl.innerHTML = data.myInventory.map(i => `
+            <div class="cookie-inv-item">
+                <span class="cookie-inv-name">${i.cookieName} (${i.shortName})</span>
+                <div class="cookie-inv-controls">
+                    <button class="inventory-btn" onclick="adjustCookieInventory('${i.productId}', -1)">-</button>
+                    <span class="cookie-inv-qty">${i.quantity}</span>
+                    <button class="inventory-btn" onclick="adjustCookieInventory('${i.productId}', 1)">+</button>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        invEl.innerHTML = '<p class="empty-state">No inventory tracked yet. Record inventory from Products.</p>';
+    }
+
+    // Recent sales
+    const recentEl = document.getElementById('cookieRecentSales');
+    if (data.recentSales?.length) {
+        recentEl.innerHTML = data.recentSales.map(s => `
+            <div class="recent-sale-item">
+                <div class="recent-sale-info">
+                    <span class="recent-sale-cookie">${s.productName || s.cookieType}</span>
+                    <span class="recent-sale-customer">${s.customerName || 'Anonymous'}</span>
+                </div>
+                <div class="recent-sale-details">
+                    <span class="recent-sale-qty">${s.quantity} box${s.quantity !== 1 ? 'es' : ''}</span>
+                    <span class="recent-sale-type">${formatSaleType(s.saleType)}</span>
+                    <span class="recent-sale-date">${new Date(s.date).toLocaleDateString()}</span>
+                </div>
+                <button class="btn btn-sm btn-danger" onclick="deleteSaleFromDashboard('${s.id}')">Del</button>
+            </div>
+        `).join('');
+    } else {
+        recentEl.innerHTML = '<p class="empty-state">No recent sales</p>';
+    }
+
+    // Troop section
+    if (data.troopData) {
+        document.getElementById('cookieTroopSection').style.display = '';
+        document.getElementById('cookieTroopBoxes').textContent = data.troopData.totals?.totalBoxes || 0;
+        document.getElementById('cookieTroopCollected').textContent = `$${parseFloat(data.troopData.totals?.totalCollected || 0).toFixed(2)}`;
+    }
+}
+
+function formatSaleType(type) {
+    const labels = {
+        individual: 'Individual', individual_inperson: 'In-Person',
+        individual_digital_delivered: 'Digital (Delivered)', individual_digital_shipped: 'Digital (Shipped)',
+        individual_donation: 'Donation', booth_troop: 'Troop Booth',
+        booth_family: 'Family Booth', booth_council: 'Council Booth', event: 'Event'
+    };
+    return labels[type] || type;
+}
+
+async function adjustCookieInventory(productId, delta) {
+    try {
+        const item = cookieDashboardData?.myInventory?.find(i => i.productId === productId);
+        const newQty = Math.max(0, (item?.quantity || 0) + delta);
+        await fetch(`${API_BASE_URL}/inventory/${productId}`, {
+            method: 'PUT', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ quantity: newQty })
+        });
+        loadCookieDashboard();
+    } catch (error) {
+        console.error('Error adjusting inventory:', error);
+    }
+}
+
+async function loadQuickSaleProducts(troopId) {
+    try {
+        const res = await fetch(`${API_BASE_URL}/troop/${troopId}/products`, { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const select = document.getElementById('qsProduct');
+        if (!select) return;
+        orderCardProducts = data.products || [];
+        select.innerHTML = '<option value="">Select cookie...</option>' +
+            orderCardProducts.map(p => `<option value="${p.id}">${p.cookieName} (${p.shortName}) - $${p.pricePerBox}</option>`).join('');
+    } catch (error) {
+        console.error('Error loading products for quick sale:', error);
+    }
+}
+
+// Quick Sale Form
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('quickSaleForm');
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const productId = document.getElementById('qsProduct').value;
+            const quantity = parseInt(document.getElementById('qsQuantity').value);
+            const saleType = document.getElementById('qsSaleType').value;
+            const customerName = document.getElementById('qsCustomer').value.trim();
+
+            if (!productId || !quantity) return alert('Please select a product and quantity');
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/sales`, {
+                    method: 'POST', credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ productId, quantity, saleType, customerName, date: new Date().toISOString().split('T')[0] })
+                });
+                if (!res.ok) { const err = await res.json(); throw new Error(err.error); }
+                document.getElementById('qsQuantity').value = 1;
+                document.getElementById('qsCustomer').value = '';
+                loadCookieDashboard();
+            } catch (error) {
+                alert('Error recording sale: ' + error.message);
+            }
+        });
+    }
+});
+
+async function deleteSaleFromDashboard(saleId) {
+    if (!confirm('Delete this sale?')) return;
+    try {
+        await fetch(`${API_BASE_URL}/sales/${saleId}`, { method: 'DELETE', credentials: 'include' });
+        loadCookieDashboard();
+    } catch (error) {
+        alert('Error deleting sale: ' + error.message);
+    }
+}
+
+// ============================================================================
+// Goal Getter Order Card (Phase B.3)
+// ============================================================================
+
+function toggleOrderCard() {
+    const container = document.getElementById('orderCardContainer');
+    container.classList.toggle('hidden');
+    if (!container.classList.contains('hidden')) {
+        setupOrderCard();
+    }
+}
+
+function setupOrderCard() {
+    if (!orderCardProducts.length) return;
+
+    // Header info
+    const scoutName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : '';
+    document.getElementById('orderCardScoutName').textContent = scoutName;
+    document.getElementById('orderCardTroop').textContent = `Troop ${cookieDashboardData?.troopData?.goal?.troopId ? '' : ''}`;
+    document.getElementById('orderCardGoal').textContent = `Goal: ${cookieDashboardData?.myGoal?.goalBoxes || 0} boxes`;
+
+    // Build table header with product columns
+    const thead = document.getElementById('orderCardHead');
+    thead.innerHTML = `<tr>
+        <th>Customer</th><th>Phone</th>
+        ${orderCardProducts.map(p => `<th class="oc-product-col" title="${p.cookieName}">${p.shortName}</th>`).join('')}
+        <th>Total</th><th>Paid</th>
+    </tr>`;
+
+    // Build footer totals
+    const tfoot = document.getElementById('orderCardFoot');
+    tfoot.innerHTML = `<tr>
+        <td colspan="2"><strong>Totals</strong></td>
+        ${orderCardProducts.map((p, i) => `<td class="oc-total" id="ocTotal_${i}">0</td>`).join('')}
+        <td class="oc-total" id="ocGrandTotal">0</td><td></td>
+    </tr>`;
+
+    // Add initial rows
+    const tbody = document.getElementById('orderCardBody');
+    if (!tbody.children.length) {
+        for (let i = 0; i < 5; i++) addOrderCardRow();
+    }
+}
+
+function addOrderCardRow() {
+    const tbody = document.getElementById('orderCardBody');
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <td><input type="text" class="oc-input oc-customer" placeholder="Name"></td>
+        <td><input type="tel" class="oc-input oc-phone" placeholder="Phone"></td>
+        ${orderCardProducts.map((p, i) => `<td><input type="number" class="oc-input oc-qty" data-idx="${i}" min="0" value="" placeholder="0" onchange="updateOrderCardTotals()"></td>`).join('')}
+        <td class="oc-row-total">0</td>
+        <td><input type="checkbox" class="oc-paid"></td>
+    `;
+    tbody.appendChild(row);
+}
+
+function updateOrderCardTotals() {
+    const tbody = document.getElementById('orderCardBody');
+    const rows = tbody.querySelectorAll('tr');
+    const productTotals = new Array(orderCardProducts.length).fill(0);
+    let grandTotal = 0;
+
+    rows.forEach(row => {
+        let rowTotal = 0;
+        row.querySelectorAll('.oc-qty').forEach(input => {
+            const val = parseInt(input.value) || 0;
+            const idx = parseInt(input.dataset.idx);
+            productTotals[idx] += val;
+            rowTotal += val;
+        });
+        const totalCell = row.querySelector('.oc-row-total');
+        if (totalCell) totalCell.textContent = rowTotal;
+        grandTotal += rowTotal;
+    });
+
+    productTotals.forEach((total, i) => {
+        const el = document.getElementById(`ocTotal_${i}`);
+        if (el) el.textContent = total;
+    });
+    const grandEl = document.getElementById('ocGrandTotal');
+    if (grandEl) grandEl.textContent = grandTotal;
+}
+
+async function saveOrderCard() {
+    const tbody = document.getElementById('orderCardBody');
+    const rows = tbody.querySelectorAll('tr');
+    const orderNumber = `OC-${Date.now()}`;
+    let savedCount = 0;
+
+    for (const row of rows) {
+        const customer = row.querySelector('.oc-customer')?.value.trim();
+        if (!customer) continue;
+        const phone = row.querySelector('.oc-phone')?.value.trim();
+        const paid = row.querySelector('.oc-paid')?.checked;
+        const qtyInputs = row.querySelectorAll('.oc-qty');
+
+        for (const input of qtyInputs) {
+            const qty = parseInt(input.value) || 0;
+            if (qty <= 0) continue;
+            const idx = parseInt(input.dataset.idx);
+            const product = orderCardProducts[idx];
+            if (!product) continue;
+
+            try {
+                await fetch(`${API_BASE_URL}/sales`, {
+                    method: 'POST', credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        productId: product.id, quantity: qty,
+                        saleType: 'individual_inperson', customerName: customer,
+                        customerPhone: phone, orderNumber,
+                        amountDue: qty * product.pricePerBox,
+                        amountCollected: paid ? qty * product.pricePerBox : 0,
+                        orderStatus: paid ? 'Paid' : 'Pending',
+                        date: new Date().toISOString().split('T')[0]
+                    })
+                });
+                savedCount++;
+            } catch (e) {
+                console.error('Error saving order card row:', e);
+            }
+        }
+    }
+
+    if (savedCount > 0) {
+        alert(`Saved ${savedCount} sale(s) from order card`);
+        loadCookieDashboard();
+    } else {
+        alert('No sales to save. Fill in customer names and quantities.');
+    }
+}
+
+function printOrderCard() {
+    const container = document.getElementById('orderCardContainer');
+    const printWin = window.open('', '_blank');
+    printWin.document.write(`
+        <html><head><title>Goal Getter Order Card</title>
+        <style>
+            body { font-family: Arial, sans-serif; font-size: 12px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #333; padding: 4px 6px; text-align: center; }
+            th { background: #f0f0f0; }
+            .oc-input { border: none; width: 100%; text-align: center; }
+            .order-card-header { margin-bottom: 10px; }
+            @media print { button { display: none; } }
+        </style></head><body>
+        ${container.innerHTML}
+        <script>window.print(); window.close();</script>
+        </body></html>
+    `);
+}
+
+// ============================================================================
+// Booth Events Management (Phase C)
+// ============================================================================
+
+async function loadBoothEvents(troopId) {
+    try {
+        const res = await fetch(`${API_BASE_URL}/troop/${troopId}/booths`, { credentials: 'include' });
+        if (!res.ok) { document.getElementById('cookieBoothSection').style.display = 'none'; return; }
+        const booths = await res.json();
+        document.getElementById('cookieBoothSection').style.display = '';
+
+        const listEl = document.getElementById('boothEventsList');
+        if (!booths.length) {
+            listEl.innerHTML = '<p class="empty-state">No booth events scheduled</p>';
+            return;
+        }
+        listEl.innerHTML = booths.map(b => `
+            <div class="booth-event-card" onclick="openBoothDetail('${b.id}')">
+                <div class="booth-event-header">
+                    <span class="booth-event-name">${b.eventName}</span>
+                    <span class="booth-status-badge booth-status-${b.status}">${b.status}</span>
+                </div>
+                <div class="booth-event-meta">
+                    <span>${b.eventType} booth</span>
+                    <span>${b.location || 'No location'}</span>
+                    <span>${new Date(b.startDateTime).toLocaleDateString()} ${new Date(b.startDateTime).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</span>
+                </div>
+                <div class="booth-event-stats">
+                    <span>${b.shiftCount || 0} shifts</span>
+                    <span>${b.totalSold || 0} boxes sold</span>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading booths:', error);
+    }
+}
+
+function openCreateBoothModal() {
+    document.getElementById('createBoothModal').style.display = 'flex';
+}
+function closeCreateBoothModal() {
+    document.getElementById('createBoothModal').style.display = 'none';
+}
+
+async function createBoothEvent() {
+    const data = {
+        eventName: document.getElementById('boothEventName').value,
+        eventType: document.getElementById('boothEventType').value,
+        startingBank: parseFloat(document.getElementById('boothStartingBank').value) || 0,
+        location: document.getElementById('boothLocation').value,
+        locationAddress: document.getElementById('boothLocationAddress').value,
+        startDateTime: document.getElementById('boothStartDate').value,
+        endDateTime: document.getElementById('boothEndDate').value,
+        notes: document.getElementById('boothNotes').value
+    };
+    if (!data.eventName || !data.startDateTime || !data.endDateTime) return alert('Fill in required fields');
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/troop/${cookieDashboardTroopId}/booths`, {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) { const err = await res.json(); throw new Error(err.error); }
+        closeCreateBoothModal();
+        loadBoothEvents(cookieDashboardTroopId);
+    } catch (error) {
+        alert('Error creating booth: ' + error.message);
+    }
+}
+
+async function openBoothDetail(boothId) {
+    currentBoothId = boothId;
+    try {
+        const res = await fetch(`${API_BASE_URL}/troop/${cookieDashboardTroopId}/booths/${boothId}`, { credentials: 'include' });
+        if (!res.ok) return;
+        const booth = await res.json();
+
+        document.getElementById('boothDetailTitle').textContent = booth.eventName;
+        document.getElementById('boothDetailStatus').textContent = booth.status;
+        document.getElementById('boothDetailStatus').className = `booth-status-badge booth-status-${booth.status}`;
+
+        // Lifecycle action buttons
+        const actionsEl = document.getElementById('boothDetailActions');
+        let btns = '';
+        if (booth.status === 'planning' || booth.status === 'scheduled') btns += `<button class="btn btn-sm btn-primary" onclick="boothLifecycle('start')">Start Event</button>`;
+        if (booth.status === 'in_progress') btns += `<button class="btn btn-sm btn-warning" onclick="boothLifecycle('end')">End Event</button>`;
+        if (booth.status === 'reconciling') btns += `<button class="btn btn-sm btn-primary" onclick="boothLifecycle('close')">Complete</button>`;
+        actionsEl.innerHTML = btns;
+
+        // Render tabs
+        renderBoothInfo(booth);
+        renderBoothShifts(booth.shifts || []);
+        renderBoothInventory(booth.inventory || []);
+        renderBoothPayments(booth.payments || []);
+        loadReconciliation(boothId);
+
+        // Populate shift scout selector
+        populateShiftScoutSelect();
+
+        document.getElementById('boothDetailModal').style.display = 'flex';
+        switchBoothTab('info');
+    } catch (error) {
+        console.error('Error loading booth detail:', error);
+    }
+}
+
+function closeBoothDetailModal() {
+    document.getElementById('boothDetailModal').style.display = 'none';
+    currentBoothId = null;
+}
+
+function switchBoothTab(tab) {
+    document.querySelectorAll('.booth-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.boothTab === tab));
+    document.querySelectorAll('.booth-panel').forEach(panel => panel.classList.add('hidden'));
+    const panel = document.getElementById(`booth-panel-${tab}`);
+    if (panel) panel.classList.remove('hidden');
+}
+
+function renderBoothInfo(booth) {
+    document.getElementById('boothDetailInfo').innerHTML = `
+        <div class="booth-info-grid">
+            <div><strong>Type:</strong> ${booth.eventType} booth</div>
+            <div><strong>Location:</strong> ${booth.location || 'N/A'}</div>
+            <div><strong>Address:</strong> ${booth.locationAddress || 'N/A'}</div>
+            <div><strong>Start:</strong> ${new Date(booth.startDateTime).toLocaleString()}</div>
+            <div><strong>End:</strong> ${new Date(booth.endDateTime).toLocaleString()}</div>
+            <div><strong>Starting Bank:</strong> $${parseFloat(booth.startingBank || 0).toFixed(2)}</div>
+            ${booth.notes ? `<div><strong>Notes:</strong> ${booth.notes}</div>` : ''}
+        </div>
+    `;
+}
+
+function renderBoothShifts(shifts) {
+    const el = document.getElementById('boothShiftsList');
+    if (!shifts.length) { el.innerHTML = '<p class="empty-state">No shifts scheduled</p>'; return; }
+    el.innerHTML = shifts.map(s => `
+        <div class="shift-item">
+            <div class="shift-scout">${s.scoutName}${s.parentName ? ` (with ${s.parentName})` : ''}</div>
+            <div class="shift-time">${new Date(s.startTime).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})} - ${new Date(s.endTime).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div>
+            <span class="booth-status-badge booth-status-${s.status}">${s.status}</span>
+            ${s.status === 'scheduled' ? `<button class="btn btn-sm" onclick="checkinShift('${s.id}')">Check In</button>` : ''}
+            ${s.status === 'confirmed' ? `<button class="btn btn-sm" onclick="checkoutShift('${s.id}')">Check Out</button>` : ''}
+        </div>
+    `).join('');
+}
+
+function renderBoothInventory(inventory) {
+    const el = document.getElementById('boothInventoryTable');
+    if (!inventory.length) { el.innerHTML = '<p class="empty-state">No inventory set up. Click "Setup Inventory" to begin.</p>'; return; }
+    el.innerHTML = `<table class="booth-inv-table">
+        <thead><tr><th>Cookie</th><th>Starting</th><th>Ending</th><th>Damaged</th><th>Sold</th></tr></thead>
+        <tbody>${inventory.map(i => `
+            <tr>
+                <td>${i.cookieName} (${i.shortName})</td>
+                <td><input type="number" class="bi-start" data-product="${i.productId}" value="${i.startingQty || 0}" min="0"></td>
+                <td><input type="number" class="bi-end" data-product="${i.productId}" value="${i.endingQty ?? ''}" min="0" placeholder="--"></td>
+                <td><input type="number" class="bi-damaged" data-product="${i.productId}" value="${i.damagedQty || 0}" min="0"></td>
+                <td>${i.soldQty ?? '--'}</td>
+            </tr>
+        `).join('')}</tbody>
+    </table>`;
+    document.getElementById('saveBoothInventoryBtn').style.display = '';
+    document.getElementById('recordEndCountBtn').style.display = '';
+}
+
+function renderBoothPayments(payments) {
+    const el = document.getElementById('boothPaymentsList');
+    if (!payments.length) { el.innerHTML = '<p class="empty-state">No payments recorded</p>'; return; }
+    el.innerHTML = payments.map(p => `
+        <div class="payment-item">
+            <span class="payment-type">${p.paymentType}</span>
+            <span class="payment-amount">$${parseFloat(p.amount).toFixed(2)}</span>
+            <span class="payment-ref">${p.referenceNumber || ''}</span>
+            <button class="btn btn-sm btn-danger" onclick="deleteBoothPayment('${p.id}')">Del</button>
+        </div>
+    `).join('');
+}
+
+async function boothLifecycle(action) {
+    try {
+        const res = await fetch(`${API_BASE_URL}/troop/${cookieDashboardTroopId}/booths/${currentBoothId}/${action}`, {
+            method: 'POST', credentials: 'include'
+        });
+        if (!res.ok) { const err = await res.json(); throw new Error(err.error); }
+        openBoothDetail(currentBoothId);
+        loadBoothEvents(cookieDashboardTroopId);
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+}
+
+// Shifts
+function openAddShiftForm() { document.getElementById('addShiftForm').classList.toggle('hidden'); }
+
+async function populateShiftScoutSelect() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/troop/${cookieDashboardTroopId}/members`, { credentials: 'include' });
+        if (!res.ok) return;
+        const members = await res.json();
+        const select = document.getElementById('shiftScoutSelect');
+        select.innerHTML = members.map(m => `<option value="${m.userId}">${m.firstName} ${m.lastName}</option>`).join('');
+    } catch (e) { console.error('Error loading members for shift:', e); }
+}
+
+async function addShift() {
+    const data = {
+        scoutId: document.getElementById('shiftScoutSelect').value,
+        startTime: document.getElementById('shiftStartTime').value,
+        endTime: document.getElementById('shiftEndTime').value
+    };
+    if (!data.scoutId || !data.startTime || !data.endTime) return alert('Fill in all shift fields');
+    try {
+        await fetch(`${API_BASE_URL}/troop/${cookieDashboardTroopId}/booths/${currentBoothId}/shifts`, {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        openBoothDetail(currentBoothId);
+    } catch (error) { alert('Error adding shift: ' + error.message); }
+}
+
+async function checkinShift(shiftId) {
+    await fetch(`${API_BASE_URL}/troop/${cookieDashboardTroopId}/booths/${currentBoothId}/shifts/${shiftId}/checkin`, { method: 'POST', credentials: 'include' });
+    openBoothDetail(currentBoothId);
+}
+
+async function checkoutShift(shiftId) {
+    await fetch(`${API_BASE_URL}/troop/${cookieDashboardTroopId}/booths/${currentBoothId}/shifts/${shiftId}/checkout`, { method: 'POST', credentials: 'include' });
+    openBoothDetail(currentBoothId);
+}
+
+// Booth Inventory
+async function setupBoothInventory() {
+    if (!orderCardProducts.length) return alert('No products loaded');
+    const items = orderCardProducts.map(p => ({ productId: p.id, startingQty: 0 }));
+    try {
+        await fetch(`${API_BASE_URL}/troop/${cookieDashboardTroopId}/booths/${currentBoothId}/inventory`, {
+            method: 'PUT', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items })
+        });
+        openBoothDetail(currentBoothId);
+    } catch (error) { alert('Error setting up inventory: ' + error.message); }
+}
+
+async function saveBoothInventory() {
+    const items = [];
+    document.querySelectorAll('.bi-start').forEach(input => {
+        items.push({
+            productId: input.dataset.product,
+            startingQty: parseInt(input.value) || 0,
+            damagedQty: parseInt(document.querySelector(`.bi-damaged[data-product="${input.dataset.product}"]`)?.value) || 0
+        });
+    });
+    try {
+        await fetch(`${API_BASE_URL}/troop/${cookieDashboardTroopId}/booths/${currentBoothId}/inventory`, {
+            method: 'PUT', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items })
+        });
+        alert('Inventory saved');
+        openBoothDetail(currentBoothId);
+    } catch (error) { alert('Error saving inventory: ' + error.message); }
+}
+
+async function recordEndingCount() {
+    const items = [];
+    document.querySelectorAll('.bi-end').forEach(input => {
+        const endVal = input.value;
+        if (endVal === '') return;
+        items.push({
+            productId: input.dataset.product,
+            endingQty: parseInt(endVal) || 0,
+            damagedQty: parseInt(document.querySelector(`.bi-damaged[data-product="${input.dataset.product}"]`)?.value) || 0
+        });
+    });
+    if (!items.length) return alert('Enter ending counts first');
+    try {
+        await fetch(`${API_BASE_URL}/troop/${cookieDashboardTroopId}/booths/${currentBoothId}/inventory/count`, {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items })
+        });
+        alert('Ending count recorded');
+        openBoothDetail(currentBoothId);
+    } catch (error) { alert('Error recording count: ' + error.message); }
+}
+
+// Payments
+function openAddPaymentForm() { document.getElementById('addPaymentForm').classList.toggle('hidden'); }
+
+async function addPayment() {
+    const data = {
+        paymentType: document.getElementById('paymentTypeSelect').value,
+        amount: parseFloat(document.getElementById('paymentAmount').value),
+        referenceNumber: document.getElementById('paymentReference').value
+    };
+    if (!data.amount) return alert('Enter an amount');
+    try {
+        await fetch(`${API_BASE_URL}/troop/${cookieDashboardTroopId}/booths/${currentBoothId}/payments`, {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        document.getElementById('paymentAmount').value = '';
+        document.getElementById('paymentReference').value = '';
+        openBoothDetail(currentBoothId);
+    } catch (error) { alert('Error adding payment: ' + error.message); }
+}
+
+async function deleteBoothPayment(paymentId) {
+    if (!confirm('Delete this payment?')) return;
+    try {
+        await fetch(`${API_BASE_URL}/troop/${cookieDashboardTroopId}/booths/${currentBoothId}/payments/${paymentId}`, {
+            method: 'DELETE', credentials: 'include'
+        });
+        openBoothDetail(currentBoothId);
+    } catch (error) { alert('Error deleting payment: ' + error.message); }
+}
+
+// Reconciliation
+async function loadReconciliation(boothId) {
+    try {
+        const res = await fetch(`${API_BASE_URL}/troop/${cookieDashboardTroopId}/booths/${boothId}/reconcile`, { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const el = document.getElementById('reconciliationSummary');
+        el.innerHTML = `
+            <div class="recon-section">
+                <h4>Inventory Summary</h4>
+                <div class="recon-grid">
+                    <div><strong>Total Starting:</strong> ${data.inventory.totalStarting} boxes</div>
+                    <div><strong>Total Ending:</strong> ${data.inventory.totalEnding} boxes</div>
+                    <div><strong>Total Sold:</strong> ${data.inventory.totalSold} boxes</div>
+                    <div><strong>Total Damaged:</strong> ${data.inventory.totalDamaged} boxes</div>
+                </div>
+            </div>
+            <div class="recon-section">
+                <h4>Payment Summary</h4>
+                <div class="recon-grid">
+                    <div><strong>Cash:</strong> $${parseFloat(data.payments.totalCash).toFixed(2)}</div>
+                    <div><strong>Checks:</strong> $${parseFloat(data.payments.totalChecks).toFixed(2)}</div>
+                    <div><strong>Digital:</strong> $${parseFloat(data.payments.totalDigital).toFixed(2)}</div>
+                    <div><strong>Total Collected:</strong> $${parseFloat(data.payments.totalCollected).toFixed(2)}</div>
+                    <div><strong>Starting Bank:</strong> -$${parseFloat(data.payments.startingBank || 0).toFixed(2)}</div>
+                    <div><strong>Actual Revenue:</strong> $${parseFloat(data.payments.actualRevenue).toFixed(2)}</div>
+                </div>
+            </div>
+            <div class="recon-section recon-result recon-${data.reconciliation.status}">
+                <h4>Reconciliation</h4>
+                <div class="recon-grid">
+                    <div><strong>Expected Revenue:</strong> $${parseFloat(data.reconciliation.expectedRevenue).toFixed(2)}</div>
+                    <div><strong>Actual Revenue:</strong> $${parseFloat(data.reconciliation.actualRevenue).toFixed(2)}</div>
+                    <div class="recon-variance"><strong>Variance:</strong> $${parseFloat(data.reconciliation.variance).toFixed(2)}
+                        <span class="recon-badge">${data.reconciliation.status}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error loading reconciliation:', error);
+    }
+}
+
+// ============================================================================
+// Phase D: Proceeds & Season Milestones
+// ============================================================================
+
+async function loadTroopProceeds(troopId) {
+    try {
+        const res = await fetch(`${API_BASE_URL}/troop/${troopId}/proceeds`, { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById('cookieTroopProceeds').textContent = `$${parseFloat(data.totalProceeds).toFixed(2)}`;
+    } catch (error) {
+        // User may not have view_financials privilege
+    }
+}
+
+async function loadSeasonMilestones(troopId) {
+    try {
+        const res = await fetch(`${API_BASE_URL}/troop/${troopId}/milestones`, { credentials: 'include' });
+        if (!res.ok) return;
+        const milestones = await res.json();
+        const el = document.getElementById('cookieMilestonesList');
+        if (!milestones.length) {
+            el.innerHTML = '<p class="empty-state">No milestones set</p>';
+            return;
+        }
+        el.innerHTML = milestones.map(m => `
+            <div class="milestone-item">
+                <span class="milestone-date">${m.milestoneDate ? new Date(m.milestoneDate).toLocaleDateString() : 'TBD'}</span>
+                <span class="milestone-name">${m.milestoneName}</span>
+                ${m.description ? `<span class="milestone-desc">${m.description}</span>` : ''}
+            </div>
+        `).join('');
+    } catch (error) {
+        // User may not have view_events privilege for milestones
+    }
+}
+
 // Initialize app when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', async () => {
@@ -2996,4 +3760,391 @@ if (document.readyState === 'loading') {
         loadInvitations();
         loadCookieCatalog();
     })();
+}
+
+// ============================================================================
+// MEMBER EDITING FUNCTIONS
+// ============================================================================
+
+let currentEditingMemberId = null;
+
+/**
+ * Open edit member modal
+ */
+async function openEditMemberModal(userId) {
+    if (!selectedTroopId) {
+        showFeedback('Please select a troop first', true);
+        return;
+    }
+
+    currentEditingMemberId = userId;
+
+    try {
+        // Fetch member from troopMembers array
+        const member = troopMembers.find(m => m.id === userId);
+        if (!member) {
+            showFeedback('Member not found', true);
+            return;
+        }
+
+        // Fetch full user details (includes contact info)
+        const userResponse = await fetch(`${API_BASE_URL}/users/${userId}`);
+        const user = await userResponse.json();
+
+        // Fetch payment methods
+        const paymentResponse = await fetch(`${API_BASE_URL}/users/${userId}/payment-methods`);
+        const paymentMethods = await paymentResponse.json();
+
+        // Populate form - Personal Info
+        document.getElementById('editMemberId').value = userId;
+        document.getElementById('editFirstName').value = user.firstName || '';
+        document.getElementById('editLastName').value = user.lastName || '';
+        document.getElementById('editDateOfBirth').value = user.dateOfBirth || '';
+        document.getElementById('editPhotoUrl').value = user.photoUrl || '';
+
+        // Show minor status
+        if (user.dateOfBirth) {
+            const age = calculateAge(user.dateOfBirth);
+            const minorStatus = document.getElementById('editMinorStatus');
+            if (age < 18) {
+                minorStatus.textContent = `Age ${age} - Minor (COPPA protected)`;
+                minorStatus.className = 'form-help text-warning';
+            } else {
+                minorStatus.textContent = `Age ${age}`;
+                minorStatus.className = 'form-help';
+            }
+        }
+
+        // Contact Info
+        document.getElementById('editEmail').value = user.email || '';
+        document.getElementById('editPhone').value = user.phone || '';
+        document.getElementById('editAddress').value = user.address || '';
+
+        // Troop Info
+        document.getElementById('editRole').value = member.troopRole || 'member';
+        document.getElementById('editPosition').value = member.position || '';
+        document.getElementById('editScoutLevel').value = member.scoutLevel || '';
+        document.getElementById('editDen').value = member.den || '';
+
+        // Load parent options
+        await loadParentOptions(member.linkedParentId);
+
+        // Load payment methods
+        renderPaymentMethods(paymentMethods);
+
+        // Show modal
+        document.getElementById('editMemberModal').style.display = 'flex';
+
+    } catch (error) {
+        console.error('Error loading member details:', error);
+        showFeedback('Failed to load member details', true);
+    }
+}
+
+/**
+ * Close edit member modal
+ */
+function closeEditMemberModal() {
+    document.getElementById('editMemberModal').style.display = 'none';
+    currentEditingMemberId = null;
+}
+
+/**
+ * Save member edits
+ */
+async function saveEditMember() {
+    const userId = document.getElementById('editMemberId').value;
+
+    if (!userId) {
+        showFeedback('Invalid member ID', true);
+        return;
+    }
+
+    try {
+        // Collect user data
+        const userData = {
+            firstName: document.getElementById('editFirstName').value.trim(),
+            lastName: document.getElementById('editLastName').value.trim(),
+            email: document.getElementById('editEmail').value.trim() || null,
+            phone: document.getElementById('editPhone').value.trim() || null,
+            address: document.getElementById('editAddress').value.trim() || null,
+            dateOfBirth: document.getElementById('editDateOfBirth').value || null,
+            photoUrl: document.getElementById('editPhotoUrl').value.trim() || null
+        };
+
+        // Collect troop data
+        const troopData = {
+            role: document.getElementById('editRole').value,
+            position: document.getElementById('editPosition').value.trim() || null,
+            scoutLevel: document.getElementById('editScoutLevel').value || null,
+            den: document.getElementById('editDen').value.trim() || null,
+            linkedParentId: document.getElementById('editLinkedParent').value || null
+        };
+
+        // Validate
+        if (!userData.firstName || !userData.lastName) {
+            showFeedback('First and last name are required', true);
+            return;
+        }
+
+        // Update user profile
+        const userResponse = await fetch(`${API_BASE_URL}/users/${userId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData)
+        });
+
+        if (!userResponse.ok) {
+            const error = await userResponse.json();
+            throw new Error(error.error || 'Failed to update user');
+        }
+
+        // Update troop member data
+        const troopResponse = await fetch(`${API_BASE_URL}/troop/${selectedTroopId}/members/${userId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(troopData)
+        });
+
+        if (!troopResponse.ok) {
+            const error = await troopResponse.json();
+            throw new Error(error.error || 'Failed to update troop data');
+        }
+
+        showFeedback('Member updated successfully');
+        closeEditMemberModal();
+
+        // Reload troop data
+        await loadTroopData(selectedTroopId);
+
+    } catch (error) {
+        console.error('Error saving member:', error);
+        showFeedback(error.message || 'Failed to save member', true);
+    }
+}
+
+/**
+ * Load parent options dropdown
+ */
+async function loadParentOptions(currentParentId) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/troop/${selectedTroopId}/parents`);
+        const parents = await response.json();
+
+        const select = document.getElementById('editLinkedParent');
+        select.innerHTML = '<option value="">No parent linked</option>';
+
+        parents.forEach(parent => {
+            const option = document.createElement('option');
+            option.value = parent.id;
+            option.textContent = `${parent.firstName} ${parent.lastName}${parent.email ? ` (${parent.email})` : ''}`;
+            if (parent.id === currentParentId) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading parents:', error);
+    }
+}
+
+/**
+ * Render payment methods list
+ */
+function renderPaymentMethods(methods) {
+    const container = document.getElementById('editPaymentMethodsList');
+
+    if (methods.length === 0) {
+        container.innerHTML = '<p class="empty-state">No payment methods configured</p>';
+        return;
+    }
+
+    container.innerHTML = methods.map(method => `
+        <div class="payment-method-item" data-id="${method.id}">
+            <div class="payment-method-info">
+                <strong>${method.name}</strong>
+                <small>${method.url}</small>
+                <span class="badge ${method.isEnabled ? 'badge-success' : 'badge-secondary'}">
+                    ${method.isEnabled ? 'Active' : 'Inactive'}
+                </span>
+            </div>
+            <button type="button" class="btn btn-sm btn-danger" onclick="deletePaymentMethod('${method.id}')">
+                Remove
+            </button>
+        </div>
+    `).join('');
+}
+
+/**
+ * Add payment method
+ */
+async function addPaymentMethod() {
+    const userId = currentEditingMemberId;
+
+    const name = prompt('Payment method name (e.g., Venmo, PayPal):');
+    if (!name) return;
+
+    const url = prompt('Payment URL or handle:');
+    if (!url) return;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/users/${userId}/payment-methods`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, url, isEnabled: true })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error);
+        }
+
+        showFeedback('Payment method added');
+
+        // Reload payment methods
+        const listResponse = await fetch(`${API_BASE_URL}/users/${userId}/payment-methods`);
+        const methods = await listResponse.json();
+        renderPaymentMethods(methods);
+
+    } catch (error) {
+        console.error('Error adding payment method:', error);
+        showFeedback(error.message || 'Failed to add payment method', true);
+    }
+}
+
+/**
+ * Delete payment method
+ */
+async function deletePaymentMethod(methodId) {
+    const userId = currentEditingMemberId;
+
+    if (!confirm('Remove this payment method?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/users/${userId}/payment-methods/${methodId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error);
+        }
+
+        showFeedback('Payment method removed');
+
+        // Reload payment methods
+        const listResponse = await fetch(`${API_BASE_URL}/users/${userId}/payment-methods`);
+        const methods = await listResponse.json();
+        renderPaymentMethods(methods);
+
+    } catch (error) {
+        console.error('Error deleting payment method:', error);
+        showFeedback(error.message || 'Failed to delete payment method', true);
+    }
+}
+
+/**
+ * Initiate password reset
+ */
+async function initiatePasswordReset() {
+    const userId = currentEditingMemberId;
+
+    if (!confirm('Send password reset to this user?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/users/${userId}/password-reset-request`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error);
+        }
+
+        showFeedback('Password reset initiated');
+
+    } catch (error) {
+        console.error('Error initiating password reset:', error);
+        showFeedback(error.message || 'Failed to initiate password reset', true);
+    }
+}
+
+/**
+ * Confirm account deletion
+ */
+function confirmDeleteAccount() {
+    document.getElementById('deleteAccountModal').style.display = 'flex';
+}
+
+/**
+ * Close delete account modal
+ */
+function closeDeleteAccountModal() {
+    document.getElementById('deleteAccountModal').style.display = 'none';
+    document.getElementById('deleteReason').value = '';
+    document.getElementById('confirmDeleteCheckbox').checked = false;
+}
+
+/**
+ * Execute account deletion
+ */
+async function executeAccountDeletion() {
+    const userId = currentEditingMemberId;
+    const reason = document.getElementById('deleteReason').value;
+    const confirmed = document.getElementById('confirmDeleteCheckbox').checked;
+
+    if (!confirmed) {
+        showFeedback('Please confirm account deletion', true);
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason, confirmDelete: true })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error);
+        }
+
+        const result = await response.json();
+        showFeedback(result.message || 'Account deleted successfully');
+
+        closeDeleteAccountModal();
+        closeEditMemberModal();
+
+        // Reload troop data
+        await loadTroopData(selectedTroopId);
+
+    } catch (error) {
+        console.error('Error deleting account:', error);
+        showFeedback(error.message || 'Failed to delete account', true);
+    }
+}
+
+/**
+ * Calculate age from date of birth
+ */
+function calculateAge(dateOfBirth) {
+    const today = new Date();
+    const birth = new Date(dateOfBirth);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+    }
+    return age;
+}
+
+// Update viewMember function to open edit modal
+function viewMember(memberId) {
+    openEditMemberModal(memberId);
 }

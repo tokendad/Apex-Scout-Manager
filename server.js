@@ -5,6 +5,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const multer = require('multer');
 const ExcelJS = require('exceljs');
 const session = require('express-session');
@@ -134,6 +135,225 @@ const PORT = process.env.PORT || 3000;
         await db.query(`
             CREATE INDEX IF NOT EXISTS idx_troop_members_den ON troop_members("troopId", den)
         `).catch(() => {});
+
+        // ---- Cookie Sales Foundation (Phase A) ----
+
+        // Create bakers table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS bakers (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "bakerName" VARCHAR(100) NOT NULL,
+                "bakerCode" VARCHAR(20) NOT NULL UNIQUE,
+                website VARCHAR(255),
+                "isActive" BOOLEAN DEFAULT true,
+                "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `).catch(() => {});
+
+        // Add bakerId and organizationId to cookie_products
+        await db.query(`
+            ALTER TABLE cookie_products ADD COLUMN IF NOT EXISTS "bakerId" UUID REFERENCES bakers(id)
+        `).catch(() => {});
+        await db.query(`
+            ALTER TABLE cookie_products ADD COLUMN IF NOT EXISTS "organizationId" UUID REFERENCES scout_organizations(id)
+        `).catch(() => {});
+        await db.query(`
+            CREATE INDEX IF NOT EXISTS idx_cookie_products_baker ON cookie_products("bakerId")
+        `).catch(() => {});
+        await db.query(`
+            CREATE INDEX IF NOT EXISTS idx_cookie_products_org ON cookie_products("organizationId")
+        `).catch(() => {});
+
+        // Expand saleType to support all sales paths
+        await db.query(`
+            ALTER TABLE sales ALTER COLUMN "saleType" TYPE VARCHAR(50)
+        `).catch(() => {});
+
+        // Create scout_inventory table (from migration 003)
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS scout_inventory (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "userId" UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                "productId" UUID NOT NULL REFERENCES cookie_products(id) ON DELETE CASCADE,
+                quantity INTEGER DEFAULT 0,
+                "lastUpdated" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE("userId", "productId")
+            )
+        `).catch(() => {});
+        await db.query(`
+            CREATE INDEX IF NOT EXISTS idx_scout_inventory_user ON scout_inventory("userId")
+        `).catch(() => {});
+        await db.query(`
+            CREATE INDEX IF NOT EXISTS idx_scout_inventory_product ON scout_inventory("productId")
+        `).catch(() => {});
+
+        // Add productId to sales table (from migration 003)
+        await db.query(`
+            ALTER TABLE sales ADD COLUMN IF NOT EXISTS "productId" UUID REFERENCES cookie_products(id) ON DELETE SET NULL
+        `).catch(() => {});
+        await db.query(`
+            CREATE INDEX IF NOT EXISTS idx_sales_product ON sales("productId")
+        `).catch(() => {});
+
+        // Expand role_check constraint to include cookie_manager (SUCM) role
+        await db.query(`
+            ALTER TABLE troop_members DROP CONSTRAINT IF EXISTS role_check
+        `).catch(() => {});
+        await db.query(`
+            ALTER TABLE troop_members ADD CONSTRAINT role_check
+            CHECK (role IN ('member', 'co-leader', 'assistant', 'parent', 'troop_leader', 'volunteer', 'cookie_leader', 'cookie_manager'))
+        `).catch(() => {});
+
+        // Update UNIQUE constraint on cookie_products to include bakerId
+        // (both bakers have "Thin Mints" and "Toffee-tastic")
+        await db.query(`
+            ALTER TABLE cookie_products DROP CONSTRAINT IF EXISTS "cookie_products_season_cookieName_key"
+        `).catch(() => {});
+        await db.query(`
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_cookie_products_season_name_baker
+            ON cookie_products(season, "cookieName", COALESCE("bakerId", '00000000-0000-0000-0000-000000000000'::uuid))
+        `).catch(() => {});
+
+        // Seed bakers (idempotent)
+        const bakerCount = await db.getOne('SELECT COUNT(*) as count FROM bakers');
+        if (bakerCount && parseInt(bakerCount.count) === 0) {
+            await db.query(`
+                INSERT INTO bakers ("bakerName", "bakerCode", website) VALUES
+                ('Little Brownie Bakers', 'lbb', 'https://www.littlebrowniebakers.com/'),
+                ('ABC Bakers', 'abc', 'https://www.abcbakers.com/')
+            `);
+            logger.info('Seeded bakers: Little Brownie Bakers, ABC Bakers');
+        }
+
+        // Relax attributeType CHECK to include 'ingredient'
+        await db.query(`
+            ALTER TABLE cookie_attributes DROP CONSTRAINT IF EXISTS attributetype_check
+        `).catch(() => {});
+        await db.query(`
+            ALTER TABLE cookie_attributes ADD CONSTRAINT attributetype_check
+            CHECK ("attributeType" IN ('dietary', 'allergen', 'certification', 'ingredient'))
+        `).catch(() => {});
+
+        // ---- Phase C: Booth Sales System ----
+
+        // Booth events table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS booth_events (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "troopId" UUID NOT NULL REFERENCES troops(id) ON DELETE CASCADE,
+                "eventType" VARCHAR(20) NOT NULL DEFAULT 'troop',
+                "scoutId" UUID REFERENCES users(id),
+                "eventName" VARCHAR(255) NOT NULL,
+                location VARCHAR(255),
+                "locationAddress" TEXT,
+                "locationNotes" TEXT,
+                "startDateTime" TIMESTAMPTZ NOT NULL,
+                "endDateTime" TIMESTAMPTZ NOT NULL,
+                "startingBank" NUMERIC(10,2) DEFAULT 0,
+                status VARCHAR(20) DEFAULT 'planning',
+                "weatherNotes" TEXT,
+                "actualStartTime" TIMESTAMPTZ,
+                "actualEndTime" TIMESTAMPTZ,
+                notes TEXT,
+                "createdBy" UUID REFERENCES users(id),
+                "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                "updatedAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT booth_event_type_check CHECK ("eventType" IN ('troop', 'family', 'council')),
+                CONSTRAINT booth_status_check CHECK (status IN ('planning', 'scheduled', 'in_progress', 'reconciling', 'completed', 'cancelled'))
+            )
+        `).catch(() => {});
+        await db.query(`CREATE INDEX IF NOT EXISTS idx_booth_events_troop ON booth_events("troopId")`).catch(() => {});
+        await db.query(`CREATE INDEX IF NOT EXISTS idx_booth_events_status ON booth_events(status)`).catch(() => {});
+
+        // Booth shifts table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS booth_shifts (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "boothEventId" UUID NOT NULL REFERENCES booth_events(id) ON DELETE CASCADE,
+                "scoutId" UUID NOT NULL REFERENCES users(id),
+                "parentId" UUID REFERENCES users(id),
+                "startTime" TIMESTAMPTZ NOT NULL,
+                "endTime" TIMESTAMPTZ NOT NULL,
+                role VARCHAR(20) DEFAULT 'seller',
+                status VARCHAR(20) DEFAULT 'scheduled',
+                "checkinTime" TIMESTAMPTZ,
+                "checkoutTime" TIMESTAMPTZ,
+                "boxesCredited" INTEGER DEFAULT 0,
+                notes TEXT,
+                CONSTRAINT shift_role_check CHECK (role IN ('seller', 'cashier', 'setup', 'cleanup')),
+                CONSTRAINT shift_status_check CHECK (status IN ('scheduled', 'confirmed', 'completed', 'no_show'))
+            )
+        `).catch(() => {});
+        await db.query(`CREATE INDEX IF NOT EXISTS idx_booth_shifts_event ON booth_shifts("boothEventId")`).catch(() => {});
+        await db.query(`CREATE INDEX IF NOT EXISTS idx_booth_shifts_scout ON booth_shifts("scoutId")`).catch(() => {});
+
+        // Booth inventory table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS booth_inventory (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "boothEventId" UUID NOT NULL REFERENCES booth_events(id) ON DELETE CASCADE,
+                "productId" UUID NOT NULL REFERENCES cookie_products(id),
+                "startingQty" INTEGER DEFAULT 0,
+                "endingQty" INTEGER,
+                "soldQty" INTEGER,
+                "damagedQty" INTEGER DEFAULT 0,
+                notes TEXT,
+                UNIQUE("boothEventId", "productId")
+            )
+        `).catch(() => {});
+        await db.query(`CREATE INDEX IF NOT EXISTS idx_booth_inventory_event ON booth_inventory("boothEventId")`).catch(() => {});
+
+        // Booth payments table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS booth_payments (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "boothEventId" UUID NOT NULL REFERENCES booth_events(id) ON DELETE CASCADE,
+                "paymentType" VARCHAR(30) NOT NULL,
+                amount NUMERIC(10,2) NOT NULL,
+                "referenceNumber" VARCHAR(100),
+                notes TEXT,
+                "recordedBy" UUID REFERENCES users(id),
+                "recordedAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT payment_type_check CHECK ("paymentType" IN ('cash', 'check', 'digital_cookie', 'venmo', 'paypal', 'square', 'zelle', 'other'))
+            )
+        `).catch(() => {});
+        await db.query(`CREATE INDEX IF NOT EXISTS idx_booth_payments_event ON booth_payments("boothEventId")`).catch(() => {});
+
+        // ---- Phase D: Proceeds & Season Management ----
+
+        // Troop season config (proceeds tracking)
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS troop_season_config (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "troopId" UUID NOT NULL REFERENCES troops(id) ON DELETE CASCADE,
+                season VARCHAR(10) NOT NULL,
+                "baseProceedsRate" NUMERIC(5,3) DEFAULT 0.750,
+                "initialOrderBonus" BOOLEAN DEFAULT false,
+                "fallProductBonus" BOOLEAN DEFAULT false,
+                "optOutBonus" BOOLEAN DEFAULT false,
+                "effectiveProceedsRate" NUMERIC(5,3) DEFAULT 0.750,
+                "initialOrderDate" DATE,
+                "initialOrderQty" INTEGER,
+                notes TEXT,
+                "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE("troopId", season)
+            )
+        `).catch(() => {});
+
+        // Season milestones table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS season_milestones (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "troopId" UUID NOT NULL REFERENCES troops(id) ON DELETE CASCADE,
+                season VARCHAR(10) NOT NULL,
+                "milestoneName" VARCHAR(100) NOT NULL,
+                "milestoneDate" DATE,
+                description TEXT,
+                "sortOrder" INTEGER DEFAULT 0,
+                "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )
+        `).catch(() => {});
+        await db.query(`CREATE INDEX IF NOT EXISTS idx_season_milestones_troop ON season_milestones("troopId", season)`).catch(() => {});
 
         logger.info('Schema migration checks completed');
     } catch (err) {
@@ -551,7 +771,21 @@ app.put('/api/notifications/:id/read', auth.isAuthenticated, async (req, res) =>
 // Get all sales (filtered by userId)
 app.get('/api/sales', auth.isAuthenticated, auth.requirePrivilegeAnyTroop('view_sales'), async (req, res) => {
     try {
-        const sales = await db.getAll('SELECT * FROM sales WHERE "userId" = $1 ORDER BY id DESC', [req.session.userId]);
+        const { saleType } = req.query;
+        let query = `
+            SELECT s.*, cp."cookieName" as "productName", cp."shortName" as "productShortName",
+                   cp."pricePerBox" as "productPrice"
+            FROM sales s
+            LEFT JOIN cookie_products cp ON s."productId" = cp.id
+            WHERE s."userId" = $1
+        `;
+        const params = [req.session.userId];
+        if (saleType) {
+            query += ' AND s."saleType" = $2';
+            params.push(saleType);
+        }
+        query += ' ORDER BY s.id DESC';
+        const sales = await db.getAll(query, params);
         res.json(sales);
     } catch (error) {
         logger.error('Error fetching sales', { error: error.message, stack: error.stack });
@@ -564,6 +798,7 @@ app.post('/api/sales', auth.isAuthenticated, auth.requirePrivilegeAnyTroop('reco
     try {
         const {
             cookieType,
+            productId,
             quantity,
             customerName,
             date,
@@ -576,16 +811,32 @@ app.post('/api/sales', auth.isAuthenticated, auth.requirePrivilegeAnyTroop('reco
             paymentMethod
         } = req.body;
 
-        if (!cookieType || !quantity || quantity < 1) {
-            logger.warn('Invalid sale data received', { cookieType, quantity });
-            return res.status(400).json({ error: 'Invalid sale data' });
+        // Require either cookieType or productId
+        if ((!cookieType && !productId) || !quantity || quantity < 1) {
+            logger.warn('Invalid sale data received', { cookieType, productId, quantity });
+            return res.status(400).json({ error: 'Invalid sale data. Provide cookieType or productId and quantity >= 1.' });
+        }
+
+        // If productId provided, resolve cookieType from it
+        let resolvedCookieType = cookieType;
+        let resolvedProductId = productId || null;
+        if (productId && !cookieType) {
+            const product = await db.getOne('SELECT "cookieName" FROM cookie_products WHERE id = $1', [productId]);
+            if (!product) return res.status(400).json({ error: 'Invalid productId' });
+            resolvedCookieType = product.cookieName;
         }
 
         // Validate and sanitize customerName
         const sanitizedCustomerName = (customerName && customerName.trim()) || 'Walk-in Customer';
 
-        // Validate saleType (individual or event)
-        const validSaleType = (saleType === 'event') ? 'event' : 'individual';
+        // Validate saleType
+        const VALID_SALE_TYPES = [
+            'individual', 'event',  // legacy values
+            'individual_inperson', 'individual_digital_delivered',
+            'individual_digital_shipped', 'individual_donation',
+            'booth_troop', 'booth_family', 'booth_council'
+        ];
+        const validSaleType = VALID_SALE_TYPES.includes(saleType) ? saleType : 'individual';
 
         // Validate and use current date if not provided or invalid
         let saleDate = date;
@@ -608,14 +859,14 @@ app.post('/api/sales', auth.isAuthenticated, auth.requirePrivilegeAnyTroop('reco
 
         const newSale = await db.getOne(`
             INSERT INTO sales (
-                "cookieType", quantity, "customerName", date, "saleType",
+                "cookieType", "productId", quantity, "customerName", date, "saleType",
                 "customerAddress", "customerPhone", "unitType",
                 "amountCollected", "amountDue", "paymentMethod",
                 "orderNumber", "orderType", "orderStatus", "userId"
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             RETURNING *
         `, [
-            cookieType, quantity, sanitizedCustomerName, saleDate, validSaleType,
+            resolvedCookieType, resolvedProductId, quantity, sanitizedCustomerName, saleDate, validSaleType,
             sanitizedCustomerAddress, sanitizedCustomerPhone, validUnitType,
             validAmountCollected, validAmountDue, validPaymentMethod,
             sanitizedOrderNumber, sanitizedOrderType, sanitizedOrderStatus,
@@ -726,7 +977,17 @@ app.get('/api/profile', auth.isAuthenticated, async (req, res) => {
             `, [req.session.userId, scoutName, email]);
         }
 
-        res.json(profile || {
+        // Also fetch normalized inventory from scout_inventory
+        const normalizedInventory = await db.getAll(`
+            SELECT si."productId", si.quantity, cp."cookieName", cp."shortName",
+                   cp."pricePerBox", cp."sortOrder"
+            FROM scout_inventory si
+            JOIN cookie_products cp ON si."productId" = cp.id
+            WHERE si."userId" = $1 AND cp."isActive" = true
+            ORDER BY cp."sortOrder"
+        `, [req.session.userId]);
+
+        const result = profile || {
             userId: req.session.userId,
             photoData: null,
             qrCodeUrl: null,
@@ -741,7 +1002,9 @@ app.get('/api/profile', auth.isAuthenticated, async (req, res) => {
             inventoryAdventurefuls: 0,
             inventoryExploremores: 0,
             inventoryToffeetastic: 0
-        });
+        };
+        result.inventory = normalizedInventory;
+        res.json(result);
     } catch (error) {
         logger.error('Error fetching profile', { error: error.message, stack: error.stack });
         res.status(500).json({ error: 'Failed to fetch profile' });
@@ -835,6 +1098,95 @@ app.put('/api/profile', auth.isAuthenticated, async (req, res) => {
     } catch (error) {
         logger.error('Error updating profile', { error: error.message, stack: error.stack });
         res.status(500).json({ error: 'Failed to update profile' });
+    }
+});
+
+// ============================================================================
+// Normalized Inventory Endpoints (scout_inventory table)
+// ============================================================================
+
+// Get current user's inventory (product-based)
+app.get('/api/inventory', auth.isAuthenticated, async (req, res) => {
+    try {
+        const inventory = await db.getAll(`
+            SELECT si.id, si."productId", si.quantity, si."lastUpdated",
+                   cp."cookieName", cp."shortName", cp."pricePerBox", cp."boxesPerCase",
+                   cp."imageUrl", cp."sortOrder",
+                   b."bakerName", b."bakerCode"
+            FROM scout_inventory si
+            JOIN cookie_products cp ON si."productId" = cp.id
+            LEFT JOIN bakers b ON cp."bakerId" = b.id
+            WHERE si."userId" = $1 AND cp."isActive" = true
+            ORDER BY cp."sortOrder", cp."cookieName"
+        `, [req.session.userId]);
+        res.json(inventory);
+    } catch (error) {
+        logger.error('Error fetching inventory', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch inventory' });
+    }
+});
+
+// Update inventory for a specific product (upsert)
+app.put('/api/inventory/:productId', auth.isAuthenticated, async (req, res) => {
+    try {
+        const { productId } = req.params;
+        const { quantity } = req.body;
+
+        if (typeof quantity !== 'number' || quantity < 0) {
+            return res.status(400).json({ error: 'Quantity must be a non-negative number' });
+        }
+
+        // Verify product exists
+        const product = await db.getOne('SELECT id FROM cookie_products WHERE id = $1', [productId]);
+        if (!product) return res.status(404).json({ error: 'Product not found' });
+
+        // Upsert inventory
+        const result = await db.getOne(`
+            INSERT INTO scout_inventory ("userId", "productId", quantity, "lastUpdated")
+            VALUES ($1, $2, $3, NOW())
+            ON CONFLICT ("userId", "productId")
+            DO UPDATE SET quantity = $3, "lastUpdated" = NOW()
+            RETURNING *
+        `, [req.session.userId, productId, quantity]);
+
+        res.json(result);
+    } catch (error) {
+        logger.error('Error updating inventory', { error: error.message });
+        res.status(500).json({ error: 'Failed to update inventory' });
+    }
+});
+
+// Bulk update inventory (replace all)
+app.put('/api/inventory', auth.isAuthenticated, async (req, res) => {
+    try {
+        const { items } = req.body;
+        if (!Array.isArray(items)) {
+            return res.status(400).json({ error: 'Items must be an array of { productId, quantity }' });
+        }
+
+        for (const item of items) {
+            if (!item.productId || typeof item.quantity !== 'number' || item.quantity < 0) continue;
+            await db.query(`
+                INSERT INTO scout_inventory ("userId", "productId", quantity, "lastUpdated")
+                VALUES ($1, $2, $3, NOW())
+                ON CONFLICT ("userId", "productId")
+                DO UPDATE SET quantity = $3, "lastUpdated" = NOW()
+            `, [req.session.userId, item.productId, item.quantity]);
+        }
+
+        // Return updated inventory
+        const inventory = await db.getAll(`
+            SELECT si.*, cp."cookieName", cp."shortName", cp."pricePerBox"
+            FROM scout_inventory si
+            JOIN cookie_products cp ON si."productId" = cp.id
+            WHERE si."userId" = $1 AND cp."isActive" = true
+            ORDER BY cp."sortOrder"
+        `, [req.session.userId]);
+
+        res.json(inventory);
+    } catch (error) {
+        logger.error('Error bulk updating inventory', { error: error.message });
+        res.status(500).json({ error: 'Failed to update inventory' });
     }
 });
 
@@ -1446,7 +1798,8 @@ app.get('/api/troop/:troopId/members', auth.isAuthenticated, auth.requirePrivile
         const members = await db.getAll(`
             SELECT
                 u.id, u.email, u."firstName", u."lastName", u."photoUrl",
-                tm.role as "troopRole", tm."joinDate", tm.status,
+                tm.role as "troopRole", tm."scoutLevel", tm.den, tm.position,
+                tm."linkedParentId", tm."joinDate", tm.status,
                 COALESCE(SUM(s.quantity), 0) as "totalBoxes",
                 COALESCE(SUM(s."amountCollected"), 0) as "totalCollected",
                 MAX(s.date) as "lastSaleDate"
@@ -1454,7 +1807,7 @@ app.get('/api/troop/:troopId/members', auth.isAuthenticated, auth.requirePrivile
             JOIN users u ON tm."userId" = u.id
             LEFT JOIN sales s ON s."userId" = u.id
             WHERE tm."troopId" = $1 AND tm.status = 'active'${scopeFilter.clause}
-            GROUP BY u.id, tm.role, tm."joinDate", tm.status
+            GROUP BY u.id, tm.role, tm."scoutLevel", tm.den, tm.position, tm."linkedParentId", tm."joinDate", tm.status
             ORDER BY u."lastName", u."firstName"
         `, [troopId, ...scopeFilter.params]);
 
@@ -1465,6 +1818,476 @@ app.get('/api/troop/:troopId/members', auth.isAuthenticated, auth.requirePrivile
     }
 });
 
+// ============================================================================
+// USER PROFILE MANAGEMENT ENDPOINTS
+// ============================================================================
+
+// Get user profile
+app.get('/api/users/:userId',
+    auth.isAuthenticated,
+    auth.requirePrivilegeForUser('view_roster'),
+    async (req, res) => {
+        try {
+            const { userId } = req.params;
+
+            const user = await db.getOne(`
+                SELECT id, email, "firstName", "lastName", "photoUrl",
+                       "dateOfBirth", "isMinor", "parentEmail", phone, address
+                FROM users
+                WHERE id = $1
+            `, [userId]);
+
+            if (!user) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+
+            res.json(user);
+        } catch (error) {
+            logger.error('Error fetching user profile', { error: error.message });
+            res.status(500).json({ error: 'Failed to fetch user profile' });
+        }
+    }
+);
+
+// Update user profile
+app.put('/api/users/:userId',
+    auth.isAuthenticated,
+    auth.requirePrivilegeForUser('edit_personal_info'),
+    async (req, res) => {
+        try {
+            const { userId } = req.params;
+            const { firstName, lastName, email, phone, address, dateOfBirth, photoUrl } = req.body;
+
+            // Validation
+            if (!firstName || !lastName) {
+                return res.status(400).json({ error: 'First and last name required' });
+            }
+
+            if (email && !auth.isValidEmail(email)) {
+                return res.status(400).json({ error: 'Invalid email format' });
+            }
+
+            // Check email uniqueness (if changing)
+            if (email) {
+                const existing = await db.getOne(
+                    'SELECT id FROM users WHERE email = $1 AND id != $2',
+                    [email, userId]
+                );
+                if (existing) {
+                    return res.status(400).json({ error: 'Email already in use' });
+                }
+            }
+
+            // Calculate isMinor from dateOfBirth
+            const isMinor = dateOfBirth ? auth.isMinor(dateOfBirth) : false;
+
+            const updated = await db.getOne(`
+                UPDATE users
+                SET "firstName" = $1,
+                    "lastName" = $2,
+                    email = COALESCE($3, email),
+                    phone = $4,
+                    address = $5,
+                    "dateOfBirth" = $6,
+                    "photoUrl" = $7,
+                    "isMinor" = $8
+                WHERE id = $9
+                RETURNING id, "firstName", "lastName", email, phone, address,
+                          "dateOfBirth", "photoUrl", "isMinor"
+            `, [firstName, lastName, email, phone, address, dateOfBirth, photoUrl, isMinor, userId]);
+
+            await auth.logAuditEvent(db, req.session.userId, 'update_user_profile', req, {
+                resourceType: 'user',
+                resourceId: userId,
+                changes: { firstName, lastName, email, phone, address, dateOfBirth }
+            });
+
+            res.json(updated);
+        } catch (error) {
+            logger.error('Error updating user profile', { error: error.message });
+            res.status(500).json({ error: 'Failed to update user profile' });
+        }
+    }
+);
+
+// Update troop member data
+app.put('/api/troop/:troopId/members/:userId',
+    auth.isAuthenticated,
+    auth.requirePrivilege('manage_members'),
+    async (req, res) => {
+        try {
+            const { troopId, userId } = req.params;
+            const { role, scoutLevel, den, position, linkedParentId, additionalRoles } = req.body;
+
+            // Verify target is in scope
+            const inScope = await auth.isTargetInScope(req, userId);
+            if (!inScope) {
+                return res.status(403).json({ error: 'Member is outside your access scope' });
+            }
+
+            // Verify member exists
+            const member = await db.getOne(
+                'SELECT * FROM troop_members WHERE "troopId" = $1 AND "userId" = $2',
+                [troopId, userId]
+            );
+            if (!member) {
+                return res.status(404).json({ error: 'Member not found in troop' });
+            }
+
+            // Validate linkedParentId if provided
+            if (linkedParentId) {
+                const parentExists = await db.getOne('SELECT id FROM users WHERE id = $1', [linkedParentId]);
+                if (!parentExists) {
+                    return res.status(400).json({ error: 'Parent user not found' });
+                }
+            }
+
+            const updated = await db.getOne(`
+                UPDATE troop_members
+                SET role = COALESCE($1, role),
+                    "scoutLevel" = $2,
+                    den = $3,
+                    position = $4,
+                    "linkedParentId" = $5,
+                    "additionalRoles" = $6
+                WHERE "troopId" = $7 AND "userId" = $8
+                RETURNING *
+            `, [
+                role,
+                scoutLevel,
+                den,
+                position,
+                linkedParentId,
+                additionalRoles ? JSON.stringify(additionalRoles) : null,
+                troopId,
+                userId
+            ]);
+
+            await auth.logAuditEvent(db, req.session.userId, 'update_troop_member', req, {
+                resourceType: 'troop_member',
+                resourceId: userId,
+                troopId,
+                changes: { role, scoutLevel, den, position, linkedParentId }
+            });
+
+            res.json(updated);
+        } catch (error) {
+            logger.error('Error updating troop member', { error: error.message });
+            res.status(500).json({ error: 'Failed to update troop member' });
+        }
+    }
+);
+
+// Search for parent users to link
+app.get('/api/troop/:troopId/parents',
+    auth.isAuthenticated,
+    auth.requirePrivilege('view_roster'),
+    async (req, res) => {
+        try {
+            const { troopId } = req.params;
+            const { search } = req.query;
+
+            let query = `
+                SELECT DISTINCT u.id, u."firstName", u."lastName", u.email
+                FROM users u
+                JOIN troop_members tm ON u.id = tm."userId"
+                WHERE tm."troopId" = $1
+                  AND tm.role IN ('parent', 'volunteer', 'co-leader', 'troop_leader')
+                  AND tm.status = 'active'
+            `;
+
+            const params = [troopId];
+
+            if (search) {
+                query += ` AND (
+                    u."firstName" ILIKE $2 OR
+                    u."lastName" ILIKE $2 OR
+                    u.email ILIKE $2
+                )`;
+                params.push(`%${search}%`);
+            }
+
+            query += ` ORDER BY u."lastName", u."firstName" LIMIT 50`;
+
+            const parents = await db.getAll(query, params);
+            res.json(parents);
+        } catch (error) {
+            logger.error('Error fetching parents', { error: error.message });
+            res.status(500).json({ error: 'Failed to fetch parents' });
+        }
+    }
+);
+
+// ============================================================================
+// PASSWORD RESET ENDPOINTS
+// ============================================================================
+
+// Initiate password reset
+app.post('/api/users/:userId/password-reset-request',
+    auth.isAuthenticated,
+    auth.requirePrivilegeForUser('edit_personal_info'),
+    async (req, res) => {
+        try {
+            const { userId } = req.params;
+
+            const user = await db.getOne('SELECT * FROM users WHERE id = $1', [userId]);
+            if (!user) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+
+            // Generate secure token
+            const resetToken = crypto.randomBytes(32).toString('hex');
+            const expiresAt = new Date(Date.now() + 3600000); // 1 hour
+
+            await db.run(`
+                UPDATE users
+                SET "passwordResetToken" = $1,
+                    "passwordResetExpires" = $2
+                WHERE id = $3
+            `, [resetToken, expiresAt, userId]);
+
+            // TODO: Send email with reset link
+            // For development, return token
+
+            await auth.logAuditEvent(db, req.session.userId, 'request_password_reset', req, {
+                resourceType: 'user',
+                resourceId: userId
+            });
+
+            res.json({
+                message: 'Password reset initiated',
+                resetToken: resetToken // DEV ONLY - remove in production
+            });
+        } catch (error) {
+            logger.error('Error initiating password reset', { error: error.message });
+            res.status(500).json({ error: 'Failed to initiate password reset' });
+        }
+    }
+);
+
+// Complete password reset using token
+app.post('/api/users/password-reset', async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+
+        if (!token || !newPassword) {
+            return res.status(400).json({ error: 'Token and new password required' });
+        }
+
+        // Validate password strength (reuse existing validation)
+        if (newPassword.length < 8) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters' });
+        }
+
+        // Find user by valid token
+        const user = await db.getOne(`
+            SELECT * FROM users
+            WHERE "passwordResetToken" = $1
+              AND "passwordResetExpires" > NOW()
+        `, [token]);
+
+        if (!user) {
+            return res.status(400).json({ error: 'Invalid or expired reset token' });
+        }
+
+        // Hash new password
+        const passwordHash = await auth.hashPassword(newPassword);
+
+        // Update password and clear token
+        await db.run(`
+            UPDATE users
+            SET password_hash = $1,
+                "passwordResetToken" = NULL,
+                "passwordResetExpires" = NULL,
+                "lastPasswordChange" = NOW()
+            WHERE id = $2
+        `, [passwordHash, user.id]);
+
+        await auth.logAuditEvent(db, user.id, 'password_reset_complete', req, {
+            resourceType: 'user',
+            resourceId: user.id
+        });
+
+        res.json({ message: 'Password reset successful' });
+    } catch (error) {
+        logger.error('Error completing password reset', { error: error.message });
+        res.status(500).json({ error: 'Failed to reset password' });
+    }
+});
+
+// ============================================================================
+// PAYMENT METHODS ENDPOINTS
+// ============================================================================
+
+// Get user payment methods
+app.get('/api/users/:userId/payment-methods',
+    auth.isAuthenticated,
+    auth.requirePrivilegeForUser('view_sales'),
+    async (req, res) => {
+        try {
+            const { userId } = req.params;
+
+            const methods = await db.getAll(`
+                SELECT id, name, url, "isEnabled"
+                FROM payment_methods
+                WHERE "userId" = $1
+                ORDER BY "isEnabled" DESC, name ASC
+            `, [userId]);
+
+            res.json(methods);
+        } catch (error) {
+            logger.error('Error fetching payment methods', { error: error.message });
+            res.status(500).json({ error: 'Failed to fetch payment methods' });
+        }
+    }
+);
+
+// Add payment method
+app.post('/api/users/:userId/payment-methods',
+    auth.isAuthenticated,
+    auth.requirePrivilegeForUser('manage_payment_methods'),
+    async (req, res) => {
+        try {
+            const { userId } = req.params;
+            const { name, url, isEnabled } = req.body;
+
+            if (!name || !url) {
+                return res.status(400).json({ error: 'Name and URL required' });
+            }
+
+            // Validate URL format
+            try {
+                new URL(url);
+            } catch (e) {
+                return res.status(400).json({ error: 'Invalid URL format' });
+            }
+
+            const method = await db.getOne(`
+                INSERT INTO payment_methods ("userId", name, url, "isEnabled")
+                VALUES ($1, $2, $3, $4)
+                RETURNING *
+            `, [userId, name, url, isEnabled !== false]);
+
+            await auth.logAuditEvent(db, req.session.userId, 'add_payment_method', req, {
+                resourceType: 'payment_method',
+                resourceId: method.id,
+                userId
+            });
+
+            res.json(method);
+        } catch (error) {
+            logger.error('Error adding payment method', { error: error.message });
+            res.status(500).json({ error: 'Failed to add payment method' });
+        }
+    }
+);
+
+// Delete payment method
+app.delete('/api/users/:userId/payment-methods/:methodId',
+    auth.isAuthenticated,
+    auth.requirePrivilegeForUser('manage_payment_methods'),
+    async (req, res) => {
+        try {
+            const { userId, methodId } = req.params;
+
+            // Verify method belongs to user
+            const method = await db.getOne(
+                'SELECT * FROM payment_methods WHERE id = $1 AND "userId" = $2',
+                [methodId, userId]
+            );
+
+            if (!method) {
+                return res.status(404).json({ error: 'Payment method not found' });
+            }
+
+            await db.run('DELETE FROM payment_methods WHERE id = $1', [methodId]);
+
+            await auth.logAuditEvent(db, req.session.userId, 'delete_payment_method', req, {
+                resourceType: 'payment_method',
+                resourceId: methodId,
+                userId
+            });
+
+            res.json({ success: true });
+        } catch (error) {
+            logger.error('Error deleting payment method', { error: error.message });
+            res.status(500).json({ error: 'Failed to delete payment method' });
+        }
+    }
+);
+
+// ============================================================================
+// ACCOUNT DELETION ENDPOINT
+// ============================================================================
+
+// Soft delete user account (COPPA-compliant)
+app.delete('/api/users/:userId',
+    auth.isAuthenticated,
+    auth.requirePrivilegeForUser('delete_own_data'),
+    async (req, res) => {
+        try {
+            const { userId } = req.params;
+            const { reason, confirmDelete } = req.body;
+
+            if (!confirmDelete) {
+                return res.status(400).json({ error: 'Deletion must be confirmed' });
+            }
+
+            const user = await db.getOne('SELECT * FROM users WHERE id = $1', [userId]);
+            if (!user) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+
+            // COPPA protection: Minors cannot self-delete
+            if (user.isMinor && req.session.userId === userId) {
+                return res.status(403).json({
+                    error: 'Minors cannot delete their own account. Parent/guardian must initiate deletion.'
+                });
+            }
+
+            // Create deletion request (for audit trail)
+            const request = await db.getOne(`
+                INSERT INTO data_deletion_requests ("userId", "requestedBy", reason, status)
+                VALUES ($1, $2, $3, 'pending')
+                RETURNING *
+            `, [userId, req.session.userId, reason || 'User requested account deletion']);
+
+            // Soft delete: anonymize and mark inactive
+            await db.run(`
+                UPDATE users
+                SET "isActive" = FALSE,
+                    email = CONCAT('deleted_', id, '@deleted.local'),
+                    phone = NULL,
+                    address = NULL
+                WHERE id = $1
+            `, [userId]);
+
+            // Mark troop memberships inactive
+            await db.run(`
+                UPDATE troop_members
+                SET status = 'inactive',
+                    "leaveDate" = NOW()
+                WHERE "userId" = $1
+            `, [userId]);
+
+            await auth.logAuditEvent(db, req.session.userId, 'delete_user_account', req, {
+                resourceType: 'user',
+                resourceId: userId,
+                isMinor: user.isMinor,
+                reason
+            });
+
+            res.json({
+                message: 'Account deletion initiated. Account will be fully deleted in 30 days.',
+                deletionRequestId: request.id
+            });
+        } catch (error) {
+            logger.error('Error deleting user account', { error: error.message });
+            res.status(500).json({ error: 'Failed to delete account' });
+        }
+    }
+);
+
 // Get aggregated sales data for a troop
 app.get('/api/troop/:troopId/sales', auth.isAuthenticated, auth.requirePrivilege('view_troop_sales'), async (req, res) => {
     try {
@@ -1473,16 +2296,20 @@ app.get('/api/troop/:troopId/sales', auth.isAuthenticated, auth.requirePrivilege
         // Build scope filter for sales visibility
         const scopeFilter = await auth.buildScopeFilter(req.effectiveScope, 's."userId"', req, 1);
 
-        // Get sales by cookie type
+        // Get sales by cookie type (prefer productId grouping, fall back to cookieType)
         const salesByCookie = await db.getAll(`
             SELECT
-                s."cookieType",
+                COALESCE(cp."cookieName", s."cookieType") as "cookieType",
+                s."productId",
+                cp."shortName" as "productShortName",
+                cp."pricePerBox" as "productPrice",
                 SUM(s.quantity) as "totalQuantity",
                 SUM(s."amountCollected") as "totalCollected"
             FROM sales s
             JOIN troop_members tm ON s."userId" = tm."userId"
+            LEFT JOIN cookie_products cp ON s."productId" = cp.id
             WHERE tm."troopId" = $1 AND tm.status = 'active'${scopeFilter.clause}
-            GROUP BY s."cookieType"
+            GROUP BY COALESCE(cp."cookieName", s."cookieType"), s."productId", cp."shortName", cp."pricePerBox"
             ORDER BY "totalQuantity" DESC
         `, [troopId, ...scopeFilter.params]);
 
@@ -2100,6 +2927,7 @@ app.get('/api/cookies', auth.isAuthenticated, async (req, res) => {
         // Build query - using PostgreSQL json_agg instead of SQLite json_group_array
         let query = `
             SELECT cp.*,
+                   b."bakerName", b."bakerCode",
                    COALESCE(
                        json_agg(
                            json_build_object('id', ca.id, 'type', ca."attributeType", 'value', ca."attributeValue", 'label', ca."displayLabel")
@@ -2108,6 +2936,7 @@ app.get('/api/cookies', auth.isAuthenticated, async (req, res) => {
                    ) as "attributesJson"
             FROM cookie_products cp
             LEFT JOIN cookie_attributes ca ON cp.id = ca."productId"
+            LEFT JOIN bakers b ON cp."bakerId" = b.id
             WHERE cp.season = $1
         `;
 
@@ -2115,7 +2944,7 @@ app.get('/api/cookies', auth.isAuthenticated, async (req, res) => {
             query += ' AND cp."isActive" = true';
         }
 
-        query += ' GROUP BY cp.id ORDER BY cp."sortOrder", cp."cookieName"';
+        query += ' GROUP BY cp.id, b."bakerName", b."bakerCode" ORDER BY cp."sortOrder", cp."cookieName"';
 
         const cookies = await db.getAll(query, [targetSeason]);
 
@@ -2162,7 +2991,7 @@ app.get('/api/cookies/:id', auth.isAuthenticated, async (req, res) => {
 // Add new cookie
 app.post('/api/cookies', auth.isAuthenticated, auth.hasRole('troop_leader', 'council_admin'), async (req, res) => {
     try {
-        const { season, cookieName, shortName, description, pricePerBox, boxesPerCase, sortOrder, imageUrl, attributes, nutrition } = req.body;
+        const { season, cookieName, shortName, description, pricePerBox, boxesPerCase, sortOrder, imageUrl, bakerId, organizationId, attributes, nutrition } = req.body;
 
         if (!season || !cookieName) {
             return res.status(400).json({ error: 'Season and cookie name are required' });
@@ -2170,10 +2999,10 @@ app.post('/api/cookies', auth.isAuthenticated, auth.hasRole('troop_leader', 'cou
 
         // Insert cookie
         const newCookie = await db.getOne(`
-            INSERT INTO cookie_products (season, "cookieName", "shortName", description, "pricePerBox", "boxesPerCase", "sortOrder", "imageUrl", "isActive", "createdAt")
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, NOW())
+            INSERT INTO cookie_products (season, "cookieName", "shortName", description, "pricePerBox", "boxesPerCase", "sortOrder", "imageUrl", "bakerId", "organizationId", "isActive", "createdAt")
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, NOW())
             RETURNING *
-        `, [season, cookieName, shortName || null, description || null, pricePerBox || 6.00, boxesPerCase || 12, sortOrder || 0, imageUrl || null]);
+        `, [season, cookieName, shortName || null, description || null, pricePerBox || 6.00, boxesPerCase || 12, sortOrder || 0, imageUrl || null, bakerId || null, organizationId || null]);
 
         const productId = newCookie.id;
 
@@ -2207,7 +3036,7 @@ app.post('/api/cookies', auth.isAuthenticated, auth.hasRole('troop_leader', 'cou
 app.put('/api/cookies/:id', auth.isAuthenticated, auth.hasRole('troop_leader', 'council_admin'), async (req, res) => {
     try {
         const { id } = req.params;
-        const { cookieName, shortName, description, pricePerBox, boxesPerCase, sortOrder, imageUrl, isActive, attributes, nutrition } = req.body;
+        const { cookieName, shortName, description, pricePerBox, boxesPerCase, sortOrder, imageUrl, isActive, bakerId, organizationId, attributes, nutrition } = req.body;
 
         const existing = await db.getOne('SELECT id FROM cookie_products WHERE id = $1', [id]);
         if (!existing) {
@@ -2225,9 +3054,11 @@ app.put('/api/cookies/:id', auth.isAuthenticated, auth.hasRole('troop_leader', '
                 "sortOrder" = COALESCE($6, "sortOrder"),
                 "imageUrl" = COALESCE($7, "imageUrl"),
                 "isActive" = COALESCE($8, "isActive"),
+                "bakerId" = COALESCE($9, "bakerId"),
+                "organizationId" = COALESCE($10, "organizationId"),
                 "updatedAt" = NOW()
-            WHERE id = $9
-        `, [cookieName, shortName, description, pricePerBox, boxesPerCase, sortOrder, imageUrl, isActive, id]);
+            WHERE id = $11
+        `, [cookieName, shortName, description, pricePerBox, boxesPerCase, sortOrder, imageUrl, isActive, bakerId, organizationId, id]);
 
         // Update attributes if provided (replace all)
         if (attributes && Array.isArray(attributes)) {
@@ -2274,6 +3105,949 @@ app.delete('/api/cookies/:id', auth.isAuthenticated, auth.hasRole('troop_leader'
     } catch (error) {
         logger.error('Error deactivating cookie', { error: error.message });
         res.status(500).json({ error: 'Failed to deactivate cookie' });
+    }
+});
+
+// ============================================================================
+// Baker & Troop Product Routes
+// ============================================================================
+
+// Get all bakers
+app.get('/api/bakers', auth.isAuthenticated, async (req, res) => {
+    try {
+        const bakers = await db.getAll(`
+            SELECT b.*,
+                   (SELECT COUNT(*) FROM cookie_products WHERE "bakerId" = b.id AND "isActive" = true) as "productCount"
+            FROM bakers b
+            WHERE b."isActive" = true
+            ORDER BY b."bakerName"
+        `);
+        res.json(bakers);
+    } catch (error) {
+        logger.error('Error fetching bakers', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch bakers' });
+    }
+});
+
+// Get products available for a troop (based on troop's organization + active season)
+app.get('/api/troop/:troopId/products', auth.isAuthenticated, auth.requirePrivilege('view_sales'), async (req, res) => {
+    try {
+        const { troopId } = req.params;
+        const { baker, includeInactive } = req.query;
+
+        // Get the troop's organization
+        const troop = await db.getOne(`
+            SELECT t.id, t."organizationId", so."orgCode", so."orgName"
+            FROM troops t
+            LEFT JOIN scout_organizations so ON t."organizationId" = so.id
+            WHERE t.id = $1
+        `, [troopId]);
+        if (!troop) return res.status(404).json({ error: 'Troop not found' });
+
+        // Get active season
+        const season = await db.getOne('SELECT * FROM seasons WHERE "isActive" = true');
+        const targetSeason = season?.year || '2026';
+
+        // Build product query
+        let query = `
+            SELECT cp.*, b."bakerName", b."bakerCode",
+                   COALESCE(
+                       json_agg(
+                           json_build_object('id', ca.id, 'type', ca."attributeType", 'value', ca."attributeValue", 'label', ca."displayLabel")
+                       ) FILTER (WHERE ca.id IS NOT NULL),
+                       '[]'::json
+                   ) as "attributesJson"
+            FROM cookie_products cp
+            LEFT JOIN cookie_attributes ca ON cp.id = ca."productId"
+            LEFT JOIN bakers b ON cp."bakerId" = b.id
+            WHERE cp.season = $1
+        `;
+        const params = [targetSeason];
+        let paramIdx = 2;
+
+        // Filter by organization if troop has one
+        if (troop.organizationId) {
+            query += ` AND cp."organizationId" = $${paramIdx}`;
+            params.push(troop.organizationId);
+            paramIdx++;
+        }
+
+        // Optional baker filter
+        if (baker) {
+            query += ` AND b."bakerCode" = $${paramIdx}`;
+            params.push(baker);
+            paramIdx++;
+        }
+
+        if (!includeInactive) {
+            query += ' AND cp."isActive" = true';
+        }
+
+        query += ' GROUP BY cp.id, b."bakerName", b."bakerCode" ORDER BY cp."sortOrder", cp."cookieName"';
+
+        const products = await db.getAll(query, params);
+
+        // Parse attributes
+        const result = products.map(p => {
+            let attributes = [];
+            try {
+                const parsed = typeof p.attributesJson === 'string' ? JSON.parse(p.attributesJson) : p.attributesJson;
+                attributes = Array.isArray(parsed) ? parsed.filter(a => a.id !== null) : [];
+            } catch (e) { attributes = []; }
+            delete p.attributesJson;
+            return { ...p, attributes };
+        });
+
+        res.json({
+            troop: { id: troop.id, orgCode: troop.orgCode, orgName: troop.orgName },
+            season: targetSeason,
+            products: result
+        });
+    } catch (error) {
+        logger.error('Error fetching troop products', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch troop products' });
+    }
+});
+
+// ============================================================================
+// Phase B: Cookie Dashboard Endpoints
+// ============================================================================
+
+// Cookie Dashboard - aggregated data for a troop member
+app.get('/api/troop/:troopId/cookie-dashboard', auth.isAuthenticated, auth.requirePrivilege('view_sales'), async (req, res) => {
+    try {
+        const { troopId } = req.params;
+        const userId = req.session.userId;
+
+        // My sales summary
+        const mySales = await db.getOne(`
+            SELECT COALESCE(SUM(quantity), 0) as "totalBoxes",
+                   COALESCE(SUM("amountCollected"), 0) as "totalCollected",
+                   COALESCE(SUM("amountDue"), 0) as "totalDue",
+                   COUNT(*) as "saleCount"
+            FROM sales WHERE "userId" = $1
+        `, [userId]);
+
+        // My sales by product
+        const myProductBreakdown = await db.getAll(`
+            SELECT COALESCE(cp."cookieName", s."cookieType") as "cookieName",
+                   cp."shortName", cp."pricePerBox", s."productId",
+                   SUM(s.quantity) as "totalQuantity",
+                   SUM(s."amountCollected") as "totalCollected"
+            FROM sales s
+            LEFT JOIN cookie_products cp ON s."productId" = cp.id
+            WHERE s."userId" = $1
+            GROUP BY COALESCE(cp."cookieName", s."cookieType"), cp."shortName", cp."pricePerBox", s."productId"
+            ORDER BY "totalQuantity" DESC
+        `, [userId]);
+
+        // My recent sales (last 10)
+        const recentSales = await db.getAll(`
+            SELECT s.*, cp."cookieName" as "productName", cp."shortName" as "productShortName", cp."pricePerBox" as "productPrice"
+            FROM sales s
+            LEFT JOIN cookie_products cp ON s."productId" = cp.id
+            WHERE s."userId" = $1
+            ORDER BY s.date DESC
+            LIMIT 10
+        `, [userId]);
+
+        // My inventory
+        const myInventory = await db.getAll(`
+            SELECT si."productId", si.quantity, cp."cookieName", cp."shortName", cp."pricePerBox", cp."sortOrder"
+            FROM scout_inventory si
+            JOIN cookie_products cp ON si."productId" = cp.id
+            WHERE si."userId" = $1
+            ORDER BY cp."sortOrder"
+        `, [userId]);
+
+        // My goal progress
+        const profile = await db.getOne('SELECT "goalBoxes", "goalAmount" FROM profile WHERE "userId" = $1', [userId]);
+
+        // Troop-level data (only if user has view_troop_sales privilege)
+        let troopData = null;
+        try {
+            const scopeFilter = await auth.buildScopeFilter(req.effectiveScope, 's."userId"', req, 1);
+            const troopTotals = await db.getOne(`
+                SELECT COALESCE(SUM(s.quantity), 0) as "totalBoxes",
+                       COALESCE(SUM(s."amountCollected"), 0) as "totalCollected",
+                       COUNT(DISTINCT s."userId") as "activeSellers"
+                FROM sales s
+                JOIN troop_members tm ON s."userId" = tm."userId"
+                WHERE tm."troopId" = $1 AND tm.status = 'active'${scopeFilter.clause}
+            `, [troopId, ...scopeFilter.params]);
+
+            const troopGoal = await db.getOne(`
+                SELECT * FROM troop_goals
+                WHERE "troopId" = $1 AND "goalType" = 'boxes_sold' AND status = 'in_progress'
+                ORDER BY "endDate" DESC LIMIT 1
+            `, [troopId]);
+
+            troopData = { totals: troopTotals, goal: troopGoal };
+        } catch (e) { /* user may not have troop sales privilege */ }
+
+        // Troop org info (for dynamic tab naming)
+        const troop = await db.getOne(`
+            SELECT t.id, so."orgCode", so."orgName"
+            FROM troops t
+            LEFT JOIN scout_organizations so ON t."organizationId" = so.id
+            WHERE t.id = $1
+        `, [troopId]);
+
+        res.json({
+            orgCode: troop?.orgCode || null,
+            orgName: troop?.orgName || null,
+            mySales,
+            myProductBreakdown,
+            recentSales,
+            myInventory,
+            myGoal: { goalBoxes: profile?.goalBoxes || 0, goalAmount: profile?.goalAmount || 0 },
+            troopData
+        });
+    } catch (error) {
+        logger.error('Error fetching cookie dashboard', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch cookie dashboard' });
+    }
+});
+
+// Troop aggregate inventory (sum of all scout inventories)
+app.get('/api/troop/:troopId/inventory', auth.isAuthenticated, auth.requirePrivilege('view_troop_sales'), async (req, res) => {
+    try {
+        const { troopId } = req.params;
+        const inventory = await db.getAll(`
+            SELECT si."productId", SUM(si.quantity) as "totalQuantity",
+                   COUNT(DISTINCT si."userId") as "scoutCount",
+                   cp."cookieName", cp."shortName", cp."pricePerBox", cp."sortOrder"
+            FROM scout_inventory si
+            JOIN troop_members tm ON si."userId" = tm."userId"
+            JOIN cookie_products cp ON si."productId" = cp.id
+            WHERE tm."troopId" = $1 AND tm.status = 'active'
+            GROUP BY si."productId", cp."cookieName", cp."shortName", cp."pricePerBox", cp."sortOrder"
+            ORDER BY cp."sortOrder"
+        `, [troopId]);
+        res.json(inventory);
+    } catch (error) {
+        logger.error('Error fetching troop inventory', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch troop inventory' });
+    }
+});
+
+// ============================================================================
+// Phase C: Booth Sales System
+// ============================================================================
+
+// --- Booth Events CRUD ---
+
+// List booth events for a troop
+app.get('/api/troop/:troopId/booths', auth.isAuthenticated, auth.requirePrivilege('view_events'), async (req, res) => {
+    try {
+        const { troopId } = req.params;
+        const { status: filterStatus } = req.query;
+
+        let query = `
+            SELECT be.*,
+                   u."firstName" || ' ' || u."lastName" as "createdByName",
+                   (SELECT COUNT(*) FROM booth_shifts bs WHERE bs."boothEventId" = be.id) as "shiftCount",
+                   (SELECT COALESCE(SUM(bi."soldQty"), 0) FROM booth_inventory bi WHERE bi."boothEventId" = be.id) as "totalSold"
+            FROM booth_events be
+            LEFT JOIN users u ON be."createdBy" = u.id
+            WHERE be."troopId" = $1
+        `;
+        const params = [troopId];
+        if (filterStatus) {
+            query += ` AND be.status = $2`;
+            params.push(filterStatus);
+        }
+        query += ' ORDER BY be."startDateTime" DESC';
+
+        const booths = await db.getAll(query, params);
+        res.json(booths);
+    } catch (error) {
+        logger.error('Error fetching booths', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch booth events' });
+    }
+});
+
+// Get single booth event with full details
+app.get('/api/troop/:troopId/booths/:boothId', auth.isAuthenticated, auth.requirePrivilege('view_events'), async (req, res) => {
+    try {
+        const { troopId, boothId } = req.params;
+        const booth = await db.getOne(`
+            SELECT be.*,
+                   u."firstName" || ' ' || u."lastName" as "createdByName"
+            FROM booth_events be
+            LEFT JOIN users u ON be."createdBy" = u.id
+            WHERE be.id = $1 AND be."troopId" = $2
+        `, [boothId, troopId]);
+        if (!booth) return res.status(404).json({ error: 'Booth event not found' });
+
+        // Include shifts, inventory, payments
+        const shifts = await db.getAll(`
+            SELECT bs.*, u."firstName" || ' ' || u."lastName" as "scoutName",
+                   p."firstName" || ' ' || p."lastName" as "parentName"
+            FROM booth_shifts bs
+            JOIN users u ON bs."scoutId" = u.id
+            LEFT JOIN users p ON bs."parentId" = p.id
+            WHERE bs."boothEventId" = $1
+            ORDER BY bs."startTime"
+        `, [boothId]);
+
+        const inventory = await db.getAll(`
+            SELECT bi.*, cp."cookieName", cp."shortName", cp."pricePerBox"
+            FROM booth_inventory bi
+            JOIN cookie_products cp ON bi."productId" = cp.id
+            WHERE bi."boothEventId" = $1
+            ORDER BY cp."sortOrder"
+        `, [boothId]);
+
+        const payments = await db.getAll(`
+            SELECT bp.*, u."firstName" || ' ' || u."lastName" as "recordedByName"
+            FROM booth_payments bp
+            LEFT JOIN users u ON bp."recordedBy" = u.id
+            WHERE bp."boothEventId" = $1
+            ORDER BY bp."recordedAt"
+        `, [boothId]);
+
+        res.json({ ...booth, shifts, inventory, payments });
+    } catch (error) {
+        logger.error('Error fetching booth detail', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch booth event' });
+    }
+});
+
+// Create booth event
+app.post('/api/troop/:troopId/booths', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { troopId } = req.params;
+        const { eventType, scoutId, eventName, location, locationAddress, locationNotes,
+                startDateTime, endDateTime, startingBank, notes } = req.body;
+
+        if (!eventName || !startDateTime || !endDateTime) {
+            return res.status(400).json({ error: 'eventName, startDateTime, and endDateTime are required' });
+        }
+        if (eventType && !['troop', 'family', 'council'].includes(eventType)) {
+            return res.status(400).json({ error: 'Invalid event type' });
+        }
+
+        const booth = await db.getOne(`
+            INSERT INTO booth_events ("troopId", "eventType", "scoutId", "eventName", location, "locationAddress",
+                "locationNotes", "startDateTime", "endDateTime", "startingBank", notes, "createdBy")
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            RETURNING *
+        `, [troopId, eventType || 'troop', scoutId || null, eventName, location, locationAddress,
+            locationNotes, startDateTime, endDateTime, startingBank || 0, notes, req.session.userId]);
+
+        res.status(201).json(booth);
+    } catch (error) {
+        logger.error('Error creating booth', { error: error.message });
+        res.status(500).json({ error: 'Failed to create booth event' });
+    }
+});
+
+// Update booth event
+app.put('/api/troop/:troopId/booths/:boothId', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { troopId, boothId } = req.params;
+        const { eventType, eventName, location, locationAddress, locationNotes,
+                startDateTime, endDateTime, startingBank, weatherNotes, notes } = req.body;
+
+        const booth = await db.getOne(`
+            UPDATE booth_events SET
+                "eventType" = COALESCE($1, "eventType"),
+                "eventName" = COALESCE($2, "eventName"),
+                location = COALESCE($3, location),
+                "locationAddress" = COALESCE($4, "locationAddress"),
+                "locationNotes" = COALESCE($5, "locationNotes"),
+                "startDateTime" = COALESCE($6, "startDateTime"),
+                "endDateTime" = COALESCE($7, "endDateTime"),
+                "startingBank" = COALESCE($8, "startingBank"),
+                "weatherNotes" = COALESCE($9, "weatherNotes"),
+                notes = COALESCE($10, notes),
+                "updatedAt" = CURRENT_TIMESTAMP
+            WHERE id = $11 AND "troopId" = $12
+            RETURNING *
+        `, [eventType, eventName, location, locationAddress, locationNotes,
+            startDateTime, endDateTime, startingBank, weatherNotes, notes, boothId, troopId]);
+
+        if (!booth) return res.status(404).json({ error: 'Booth event not found' });
+        res.json(booth);
+    } catch (error) {
+        logger.error('Error updating booth', { error: error.message });
+        res.status(500).json({ error: 'Failed to update booth event' });
+    }
+});
+
+// Delete booth event
+app.delete('/api/troop/:troopId/booths/:boothId', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { troopId, boothId } = req.params;
+        const result = await db.run(
+            'DELETE FROM booth_events WHERE id = $1 AND "troopId" = $2',
+            [boothId, troopId]
+        );
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Booth event not found' });
+        res.json({ message: 'Booth event deleted' });
+    } catch (error) {
+        logger.error('Error deleting booth', { error: error.message });
+        res.status(500).json({ error: 'Failed to delete booth event' });
+    }
+});
+
+// Booth lifecycle transitions
+app.post('/api/troop/:troopId/booths/:boothId/start', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { troopId, boothId } = req.params;
+        const booth = await db.getOne(
+            'UPDATE booth_events SET status = \'in_progress\', "actualStartTime" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $1 AND "troopId" = $2 AND status IN (\'planning\', \'scheduled\') RETURNING *',
+            [boothId, troopId]
+        );
+        if (!booth) return res.status(400).json({ error: 'Booth not found or cannot be started from current status' });
+        res.json(booth);
+    } catch (error) {
+        logger.error('Error starting booth', { error: error.message });
+        res.status(500).json({ error: 'Failed to start booth event' });
+    }
+});
+
+app.post('/api/troop/:troopId/booths/:boothId/end', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { troopId, boothId } = req.params;
+        const booth = await db.getOne(
+            'UPDATE booth_events SET status = \'reconciling\', "actualEndTime" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $1 AND "troopId" = $2 AND status = \'in_progress\' RETURNING *',
+            [boothId, troopId]
+        );
+        if (!booth) return res.status(400).json({ error: 'Booth not found or not in progress' });
+        res.json(booth);
+    } catch (error) {
+        logger.error('Error ending booth', { error: error.message });
+        res.status(500).json({ error: 'Failed to end booth event' });
+    }
+});
+
+app.post('/api/troop/:troopId/booths/:boothId/close', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { troopId, boothId } = req.params;
+        const booth = await db.getOne(
+            'UPDATE booth_events SET status = \'completed\', "updatedAt" = CURRENT_TIMESTAMP WHERE id = $1 AND "troopId" = $2 AND status = \'reconciling\' RETURNING *',
+            [boothId, troopId]
+        );
+        if (!booth) return res.status(400).json({ error: 'Booth not found or not in reconciling status' });
+        res.json(booth);
+    } catch (error) {
+        logger.error('Error closing booth', { error: error.message });
+        res.status(500).json({ error: 'Failed to close booth event' });
+    }
+});
+
+// --- Booth Shifts CRUD ---
+
+app.get('/api/troop/:troopId/booths/:boothId/shifts', auth.isAuthenticated, auth.requirePrivilege('view_events'), async (req, res) => {
+    try {
+        const { boothId } = req.params;
+        const shifts = await db.getAll(`
+            SELECT bs.*, u."firstName" || ' ' || u."lastName" as "scoutName",
+                   p."firstName" || ' ' || p."lastName" as "parentName"
+            FROM booth_shifts bs
+            JOIN users u ON bs."scoutId" = u.id
+            LEFT JOIN users p ON bs."parentId" = p.id
+            WHERE bs."boothEventId" = $1
+            ORDER BY bs."startTime"
+        `, [boothId]);
+        res.json(shifts);
+    } catch (error) {
+        logger.error('Error fetching shifts', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch shifts' });
+    }
+});
+
+app.post('/api/troop/:troopId/booths/:boothId/shifts', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { boothId } = req.params;
+        const { scoutId, parentId, startTime, endTime, role, notes } = req.body;
+        if (!scoutId || !startTime || !endTime) {
+            return res.status(400).json({ error: 'scoutId, startTime, and endTime are required' });
+        }
+        const shift = await db.getOne(`
+            INSERT INTO booth_shifts ("boothEventId", "scoutId", "parentId", "startTime", "endTime", role, notes)
+            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
+        `, [boothId, scoutId, parentId || null, startTime, endTime, role || 'seller', notes]);
+        res.status(201).json(shift);
+    } catch (error) {
+        logger.error('Error creating shift', { error: error.message });
+        res.status(500).json({ error: 'Failed to create shift' });
+    }
+});
+
+app.put('/api/troop/:troopId/booths/:boothId/shifts/:shiftId', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { shiftId } = req.params;
+        const { scoutId, parentId, startTime, endTime, role, status, boxesCredited, notes } = req.body;
+        const shift = await db.getOne(`
+            UPDATE booth_shifts SET
+                "scoutId" = COALESCE($1, "scoutId"),
+                "parentId" = COALESCE($2, "parentId"),
+                "startTime" = COALESCE($3, "startTime"),
+                "endTime" = COALESCE($4, "endTime"),
+                role = COALESCE($5, role),
+                status = COALESCE($6, status),
+                "boxesCredited" = COALESCE($7, "boxesCredited"),
+                notes = COALESCE($8, notes)
+            WHERE id = $9 RETURNING *
+        `, [scoutId, parentId, startTime, endTime, role, status, boxesCredited, notes, shiftId]);
+        if (!shift) return res.status(404).json({ error: 'Shift not found' });
+        res.json(shift);
+    } catch (error) {
+        logger.error('Error updating shift', { error: error.message });
+        res.status(500).json({ error: 'Failed to update shift' });
+    }
+});
+
+app.delete('/api/troop/:troopId/booths/:boothId/shifts/:shiftId', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { shiftId } = req.params;
+        const result = await db.run('DELETE FROM booth_shifts WHERE id = $1', [shiftId]);
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Shift not found' });
+        res.json({ message: 'Shift deleted' });
+    } catch (error) {
+        logger.error('Error deleting shift', { error: error.message });
+        res.status(500).json({ error: 'Failed to delete shift' });
+    }
+});
+
+// Shift check-in/check-out
+app.post('/api/troop/:troopId/booths/:boothId/shifts/:shiftId/checkin', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { shiftId } = req.params;
+        const shift = await db.getOne(
+            'UPDATE booth_shifts SET "checkinTime" = CURRENT_TIMESTAMP, status = \'confirmed\' WHERE id = $1 RETURNING *',
+            [shiftId]
+        );
+        if (!shift) return res.status(404).json({ error: 'Shift not found' });
+        res.json(shift);
+    } catch (error) {
+        logger.error('Error checking in', { error: error.message });
+        res.status(500).json({ error: 'Failed to check in' });
+    }
+});
+
+app.post('/api/troop/:troopId/booths/:boothId/shifts/:shiftId/checkout', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { shiftId } = req.params;
+        const shift = await db.getOne(
+            'UPDATE booth_shifts SET "checkoutTime" = CURRENT_TIMESTAMP, status = \'completed\' WHERE id = $1 RETURNING *',
+            [shiftId]
+        );
+        if (!shift) return res.status(404).json({ error: 'Shift not found' });
+        res.json(shift);
+    } catch (error) {
+        logger.error('Error checking out', { error: error.message });
+        res.status(500).json({ error: 'Failed to check out' });
+    }
+});
+
+// --- Booth Inventory ---
+
+app.get('/api/troop/:troopId/booths/:boothId/inventory', auth.isAuthenticated, auth.requirePrivilege('view_events'), async (req, res) => {
+    try {
+        const { boothId } = req.params;
+        const inventory = await db.getAll(`
+            SELECT bi.*, cp."cookieName", cp."shortName", cp."pricePerBox", cp."sortOrder"
+            FROM booth_inventory bi
+            JOIN cookie_products cp ON bi."productId" = cp.id
+            WHERE bi."boothEventId" = $1
+            ORDER BY cp."sortOrder"
+        `, [boothId]);
+        res.json(inventory);
+    } catch (error) {
+        logger.error('Error fetching booth inventory', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch booth inventory' });
+    }
+});
+
+// Set/update booth inventory (bulk upsert)
+app.put('/api/troop/:troopId/booths/:boothId/inventory', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { boothId } = req.params;
+        const { items } = req.body; // [{productId, startingQty, endingQty, damagedQty, notes}]
+        if (!items || !Array.isArray(items)) {
+            return res.status(400).json({ error: 'items array is required' });
+        }
+
+        const results = [];
+        for (const item of items) {
+            const row = await db.getOne(`
+                INSERT INTO booth_inventory ("boothEventId", "productId", "startingQty", "endingQty", "damagedQty", notes)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                ON CONFLICT ("boothEventId", "productId") DO UPDATE SET
+                    "startingQty" = COALESCE(EXCLUDED."startingQty", booth_inventory."startingQty"),
+                    "endingQty" = COALESCE(EXCLUDED."endingQty", booth_inventory."endingQty"),
+                    "damagedQty" = COALESCE(EXCLUDED."damagedQty", booth_inventory."damagedQty"),
+                    notes = COALESCE(EXCLUDED.notes, booth_inventory.notes)
+                RETURNING *
+            `, [boothId, item.productId, item.startingQty || 0, item.endingQty ?? null, item.damagedQty || 0, item.notes]);
+            results.push(row);
+        }
+        res.json(results);
+    } catch (error) {
+        logger.error('Error updating booth inventory', { error: error.message });
+        res.status(500).json({ error: 'Failed to update booth inventory' });
+    }
+});
+
+// Record ending count and auto-calculate soldQty
+app.post('/api/troop/:troopId/booths/:boothId/inventory/count', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { boothId } = req.params;
+        const { items } = req.body; // [{productId, endingQty, damagedQty}]
+        if (!items || !Array.isArray(items)) {
+            return res.status(400).json({ error: 'items array is required' });
+        }
+
+        const results = [];
+        for (const item of items) {
+            const row = await db.getOne(`
+                UPDATE booth_inventory SET
+                    "endingQty" = $1,
+                    "damagedQty" = COALESCE($2, "damagedQty"),
+                    "soldQty" = "startingQty" - $1 - COALESCE($2, "damagedQty", 0)
+                WHERE "boothEventId" = $3 AND "productId" = $4
+                RETURNING *
+            `, [item.endingQty, item.damagedQty || 0, boothId, item.productId]);
+            if (row) results.push(row);
+        }
+        res.json(results);
+    } catch (error) {
+        logger.error('Error recording inventory count', { error: error.message });
+        res.status(500).json({ error: 'Failed to record inventory count' });
+    }
+});
+
+// --- Booth Payments ---
+
+app.get('/api/troop/:troopId/booths/:boothId/payments', auth.isAuthenticated, auth.requirePrivilege('view_events'), async (req, res) => {
+    try {
+        const { boothId } = req.params;
+        const payments = await db.getAll(`
+            SELECT bp.*, u."firstName" || ' ' || u."lastName" as "recordedByName"
+            FROM booth_payments bp
+            LEFT JOIN users u ON bp."recordedBy" = u.id
+            WHERE bp."boothEventId" = $1
+            ORDER BY bp."recordedAt"
+        `, [boothId]);
+        res.json(payments);
+    } catch (error) {
+        logger.error('Error fetching payments', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch payments' });
+    }
+});
+
+app.post('/api/troop/:troopId/booths/:boothId/payments', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { boothId } = req.params;
+        const { paymentType, amount, referenceNumber, notes } = req.body;
+        if (!paymentType || amount === undefined) {
+            return res.status(400).json({ error: 'paymentType and amount are required' });
+        }
+        const validTypes = ['cash', 'check', 'digital_cookie', 'venmo', 'paypal', 'square', 'zelle', 'other'];
+        if (!validTypes.includes(paymentType)) {
+            return res.status(400).json({ error: `Invalid payment type. Must be one of: ${validTypes.join(', ')}` });
+        }
+        const payment = await db.getOne(`
+            INSERT INTO booth_payments ("boothEventId", "paymentType", amount, "referenceNumber", notes, "recordedBy")
+            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
+        `, [boothId, paymentType, amount, referenceNumber, notes, req.session.userId]);
+        res.status(201).json(payment);
+    } catch (error) {
+        logger.error('Error creating payment', { error: error.message });
+        res.status(500).json({ error: 'Failed to create payment' });
+    }
+});
+
+app.put('/api/troop/:troopId/booths/:boothId/payments/:paymentId', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { paymentId } = req.params;
+        const { paymentType, amount, referenceNumber, notes } = req.body;
+        const payment = await db.getOne(`
+            UPDATE booth_payments SET
+                "paymentType" = COALESCE($1, "paymentType"),
+                amount = COALESCE($2, amount),
+                "referenceNumber" = COALESCE($3, "referenceNumber"),
+                notes = COALESCE($4, notes)
+            WHERE id = $5 RETURNING *
+        `, [paymentType, amount, referenceNumber, notes, paymentId]);
+        if (!payment) return res.status(404).json({ error: 'Payment not found' });
+        res.json(payment);
+    } catch (error) {
+        logger.error('Error updating payment', { error: error.message });
+        res.status(500).json({ error: 'Failed to update payment' });
+    }
+});
+
+app.delete('/api/troop/:troopId/booths/:boothId/payments/:paymentId', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { paymentId } = req.params;
+        const result = await db.run('DELETE FROM booth_payments WHERE id = $1', [paymentId]);
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Payment not found' });
+        res.json({ message: 'Payment deleted' });
+    } catch (error) {
+        logger.error('Error deleting payment', { error: error.message });
+        res.status(500).json({ error: 'Failed to delete payment' });
+    }
+});
+
+// Booth reconciliation summary
+app.get('/api/troop/:troopId/booths/:boothId/reconcile', auth.isAuthenticated, auth.requirePrivilege('view_events'), async (req, res) => {
+    try {
+        const { boothId } = req.params;
+
+        // Get booth info
+        const booth = await db.getOne('SELECT * FROM booth_events WHERE id = $1', [boothId]);
+        if (!booth) return res.status(404).json({ error: 'Booth event not found' });
+
+        // Get inventory totals
+        const inventoryTotals = await db.getOne(`
+            SELECT COALESCE(SUM("startingQty"), 0) as "totalStarting",
+                   COALESCE(SUM("endingQty"), 0) as "totalEnding",
+                   COALESCE(SUM("soldQty"), 0) as "totalSold",
+                   COALESCE(SUM("damagedQty"), 0) as "totalDamaged"
+            FROM booth_inventory WHERE "boothEventId" = $1
+        `, [boothId]);
+
+        // Get detailed inventory per product
+        const inventoryDetail = await db.getAll(`
+            SELECT bi.*, cp."cookieName", cp."shortName", cp."pricePerBox"
+            FROM booth_inventory bi
+            JOIN cookie_products cp ON bi."productId" = cp.id
+            WHERE bi."boothEventId" = $1
+            ORDER BY cp."sortOrder"
+        `, [boothId]);
+
+        // Calculate expected revenue from inventory
+        let expectedRevenue = 0;
+        for (const item of inventoryDetail) {
+            expectedRevenue += (item.soldQty || 0) * parseFloat(item.pricePerBox || 0);
+        }
+
+        // Get payment totals
+        const paymentTotals = await db.getOne(`
+            SELECT COALESCE(SUM(amount), 0) as "totalCollected",
+                   COALESCE(SUM(CASE WHEN "paymentType" = 'cash' THEN amount ELSE 0 END), 0) as "totalCash",
+                   COALESCE(SUM(CASE WHEN "paymentType" = 'check' THEN amount ELSE 0 END), 0) as "totalChecks",
+                   COALESCE(SUM(CASE WHEN "paymentType" NOT IN ('cash', 'check') THEN amount ELSE 0 END), 0) as "totalDigital"
+            FROM booth_payments WHERE "boothEventId" = $1
+        `, [boothId]);
+
+        const actualRevenue = parseFloat(paymentTotals.totalCollected) - parseFloat(booth.startingBank || 0);
+        const variance = actualRevenue - expectedRevenue;
+
+        res.json({
+            booth: { id: booth.id, eventName: booth.eventName, status: booth.status, startingBank: booth.startingBank },
+            inventory: {
+                ...inventoryTotals,
+                detail: inventoryDetail,
+                expectedRevenue
+            },
+            payments: {
+                ...paymentTotals,
+                startingBank: booth.startingBank,
+                actualRevenue
+            },
+            reconciliation: {
+                expectedRevenue,
+                actualRevenue,
+                variance,
+                status: Math.abs(variance) < 0.01 ? 'balanced' : variance > 0 ? 'overage' : 'shortage'
+            }
+        });
+    } catch (error) {
+        logger.error('Error reconciling booth', { error: error.message });
+        res.status(500).json({ error: 'Failed to reconcile booth' });
+    }
+});
+
+// ============================================================================
+// Phase D: Troop Proceeds & Season Management
+// ============================================================================
+
+// Get troop season config
+app.get('/api/troop/:troopId/season-config', auth.isAuthenticated, auth.requirePrivilege('view_financials'), async (req, res) => {
+    try {
+        const { troopId } = req.params;
+        const season = await db.getOne('SELECT * FROM seasons WHERE "isActive" = true');
+        const targetSeason = season?.year || '2026';
+
+        let config = await db.getOne(
+            'SELECT * FROM troop_season_config WHERE "troopId" = $1 AND season = $2',
+            [troopId, targetSeason]
+        );
+
+        // Auto-create default config if none exists
+        if (!config) {
+            config = await db.getOne(`
+                INSERT INTO troop_season_config ("troopId", season)
+                VALUES ($1, $2) RETURNING *
+            `, [troopId, targetSeason]);
+        }
+
+        res.json(config);
+    } catch (error) {
+        logger.error('Error fetching season config', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch season config' });
+    }
+});
+
+// Update troop season config
+app.put('/api/troop/:troopId/season-config', auth.isAuthenticated, auth.requirePrivilege('manage_financials'), async (req, res) => {
+    try {
+        const { troopId } = req.params;
+        const { baseProceedsRate, initialOrderBonus, fallProductBonus, optOutBonus,
+                initialOrderDate, initialOrderQty, notes } = req.body;
+
+        const season = await db.getOne('SELECT * FROM seasons WHERE "isActive" = true');
+        const targetSeason = season?.year || '2026';
+
+        // Calculate effective rate
+        let effectiveRate = parseFloat(baseProceedsRate || 0.75);
+        if (initialOrderBonus) effectiveRate += 0.10;
+        if (fallProductBonus) effectiveRate += 0.10;
+        if (optOutBonus) effectiveRate += 0.10;
+
+        const config = await db.getOne(`
+            INSERT INTO troop_season_config ("troopId", season, "baseProceedsRate", "initialOrderBonus",
+                "fallProductBonus", "optOutBonus", "effectiveProceedsRate", "initialOrderDate", "initialOrderQty", notes)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            ON CONFLICT ("troopId", season) DO UPDATE SET
+                "baseProceedsRate" = EXCLUDED."baseProceedsRate",
+                "initialOrderBonus" = EXCLUDED."initialOrderBonus",
+                "fallProductBonus" = EXCLUDED."fallProductBonus",
+                "optOutBonus" = EXCLUDED."optOutBonus",
+                "effectiveProceedsRate" = EXCLUDED."effectiveProceedsRate",
+                "initialOrderDate" = EXCLUDED."initialOrderDate",
+                "initialOrderQty" = EXCLUDED."initialOrderQty",
+                notes = EXCLUDED.notes
+            RETURNING *
+        `, [troopId, targetSeason, baseProceedsRate || 0.75, !!initialOrderBonus,
+            !!fallProductBonus, !!optOutBonus, effectiveRate,
+            initialOrderDate || null, initialOrderQty || null, notes]);
+
+        res.json(config);
+    } catch (error) {
+        logger.error('Error updating season config', { error: error.message });
+        res.status(500).json({ error: 'Failed to update season config' });
+    }
+});
+
+// Calculate troop proceeds
+app.get('/api/troop/:troopId/proceeds', auth.isAuthenticated, auth.requirePrivilege('view_financials'), async (req, res) => {
+    try {
+        const { troopId } = req.params;
+        const season = await db.getOne('SELECT * FROM seasons WHERE "isActive" = true');
+        const targetSeason = season?.year || '2026';
+
+        // Get season config
+        const config = await db.getOne(
+            'SELECT * FROM troop_season_config WHERE "troopId" = $1 AND season = $2',
+            [troopId, targetSeason]
+        );
+        const effectiveRate = parseFloat(config?.effectiveProceedsRate || 0.75);
+
+        // Get total boxes sold by troop
+        const totals = await db.getOne(`
+            SELECT COALESCE(SUM(s.quantity), 0) as "totalBoxes",
+                   COALESCE(SUM(s."amountCollected"), 0) as "totalRevenue"
+            FROM sales s
+            JOIN troop_members tm ON s."userId" = tm."userId"
+            WHERE tm."troopId" = $1 AND tm.status = 'active'
+        `, [troopId]);
+
+        const totalBoxes = parseInt(totals.totalBoxes);
+        const totalProceeds = totalBoxes * effectiveRate;
+
+        res.json({
+            season: targetSeason,
+            effectiveRate,
+            totalBoxes,
+            totalRevenue: parseFloat(totals.totalRevenue),
+            totalProceeds,
+            bonuses: {
+                initialOrder: config?.initialOrderBonus || false,
+                fallProduct: config?.fallProductBonus || false,
+                optOut: config?.optOutBonus || false
+            }
+        });
+    } catch (error) {
+        logger.error('Error calculating proceeds', { error: error.message });
+        res.status(500).json({ error: 'Failed to calculate proceeds' });
+    }
+});
+
+// --- Season Milestones ---
+
+app.get('/api/troop/:troopId/milestones', auth.isAuthenticated, auth.requirePrivilege('view_events'), async (req, res) => {
+    try {
+        const { troopId } = req.params;
+        const season = await db.getOne('SELECT * FROM seasons WHERE "isActive" = true');
+        const targetSeason = season?.year || '2026';
+
+        const milestones = await db.getAll(
+            'SELECT * FROM season_milestones WHERE "troopId" = $1 AND season = $2 ORDER BY "milestoneDate", "sortOrder"',
+            [troopId, targetSeason]
+        );
+        res.json(milestones);
+    } catch (error) {
+        logger.error('Error fetching milestones', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch milestones' });
+    }
+});
+
+app.post('/api/troop/:troopId/milestones', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { troopId } = req.params;
+        const { milestoneName, milestoneDate, description, sortOrder } = req.body;
+        if (!milestoneName) return res.status(400).json({ error: 'milestoneName is required' });
+
+        const season = await db.getOne('SELECT * FROM seasons WHERE "isActive" = true');
+        const targetSeason = season?.year || '2026';
+
+        const milestone = await db.getOne(`
+            INSERT INTO season_milestones ("troopId", season, "milestoneName", "milestoneDate", description, "sortOrder")
+            VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
+        `, [troopId, targetSeason, milestoneName, milestoneDate || null, description, sortOrder || 0]);
+        res.status(201).json(milestone);
+    } catch (error) {
+        logger.error('Error creating milestone', { error: error.message });
+        res.status(500).json({ error: 'Failed to create milestone' });
+    }
+});
+
+app.put('/api/troop/:troopId/milestones/:milestoneId', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { milestoneId } = req.params;
+        const { milestoneName, milestoneDate, description, sortOrder } = req.body;
+        const milestone = await db.getOne(`
+            UPDATE season_milestones SET
+                "milestoneName" = COALESCE($1, "milestoneName"),
+                "milestoneDate" = COALESCE($2, "milestoneDate"),
+                description = COALESCE($3, description),
+                "sortOrder" = COALESCE($4, "sortOrder")
+            WHERE id = $5 RETURNING *
+        `, [milestoneName, milestoneDate, description, sortOrder, milestoneId]);
+        if (!milestone) return res.status(404).json({ error: 'Milestone not found' });
+        res.json(milestone);
+    } catch (error) {
+        logger.error('Error updating milestone', { error: error.message });
+        res.status(500).json({ error: 'Failed to update milestone' });
+    }
+});
+
+app.delete('/api/troop/:troopId/milestones/:milestoneId', auth.isAuthenticated, auth.requirePrivilege('manage_events'), async (req, res) => {
+    try {
+        const { milestoneId } = req.params;
+        const result = await db.run('DELETE FROM season_milestones WHERE id = $1', [milestoneId]);
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Milestone not found' });
+        res.json({ message: 'Milestone deleted' });
+    } catch (error) {
+        logger.error('Error deleting milestone', { error: error.message });
+        res.status(500).json({ error: 'Failed to delete milestone' });
     }
 });
 

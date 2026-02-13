@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <title>Apex Scout Manager</title>
-    <link rel="stylesheet" href="styles.css?v=12">
+    <link rel="stylesheet" href="styles.css?v=13">
 </head>
 <body>
     <div class="container">
@@ -27,6 +27,10 @@
             <button class="tab-btn active" data-view="profile">
                 <span class="tab-icon">👤</span>
                 <span class="tab-label">Profile</span>
+            </button>
+            <button class="tab-btn" data-view="cookies" id="cookiesTab">
+                <span class="tab-icon">🍪</span>
+                <span class="tab-label" id="cookiesTabLabel">Cookies</span>
             </button>
             <button class="tab-btn" data-view="events">
                 <span class="tab-icon">📅</span>
@@ -242,7 +246,348 @@
                 </section>
             </div>
 
-            <!-- Dashboard View -->
+            <!-- Cookie Dashboard View -->
+            <div id="view-cookies" class="view-section hidden">
+                <!-- My Sales Summary -->
+                <div class="cookie-dashboard-header">
+                    <h2 id="cookieDashTitle">Cookie Dashboard</h2>
+                </div>
+
+                <div class="cookie-summary-cards">
+                    <div class="summary-card">
+                        <span class="summary-icon">📦</span>
+                        <div class="summary-data">
+                            <span class="summary-value" id="myTotalBoxes">0</span>
+                            <span class="summary-label">Boxes Sold</span>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <span class="summary-icon">💵</span>
+                        <div class="summary-data">
+                            <span class="summary-value" id="myTotalCollected">$0</span>
+                            <span class="summary-label">Collected</span>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <span class="summary-icon">🎯</span>
+                        <div class="summary-data">
+                            <span class="summary-value" id="myGoalProgress">0%</span>
+                            <span class="summary-label">Goal</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Sale Entry -->
+                <section class="cookie-quick-sale">
+                    <h3>Quick Sale</h3>
+                    <form id="quickSaleForm" class="quick-sale-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="qsProduct">Product</label>
+                                <select id="qsProduct" required>
+                                    <option value="">Select cookie...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="qsQuantity">Qty</label>
+                                <input type="number" id="qsQuantity" min="1" value="1" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="qsSaleType">Type</label>
+                                <select id="qsSaleType">
+                                    <option value="individual_inperson">In-Person</option>
+                                    <option value="individual_digital_delivered">Digital (Delivered)</option>
+                                    <option value="individual_digital_shipped">Digital (Shipped)</option>
+                                    <option value="individual_donation">Donation</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group flex-grow">
+                                <label for="qsCustomer">Customer Name</label>
+                                <input type="text" id="qsCustomer" placeholder="Optional">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Record Sale</button>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- Product Breakdown -->
+                <section class="cookie-product-breakdown">
+                    <h3>Sales by Product</h3>
+                    <div id="cookieProductBreakdown" class="cookie-product-grid">
+                        <p class="empty-state">No sales recorded yet</p>
+                    </div>
+                </section>
+
+                <!-- My Inventory -->
+                <section class="cookie-inventory-section">
+                    <h3>My Inventory</h3>
+                    <div id="cookieInventoryGrid" class="cookie-inventory-grid">
+                        <p class="empty-state">No inventory tracked yet</p>
+                    </div>
+                </section>
+
+                <!-- Recent Sales -->
+                <section class="cookie-recent-sales">
+                    <h3>Recent Sales</h3>
+                    <div id="cookieRecentSales" class="recent-sales-list">
+                        <p class="empty-state">No recent sales</p>
+                    </div>
+                </section>
+
+                <!-- Goal Getter Order Card -->
+                <section class="cookie-order-card">
+                    <div class="section-header">
+                        <h3>Goal Getter Order Card</h3>
+                        <button class="btn btn-secondary btn-sm" onclick="toggleOrderCard()">Open Order Card</button>
+                    </div>
+                    <div id="orderCardContainer" class="order-card-container hidden">
+                        <div class="order-card-header">
+                            <div class="order-card-info">
+                                <span id="orderCardScoutName" class="order-card-scout"></span>
+                                <span id="orderCardTroop" class="order-card-troop"></span>
+                                <span id="orderCardGoal" class="order-card-goal"></span>
+                            </div>
+                            <div class="order-card-actions">
+                                <button class="btn btn-sm btn-secondary" onclick="printOrderCard()">Print</button>
+                                <button class="btn btn-sm btn-primary" onclick="saveOrderCard()">Save All</button>
+                            </div>
+                        </div>
+                        <div class="order-card-table-wrapper">
+                            <table class="order-card-table" id="orderCardTable">
+                                <thead id="orderCardHead">
+                                    <tr><th>Customer</th><th>Phone</th></tr>
+                                </thead>
+                                <tbody id="orderCardBody">
+                                </tbody>
+                                <tfoot id="orderCardFoot">
+                                    <tr><td colspan="2"><strong>Totals</strong></td></tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="addOrderCardRow()">+ Add Customer</button>
+                    </div>
+                </section>
+
+                <!-- Troop Summary (shown with view_troop_sales privilege) -->
+                <section id="cookieTroopSection" class="cookie-troop-section" style="display:none;">
+                    <h3>Troop Overview</h3>
+                    <div class="cookie-troop-cards">
+                        <div class="summary-card">
+                            <span class="summary-icon">📦</span>
+                            <div class="summary-data">
+                                <span class="summary-value" id="cookieTroopBoxes">0</span>
+                                <span class="summary-label">Troop Boxes</span>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <span class="summary-icon">💵</span>
+                            <div class="summary-data">
+                                <span class="summary-value" id="cookieTroopCollected">$0</span>
+                                <span class="summary-label">Troop Collected</span>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <span class="summary-icon">💰</span>
+                            <div class="summary-data">
+                                <span class="summary-value" id="cookieTroopProceeds">$0</span>
+                                <span class="summary-label">Est. Proceeds</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Season Milestones -->
+                    <div class="cookie-milestones">
+                        <h4>Season Milestones</h4>
+                        <div id="cookieMilestonesList" class="milestones-list">
+                            <p class="empty-state">No milestones set</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Booth Events (shown with view_events privilege) -->
+                <section id="cookieBoothSection" class="cookie-booth-section" style="display:none;">
+                    <div class="section-header">
+                        <h3>Booth Events</h3>
+                        <button class="btn btn-primary btn-sm" onclick="openCreateBoothModal()">+ New Booth</button>
+                    </div>
+                    <div id="boothEventsList" class="booth-events-list">
+                        <p class="empty-state">No booth events scheduled</p>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Create Booth Modal -->
+            <div id="createBoothModal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>New Booth Event</h3>
+                        <button class="modal-close" onclick="closeCreateBoothModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="boothEventName">Event Name *</label>
+                            <input type="text" id="boothEventName" placeholder="e.g., Walmart Cookie Booth" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="boothEventType">Booth Type</label>
+                                <select id="boothEventType">
+                                    <option value="troop">Troop Booth (2-5 girls)</option>
+                                    <option value="family">Family Booth (1 girl)</option>
+                                    <option value="council">Council Booth</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="boothStartingBank">Starting Bank ($)</label>
+                                <input type="number" id="boothStartingBank" min="0" step="0.01" value="0">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="boothLocation">Location</label>
+                            <input type="text" id="boothLocation" placeholder="e.g., Walmart #1234">
+                        </div>
+                        <div class="form-group">
+                            <label for="boothLocationAddress">Address</label>
+                            <input type="text" id="boothLocationAddress" placeholder="Street address">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="boothStartDate">Start Date/Time *</label>
+                                <input type="datetime-local" id="boothStartDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="boothEndDate">End Date/Time *</label>
+                                <input type="datetime-local" id="boothEndDate" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="boothNotes">Notes</label>
+                            <textarea id="boothNotes" rows="2" placeholder="Optional notes"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="closeCreateBoothModal()">Cancel</button>
+                        <button class="btn btn-primary" onclick="createBoothEvent()">Create Booth</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Booth Detail Modal -->
+            <div id="boothDetailModal" class="modal" style="display:none;">
+                <div class="modal-content modal-lg">
+                    <div class="modal-header">
+                        <h3 id="boothDetailTitle">Booth Details</h3>
+                        <button class="modal-close" onclick="closeBoothDetailModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="booth-detail-status">
+                            <span id="boothDetailStatus" class="booth-status-badge">Planning</span>
+                            <div class="booth-detail-actions" id="boothDetailActions"></div>
+                        </div>
+
+                        <div class="booth-detail-tabs">
+                            <button class="booth-tab active" data-booth-tab="info" onclick="switchBoothTab('info')">Info</button>
+                            <button class="booth-tab" data-booth-tab="shifts" onclick="switchBoothTab('shifts')">Shifts</button>
+                            <button class="booth-tab" data-booth-tab="inventory" onclick="switchBoothTab('inventory')">Inventory</button>
+                            <button class="booth-tab" data-booth-tab="payments" onclick="switchBoothTab('payments')">Payments</button>
+                            <button class="booth-tab" data-booth-tab="reconcile" onclick="switchBoothTab('reconcile')">Reconcile</button>
+                        </div>
+
+                        <!-- Info Tab -->
+                        <div id="booth-panel-info" class="booth-panel">
+                            <div id="boothDetailInfo"></div>
+                        </div>
+
+                        <!-- Shifts Tab -->
+                        <div id="booth-panel-shifts" class="booth-panel hidden">
+                            <div class="section-header">
+                                <h4>Shift Schedule</h4>
+                                <button class="btn btn-sm btn-secondary" onclick="openAddShiftForm()">+ Add Shift</button>
+                            </div>
+                            <div id="addShiftForm" class="add-shift-form hidden">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Scout</label>
+                                        <select id="shiftScoutSelect"></select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Start</label>
+                                        <input type="datetime-local" id="shiftStartTime">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>End</label>
+                                        <input type="datetime-local" id="shiftEndTime">
+                                    </div>
+                                    <button class="btn btn-sm btn-primary" onclick="addShift()">Add</button>
+                                </div>
+                            </div>
+                            <div id="boothShiftsList" class="shifts-list">
+                                <p class="empty-state">No shifts scheduled</p>
+                            </div>
+                        </div>
+
+                        <!-- Inventory Tab -->
+                        <div id="booth-panel-inventory" class="booth-panel hidden">
+                            <div class="section-header">
+                                <h4>Booth Inventory</h4>
+                                <button class="btn btn-sm btn-secondary" onclick="setupBoothInventory()">Setup Inventory</button>
+                            </div>
+                            <div id="boothInventoryTable" class="booth-inventory-grid">
+                                <p class="empty-state">No inventory set up</p>
+                            </div>
+                            <button id="saveBoothInventoryBtn" class="btn btn-primary" style="display:none;" onclick="saveBoothInventory()">Save Inventory</button>
+                            <button id="recordEndCountBtn" class="btn btn-secondary" style="display:none;" onclick="recordEndingCount()">Record Ending Count</button>
+                        </div>
+
+                        <!-- Payments Tab -->
+                        <div id="booth-panel-payments" class="booth-panel hidden">
+                            <div class="section-header">
+                                <h4>Payments</h4>
+                                <button class="btn btn-sm btn-secondary" onclick="openAddPaymentForm()">+ Add Payment</button>
+                            </div>
+                            <div id="addPaymentForm" class="add-payment-form hidden">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Type</label>
+                                        <select id="paymentTypeSelect">
+                                            <option value="cash">Cash</option>
+                                            <option value="check">Check</option>
+                                            <option value="venmo">Venmo</option>
+                                            <option value="paypal">PayPal</option>
+                                            <option value="square">Square</option>
+                                            <option value="zelle">Zelle</option>
+                                            <option value="digital_cookie">Digital Cookie</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Amount ($)</label>
+                                        <input type="number" id="paymentAmount" min="0" step="0.01">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Reference #</label>
+                                        <input type="text" id="paymentReference" placeholder="Optional">
+                                    </div>
+                                    <button class="btn btn-sm btn-primary" onclick="addPayment()">Add</button>
+                                </div>
+                            </div>
+                            <div id="boothPaymentsList" class="payments-list">
+                                <p class="empty-state">No payments recorded</p>
+                            </div>
+                        </div>
+
+                        <!-- Reconciliation Tab -->
+                        <div id="booth-panel-reconcile" class="booth-panel hidden">
+                            <div id="reconciliationSummary" class="reconciliation-summary">
+                                <p class="empty-state">Complete inventory count and payment entry to reconcile</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Events View -->
             <div id="view-events" class="view-section hidden">
                 <div class="calendar-controls-header">
@@ -906,12 +1251,179 @@
                                     <option value="co-leader">Co-Leader</option>
                                     <option value="assistant">Assistant</option>
                                     <option value="cookie_leader">Cookie Leader</option>
+                                    <option value="cookie_manager">Cookie Manager (SUCM)</option>
                                 </select>
                             </div>
                         </div>
                         <div class="modal-footer">
                             <button class="btn btn-secondary" onclick="closeSendInviteModal()">Cancel</button>
                             <button class="btn btn-primary" onclick="sendInvitation()">Send Invitation</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit Member Modal -->
+                <div id="editMemberModal" class="modal" style="display: none;">
+                    <div class="modal-content modal-lg" style="max-height: 90vh; overflow-y: auto;">
+                        <div class="modal-header">
+                            <h3>Edit Member</h3>
+                            <button class="modal-close" onclick="closeEditMemberModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="editMemberForm">
+                                <input type="hidden" id="editMemberId" value="">
+
+                                <!-- Personal Information -->
+                                <div class="form-section">
+                                    <h4>Personal Information</h4>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="editFirstName">First Name *</label>
+                                            <input type="text" id="editFirstName" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="editLastName">Last Name *</label>
+                                            <input type="text" id="editLastName" required>
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="editDateOfBirth">Date of Birth</label>
+                                            <input type="date" id="editDateOfBirth">
+                                            <small class="form-help" id="editMinorStatus"></small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="editPhotoUrl">Photo URL</label>
+                                            <input type="url" id="editPhotoUrl" placeholder="https://...">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Contact Information -->
+                                <div class="form-section">
+                                    <h4>Contact Information</h4>
+                                    <div class="form-group">
+                                        <label for="editEmail">Email</label>
+                                        <input type="email" id="editEmail">
+                                        <small class="form-help">Used for login and notifications</small>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="editPhone">Phone</label>
+                                            <input type="tel" id="editPhone" placeholder="(555) 123-4567">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="editAddress">Address</label>
+                                            <input type="text" id="editAddress" placeholder="123 Main St, City, ST 12345">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Troop Information -->
+                                <div class="form-section">
+                                    <h4>Troop Information</h4>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="editRole">Role</label>
+                                            <select id="editRole">
+                                                <option value="member">Scout/Member</option>
+                                                <option value="parent">Parent</option>
+                                                <option value="volunteer">Volunteer</option>
+                                                <option value="assistant">Assistant Leader</option>
+                                                <option value="co-leader">Co-Leader</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="editPosition">Position</label>
+                                            <input type="text" id="editPosition" placeholder="e.g., Treasurer, Scribe">
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="editScoutLevel">Scout Level</label>
+                                            <select id="editScoutLevel">
+                                                <option value="">Not a scout</option>
+                                                <option value="Daisy">Daisy</option>
+                                                <option value="Brownie">Brownie</option>
+                                                <option value="Junior">Junior</option>
+                                                <option value="Cadette">Cadette</option>
+                                                <option value="Senior">Senior</option>
+                                                <option value="Ambassador">Ambassador</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="editDen">Den</label>
+                                            <input type="text" id="editDen" placeholder="Den name/number">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="editLinkedParent">Linked Parent/Guardian</label>
+                                        <select id="editLinkedParent">
+                                            <option value="">No parent linked</option>
+                                        </select>
+                                        <small class="form-help">Link this scout to a parent/guardian in the troop</small>
+                                    </div>
+                                </div>
+
+                                <!-- Payment Methods -->
+                                <div class="form-section">
+                                    <h4>Payment Methods</h4>
+                                    <div id="editPaymentMethodsList"></div>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="addPaymentMethod()">
+                                        + Add Payment Method
+                                    </button>
+                                </div>
+
+                                <!-- Account Actions -->
+                                <div class="form-section">
+                                    <h4>Account Actions</h4>
+                                    <div class="action-buttons">
+                                        <button type="button" class="btn btn-warning" onclick="initiatePasswordReset()">
+                                            Reset Password
+                                        </button>
+                                        <button type="button" class="btn btn-danger" onclick="confirmDeleteAccount()">
+                                            Delete Account
+                                        </button>
+                                    </div>
+                                    <small class="form-help text-danger">
+                                        Warning: Account deletion is permanent and cannot be undone.
+                                    </small>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" onclick="closeEditMemberModal()">Cancel</button>
+                            <button class="btn btn-primary" onclick="saveEditMember()">Save Changes</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Delete Account Confirmation Modal -->
+                <div id="deleteAccountModal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Confirm Account Deletion</h3>
+                            <button class="modal-close" onclick="closeDeleteAccountModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="text-danger">
+                                <strong>Warning:</strong> This action will permanently delete this account and all associated data.
+                            </p>
+                            <p>The account will be deactivated immediately and fully deleted after 30 days.</p>
+                            <div class="form-group">
+                                <label for="deleteReason">Reason for deletion (optional)</label>
+                                <textarea id="deleteReason" rows="3" placeholder="e.g., Member left troop, duplicate account, etc."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="confirmDeleteCheckbox">
+                                    I understand this action is permanent
+                                </label>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" onclick="closeDeleteAccountModal()">Cancel</button>
+                            <button class="btn btn-danger" onclick="executeAccountDeletion()">Delete Account</button>
                         </div>
                     </div>
                 </div>
@@ -923,6 +1435,6 @@
         </footer>
     </div>
 
-    <script src="script.js?v=12"></script>
+    <script src="script.js?v=13"></script>
 </body>
 </html>

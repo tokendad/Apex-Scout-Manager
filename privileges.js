@@ -27,13 +27,13 @@ const PRIVILEGE_DEFINITIONS = [
     { code: 'view_events', name: 'View events', category: 'Calendar & Events' },
     { code: 'manage_events', name: 'Manage events', category: 'Calendar & Events' },
     { code: 'export_calendar', name: 'Export calendar', category: 'Calendar & Events' },
-    // Fundraising & Sales (future)
-    { code: 'view_sales', name: 'View sales data', category: 'Fundraising & Sales', future: true },
-    { code: 'record_sales', name: 'Record sales', category: 'Fundraising & Sales', future: true },
-    { code: 'manage_fundraisers', name: 'Manage fundraisers', category: 'Fundraising & Sales', future: true },
-    { code: 'view_troop_sales', name: 'View troop sales', category: 'Fundraising & Sales', future: true },
-    { code: 'view_financials', name: 'View financial accounts', category: 'Fundraising & Sales', future: true },
-    { code: 'manage_financials', name: 'Manage financial accounts', category: 'Fundraising & Sales', future: true },
+    // Fundraising & Sales
+    { code: 'view_sales', name: 'View sales data', category: 'Fundraising & Sales' },
+    { code: 'record_sales', name: 'Record sales', category: 'Fundraising & Sales' },
+    { code: 'manage_fundraisers', name: 'Manage fundraisers', category: 'Fundraising & Sales' },
+    { code: 'view_troop_sales', name: 'View troop sales', category: 'Fundraising & Sales' },
+    { code: 'view_financials', name: 'View financial accounts', category: 'Fundraising & Sales' },
+    { code: 'manage_financials', name: 'Manage financial accounts', category: 'Fundraising & Sales' },
     // Donations
     { code: 'view_donations', name: 'View donations', category: 'Donations' },
     { code: 'record_donations', name: 'Record donations', category: 'Donations' },
@@ -62,6 +62,8 @@ const ROLE_PRIVILEGE_DEFAULTS = {
     cookie_leader: { view_roster:'T', manage_members:'none', manage_troop_settings:'none', send_invitations:'none', import_roster:'none', manage_member_roles:'none', manage_privileges:'none', view_scout_profiles:'none', edit_scout_level:'none', edit_scout_status:'none', award_badges:'none', view_badge_progress:'none', edit_personal_info:'none', view_events:'T', manage_events:'none', export_calendar:'T', view_sales:'T', record_sales:'T', manage_fundraisers:'T', view_troop_sales:'T', view_financials:'T', manage_financials:'T', view_donations:'T', record_donations:'S', delete_donations:'none', view_goals:'T', manage_goals:'none', view_leaderboard:'T', manage_payment_methods:'S', import_data:'T', export_data:'T', delete_own_data:'S' },
     troop_leader:  { view_roster:'T', manage_members:'T', manage_troop_settings:'T', send_invitations:'T', import_roster:'T', manage_member_roles:'T', manage_privileges:'T', view_scout_profiles:'T', edit_scout_level:'T', edit_scout_status:'T', award_badges:'T', view_badge_progress:'T', edit_personal_info:'T', view_events:'T', manage_events:'T', export_calendar:'T', view_sales:'T', record_sales:'T', manage_fundraisers:'T', view_troop_sales:'T', view_financials:'T', manage_financials:'T', view_donations:'T', record_donations:'T', delete_donations:'T', view_goals:'T', manage_goals:'T', view_leaderboard:'T', manage_payment_methods:'S', import_data:'T', export_data:'T', delete_own_data:'S' },
     council_admin: { view_roster:'T', manage_members:'T', manage_troop_settings:'T', send_invitations:'T', import_roster:'T', manage_member_roles:'T', manage_privileges:'T', view_scout_profiles:'T', edit_scout_level:'T', edit_scout_status:'T', award_badges:'T', view_badge_progress:'T', edit_personal_info:'T', view_events:'T', manage_events:'T', export_calendar:'T', view_sales:'T', record_sales:'T', manage_fundraisers:'T', view_troop_sales:'T', view_financials:'T', manage_financials:'T', view_donations:'T', record_donations:'T', delete_donations:'T', view_goals:'T', manage_goals:'T', view_leaderboard:'T', manage_payment_methods:'S', import_data:'T', export_data:'T', delete_own_data:'S' },
+    // Service Unit Cookie Manager (SUCM) - full cookie/sales access, limited troop management
+    cookie_manager:{ view_roster:'T', manage_members:'none', manage_troop_settings:'none', send_invitations:'none', import_roster:'none', manage_member_roles:'none', manage_privileges:'none', view_scout_profiles:'T', edit_scout_level:'none', edit_scout_status:'none', award_badges:'none', view_badge_progress:'T', edit_personal_info:'none', view_events:'T', manage_events:'none', export_calendar:'T', view_sales:'T', record_sales:'T', manage_fundraisers:'T', view_troop_sales:'T', view_financials:'T', manage_financials:'T', view_donations:'T', record_donations:'T', delete_donations:'none', view_goals:'T', manage_goals:'T', view_leaderboard:'T', manage_payment_methods:'S', import_data:'T', export_data:'T', delete_own_data:'S' },
 };
 
 /**
