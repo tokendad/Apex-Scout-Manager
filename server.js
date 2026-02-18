@@ -6,6 +6,8 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const os = require('os');
+const { exec } = require('child_process');
 const multer = require('multer');
 const ExcelJS = require('exceljs');
 const session = require('express-session');
@@ -355,6 +357,36 @@ const PORT = process.env.PORT || 3000;
         `).catch(() => {});
         await db.query(`CREATE INDEX IF NOT EXISTS idx_season_milestones_troop ON season_milestones("troopId", season)`).catch(() => {});
 
+        // Create admins table for system administrator management (Phase 1)
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS admins (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                "userId" UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+                role VARCHAR(50) DEFAULT 'admin' NOT NULL CHECK (role IN ('admin', 'super_admin')),
+                "grantedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                "grantedBy" UUID REFERENCES users(id) ON DELETE SET NULL,
+                "revokedAt" TIMESTAMP WITH TIME ZONE,
+                "revokedBy" UUID REFERENCES users(id) ON DELETE SET NULL
+            )
+        `).catch(() => {});
+        await db.query(`
+            CREATE INDEX IF NOT EXISTS "idx_admins_user_id" ON admins("userId")
+        `).catch(() => {});
+        await db.query(`
+            CREATE INDEX IF NOT EXISTS "idx_admins_active" ON admins("userId") WHERE ("revokedAt" IS NULL)
+        `).catch(() => {});
+
+        // Update users.role CHECK constraint to include 'admin' and 'member' roles for admin system
+        await db.query(`
+            ALTER TABLE users DROP CONSTRAINT IF EXISTS role_check
+        `).catch(() => {});
+        await db.query(`
+            ALTER TABLE users ADD CONSTRAINT role_check
+            CHECK (role IN ('scout', 'member', 'parent', 'volunteer', 'assistant',
+                           'co-leader', 'cookie_leader', 'troop_leader',
+                           'cookie_manager', 'admin'))
+        `).catch(() => {});
+
         logger.info('Schema migration checks completed');
     } catch (err) {
         logger.warn('Schema migration checks had issues (non-fatal)', { error: err.message });
@@ -459,6 +491,69 @@ app.get('/register.html', (req, res, next) => {
     next();
 });
 
+// Maintenance Mode Middleware
+app.use(async (req, res, next) => {
+    // Skip for static assets, login, and admin API
+    if (req.path.match(/\.(css|js|png|jpg|ico)$/) || 
+        req.path === '/login.html' || 
+        req.path === '/api/login' ||
+        req.path.startsWith('/api/system/') ||
+        (req.session && req.session.userId && await auth.isAdmin(db, req.session.userId))) {
+        return next();
+    }
+
+    try {
+        const maintenanceSetting = await db.getOne('SELECT value FROM system_settings WHERE key = $1', ['site_maintenance_mode']);
+        if (maintenanceSetting && (maintenanceSetting.value === 'true' || maintenanceSetting.value === true)) {
+            // If API request, return JSON
+            if (req.path.startsWith('/api/')) {
+                return res.status(503).json({ error: 'System is currently in maintenance mode' });
+            }
+            // Otherwise show maintenance page (or simple text for now)
+            return res.status(503).send('<h1>System Under Maintenance</h1><p>We are currently performing system maintenance. Please try again later.</p>');
+        }
+        next();
+    } catch (error) {
+        // Fallback on error
+        next();
+    }
+});
+
+// Bootstrap check middleware - redirect to setup wizard if needed
+app.use(async (req, res, next) => {
+    // Only check for authenticated users trying to access protected pages
+    if (!req.session || !req.session.userId) {
+        return next();
+    }
+
+    // Skip check for specific routes
+    if (req.path === '/logout' ||
+        req.path === '/login.html' ||
+        req.path === '/register.html' ||
+        req.path === '/setup-wizard' ||
+        req.path === '/setup-wizard.html' ||
+        req.path.startsWith('/api/')) {
+        return next();
+    }
+
+    try {
+        // Check if any admins exist
+        const adminCount = await db.getOne(
+            'SELECT COUNT(*)::int as count FROM admins WHERE "revokedAt" IS NULL'
+        );
+
+        // If no admins, redirect to setup wizard (except already on setup page)
+        if (Number(adminCount.count) === 0 && !req.path.startsWith('/setup')) {
+            return res.redirect('/setup-wizard');
+        }
+
+        next();
+    } catch (error) {
+        logger.error('Bootstrap check error:', error);
+        next(); // Continue on error, don't block
+    }
+});
+
 // Protect the main page - redirect to login if not authenticated
 app.get('/', (req, res, next) => {
     if (!req.session || !req.session.userId) {
@@ -472,6 +567,68 @@ app.get('/index.html', (req, res, next) => {
         return res.redirect('/login.html');
     }
     next();
+});
+
+// Setup wizard route - first-time admin account creation (no admin auth required if bootstrap needed)
+app.get('/setup-wizard.html', async (req, res, next) => {
+    try {
+        // Check if bootstrap is needed
+        const adminCount = await db.getOne(
+            'SELECT COUNT(*)::int as count FROM admins WHERE "revokedAt" IS NULL'
+        );
+
+        if (Number(adminCount.count) > 0) {
+            // Bootstrap already complete, redirect to login
+            return res.redirect('/login.html');
+        }
+
+        // Check if user is authenticated
+        if (!req.session || !req.session.userId) {
+            return res.redirect('/login.html');
+        }
+
+        // Bootstrap needed and user is authenticated, serve setup wizard
+        next();
+    } catch (error) {
+        logger.error('Setup wizard route error:', error);
+        res.status(500).send('Error checking bootstrap status');
+    }
+});
+
+app.get('/setup-wizard', async (req, res) => {
+    try {
+        // Check if bootstrap is needed
+        const adminCount = await db.getOne(
+            'SELECT COUNT(*)::int as count FROM admins WHERE "revokedAt" IS NULL'
+        );
+
+        if (Number(adminCount.count) > 0) {
+            // Bootstrap already complete
+            return res.redirect('/admin');
+        }
+
+        // Check if user is authenticated
+        if (!req.session || !req.session.userId) {
+            return res.redirect('/login.html');
+        }
+
+        // Redirect to setup-wizard.html
+        res.redirect('/setup-wizard.html');
+    } catch (error) {
+        logger.error('Setup wizard redirect error:', error);
+        res.status(500).send('Error checking bootstrap status');
+    }
+});
+
+// Admin panel route - requires admin access
+app.get('/admin.html', auth.isAuthenticated, auth.requireAdmin, (req, res, next) => {
+    // Access already verified by middleware, continue to serve static file
+    next();
+});
+
+app.get('/admin', auth.isAuthenticated, auth.requireAdmin, (req, res) => {
+    // Redirect to admin.html
+    res.redirect('/admin.html');
 });
 
 app.use(express.static('public'));
@@ -603,15 +760,9 @@ app.post('/api/auth/login', (req, res, next) => {
             // Store user info in session
             req.session.userId = user.id;
             req.session.userEmail = user.email;
+            req.session.userRole = user.role;
 
-            // Hardcoded superuser privilege for welefort@gmail.com
-            if (user.email === 'welefort@gmail.com') {
-                req.session.userRole = 'council_admin';
-            } else {
-                req.session.userRole = user.role;
-            }
-
-            // Log audit event
+            // Update last login timestamp
             await auth.logAuditEvent(db, user.id, 'user_login', req, { method: 'local' });
 
             logger.info('User logged in', { userId: user.id, email: user.email });
@@ -646,18 +797,7 @@ if (passportStrategies.google) {
             // Store user info in session
             req.session.userId = req.user.id;
             req.session.userEmail = req.user.email;
-            
-            // Hardcoded superuser privilege for welefort@gmail.com
-            if (req.user.email === 'welefort@gmail.com') {
-                req.session.userRole = 'council_admin';
-            } else {
-                req.session.userRole = req.user.role;
-            }
-
-            // Log audit event
-            auth.logAuditEvent(db, req.user.id, 'user_login', req, { method: 'google' });
-
-            logger.info('User logged in via Google', { userId: req.user.id, email: req.user.email });
+            req.session.userRole = req.user.role;
 
             res.redirect('/');
         }
@@ -700,11 +840,6 @@ app.get('/api/auth/me', auth.isAuthenticated, async (req, res) => {
 
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Hardcoded superuser privilege for welefort@gmail.com
-        if (user.email === 'welefort@gmail.com') {
-            user.role = 'council_admin';
         }
 
         // Get troop info
@@ -893,8 +1028,8 @@ app.put('/api/sales/:id', auth.isAuthenticated, auth.requirePrivilegeAnyTroop('r
         if (!existingSale) {
             return res.status(404).json({ error: 'Sale not found' });
         }
-        if (existingSale.userId !== req.session.userId && req.session.userRole !== 'council_admin') {
-            return res.status(403).json({ error: 'Access denied' });
+        if (existingSale.userId !== req.session.userId && req.session.userRole !== 'admin') {
+            return res.status(403).json({ error: 'Not authorized to edit this sale' });
         }
 
         // Dynamic update query construction
@@ -945,8 +1080,8 @@ app.delete('/api/sales/:id', auth.isAuthenticated, auth.requirePrivilegeAnyTroop
             logger.warn('Attempted to delete non-existent sale', { saleId: id });
             return res.status(404).json({ error: 'Sale not found' });
         }
-        if (existingSale.userId !== req.session.userId && req.session.userRole !== 'council_admin') {
-            return res.status(403).json({ error: 'Access denied' });
+        if (existingSale.userId !== req.session.userId && req.session.userRole !== 'admin') {
+            return res.status(403).json({ error: 'Not authorized to edit this sale' });
         }
 
         await db.run('DELETE FROM sales WHERE id = $1', [id]);
@@ -1242,8 +1377,9 @@ app.delete('/api/donations/:id', auth.isAuthenticated, auth.requirePrivilegeAnyT
             logger.warn('Attempted to delete non-existent donation', { donationId: id });
             return res.status(404).json({ error: 'Donation not found' });
         }
-        if (existingDonation.userId !== req.session.userId && req.session.userRole !== 'council_admin') {
-            return res.status(403).json({ error: 'Access denied' });
+        // Check if user is deleting their own donation or is admin
+        if (existingDonation.userId !== req.session.userId && req.session.userRole !== 'admin') {
+            return res.status(403).json({ error: 'Not authorized to delete this donation' });
         }
 
         await db.run('DELETE FROM donations WHERE id = $1', [id]);
@@ -1319,7 +1455,7 @@ app.post('/api/events', auth.isAuthenticated, async (req, res) => {
                 'SELECT * FROM troop_members WHERE "troopId" = $1 AND "userId" = $2 AND status = \'active\'',
                 [troopId, req.session.userId]
             );
-            if (!membership && req.session.userRole !== 'council_admin') {
+            if (!membership && req.session.userRole !== 'admin') {
                 return res.status(403).json({ error: 'You are not an active member of this troop' });
             }
         }
@@ -1373,8 +1509,8 @@ app.put('/api/events/:id', auth.isAuthenticated, async (req, res) => {
             logger.warn('Attempted to update non-existent event', { eventId: id });
             return res.status(404).json({ error: 'Event not found' });
         }
-        if (existingEvent.userId !== req.session.userId && req.session.userRole !== 'council_admin') {
-            return res.status(403).json({ error: 'Access denied' });
+        if (existingEvent.userId !== req.session.userId && req.session.userRole !== 'admin') {
+            return res.status(403).json({ error: 'Not authorized to edit this event' });
         }
 
         if (!eventName || !eventDate) {
@@ -1446,8 +1582,8 @@ app.delete('/api/events/:id', auth.isAuthenticated, async (req, res) => {
             logger.warn('Attempted to delete non-existent event', { eventId: id });
             return res.status(404).json({ error: 'Event not found' });
         }
-        if (existingEvent.userId !== req.session.userId && req.session.userRole !== 'council_admin') {
-            return res.status(403).json({ error: 'Access denied' });
+        if (existingEvent.userId !== req.session.userId && req.session.userRole !== 'admin') {
+            return res.status(403).json({ error: 'Not authorized to edit this event' });
         }
 
         await db.run('DELETE FROM events WHERE id = $1', [id]);
@@ -1693,8 +1829,9 @@ app.delete('/api/payment-methods/:id', auth.isAuthenticated, async (req, res) =>
         if (!existingMethod) {
             return res.status(404).json({ error: 'Payment method not found' });
         }
-        if (existingMethod.userId !== req.session.userId && req.session.userRole !== 'council_admin') {
-            return res.status(403).json({ error: 'Access denied' });
+        // Check if user is deleting their own payment method or is admin
+        if (existingMethod.userId !== req.session.userId && req.session.userRole !== 'admin') {
+            return res.status(403).json({ error: 'Not authorized to delete this payment method' });
         }
 
         await db.run('DELETE FROM payment_methods WHERE id = $1', [id]);
@@ -1754,12 +1891,12 @@ app.delete('/api/data', auth.isAuthenticated, async (req, res) => {
 // Troop Management Routes (Phase 2)
 // ============================================================================
 
-// Get all troops for current user (as leader) or all troops (as council_admin)
+// Get all troops for current user (as leader) or all troops (as admin)
 app.get('/api/troop/my-troops', auth.isAuthenticated, async (req, res) => {
     try {
         let troops;
-        if (req.session.userRole === 'council_admin') {
-            // Council admin sees all troops
+        if (req.session.userRole === 'admin') {
+            // Admin sees all troops
             troops = await db.getAll(`
                 SELECT t.*, u."firstName" || ' ' || u."lastName" as "leaderName",
                        (SELECT COUNT(*) FROM troop_members WHERE "troopId" = t.id AND status = 'active') as "memberCount"
@@ -2427,7 +2564,7 @@ app.get('/api/troop/:troopId/goals', auth.isAuthenticated, auth.requirePrivilege
 });
 
 // Create a new troop
-app.post('/api/troop', auth.isAuthenticated, auth.hasRole('troop_leader', 'council_admin'), async (req, res) => {
+app.post('/api/troop', auth.isAuthenticated, auth.hasRole('troop_leader', 'admin'), async (req, res) => {
     try {
         const { troopNumber, troopType, meetingLocation, meetingDay, meetingTime } = req.body;
 
@@ -2787,10 +2924,10 @@ app.post('/api/troop/:troopId/goals', auth.isAuthenticated, auth.requirePrivileg
     }
 });
 
-// Get all users (for adding members) - council_admin or troop_leader
-app.get('/api/users/search', auth.isAuthenticated, auth.hasRole('troop_leader', 'council_admin'), async (req, res) => {
+// Get all users (for adding members) - admin or troop_leader
+app.get('/api/users/search', auth.isAuthenticated, auth.hasRole('troop_leader', 'admin'), async (req, res) => {
     try {
-        const { q } = req.query;
+        const { query } = req.query;
         if (!q || q.length < 2) {
             return res.json([]);
         }
@@ -2842,7 +2979,7 @@ app.get('/api/seasons', auth.isAuthenticated, async (req, res) => {
 });
 
 // Create new season
-app.post('/api/seasons', auth.isAuthenticated, auth.hasRole('council_admin'), async (req, res) => {
+app.post('/api/seasons', auth.isAuthenticated, auth.hasRole('admin'), async (req, res) => {
     try {
         const { year, name, startDate, endDate, pricePerBox, copyFromYear } = req.body;
 
@@ -2890,7 +3027,7 @@ app.post('/api/seasons', auth.isAuthenticated, auth.hasRole('council_admin'), as
 });
 
 // Activate a season
-app.put('/api/seasons/:year/activate', auth.isAuthenticated, auth.hasRole('council_admin'), async (req, res) => {
+app.put('/api/seasons/:year/activate', auth.isAuthenticated, auth.hasRole('admin'), async (req, res) => {
     try {
         const { year } = req.params;
 
@@ -2989,7 +3126,7 @@ app.get('/api/cookies/:id', auth.isAuthenticated, async (req, res) => {
 });
 
 // Add new cookie
-app.post('/api/cookies', auth.isAuthenticated, auth.hasRole('troop_leader', 'council_admin'), async (req, res) => {
+app.post('/api/cookies', auth.isAuthenticated, auth.hasRole('troop_leader', 'admin'), async (req, res) => {
     try {
         const { season, cookieName, shortName, description, pricePerBox, boxesPerCase, sortOrder, imageUrl, bakerId, organizationId, attributes, nutrition } = req.body;
 
@@ -3033,7 +3170,7 @@ app.post('/api/cookies', auth.isAuthenticated, auth.hasRole('troop_leader', 'cou
 });
 
 // Update cookie
-app.put('/api/cookies/:id', auth.isAuthenticated, auth.hasRole('troop_leader', 'council_admin'), async (req, res) => {
+app.put('/api/cookies/:id', auth.isAuthenticated, auth.hasRole('troop_leader', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const { cookieName, shortName, description, pricePerBox, boxesPerCase, sortOrder, imageUrl, isActive, bakerId, organizationId, attributes, nutrition } = req.body;
@@ -3089,8 +3226,8 @@ app.put('/api/cookies/:id', auth.isAuthenticated, auth.hasRole('troop_leader', '
     }
 });
 
-// Deactivate cookie (soft delete)
-app.delete('/api/cookies/:id', auth.isAuthenticated, auth.hasRole('troop_leader', 'council_admin'), async (req, res) => {
+// Delete cookie (soft delete)
+app.delete('/api/cookies/:id', auth.isAuthenticated, auth.hasRole('troop_leader', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -4813,6 +4950,7 @@ app.get('/api/scouts/:userId/badges', auth.isAuthenticated, auth.requirePrivileg
                 sb.*,
                 b."badgeName",
                 b."badgeType",
+                b."description",
                 b."imageUrl",
                 b."badgeCode",
                 verifier."firstName" || ' ' || verifier."lastName" as "verifiedByName"
@@ -5147,6 +5285,990 @@ app.delete('/api/troop/:troopId/members/:userId/privileges', auth.isAuthenticate
     } catch (error) {
         logger.error('Error resetting privilege overrides', { error: error.message });
         res.status(500).json({ error: 'Failed to reset privileges' });
+    }
+});
+
+// ============================================================================
+// Admin API Endpoints (System-Level Administration)
+// ============================================================================
+
+/**
+ * POST /api/system/bootstrap
+ * Bootstrap the first admin account (one-time, no auth required if no admins exist)
+ * Body: { email: string, password: string }
+ */
+app.post('/api/system/bootstrap', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // 1. Validate input
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password required' });
+        }
+
+        if (!auth.isValidEmail(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+
+        const passwordValidation = auth.validatePassword(password);
+        if (!passwordValidation.valid) {
+            return res.status(400).json({ error: passwordValidation.message });
+        }
+
+        // 2. Check if any admins already exist
+        const adminCount = await db.getOne(
+            'SELECT COUNT(*)::int as count FROM admins WHERE "revokedAt" IS NULL'
+        );
+
+        if (Number(adminCount.count) > 0) {
+            return res.status(403).json({ error: 'Bootstrap already completed - admin accounts exist' });
+        }
+
+        // 3. Create user account
+        const hashedPassword = await auth.hashPassword(password);
+        const userId = crypto.randomUUID();
+
+        await db.run(
+            `INSERT INTO users (id, email, password, role, "createdAt")
+             VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
+            [userId, email, hashedPassword, 'admin']
+        );
+
+        // 4. Create admin record (grantedBy is NULL for bootstrap)
+        await db.run(
+            `INSERT INTO admins ("userId", role, "grantedBy")
+             VALUES ($1, $2, NULL)`,
+            [userId, 'admin']
+        );
+
+        // 5. Log audit event
+        await auth.logAuditEvent(db, userId, 'bootstrap_admin', req, {
+            resourceType: 'admin',
+            resourceId: userId
+        });
+
+        res.json({
+            success: true,
+            message: 'First admin account created successfully',
+            user: { id: userId, email, role: 'admin' }
+        });
+    } catch (error) {
+        logger.error('Bootstrap admin creation failed', { error: error.message });
+        res.status(500).json({ error: 'Failed to create admin account' });
+    }
+});
+
+/**
+ * GET /api/system/bootstrap-status
+ * Check if bootstrap is needed (no auth required)
+ */
+app.get('/api/system/bootstrap-status', async (req, res) => {
+    try {
+        const adminCount = await db.getOne(
+            'SELECT COUNT(*)::int as count FROM admins WHERE "revokedAt" IS NULL'
+        );
+        res.json({ needsBootstrap: Number(adminCount.count) === 0 });
+    } catch (error) {
+        logger.error('Bootstrap status check failed', { error: error.message });
+        res.status(500).json({ error: 'Failed to check bootstrap status' });
+    }
+});
+
+/**
+ * GET /api/system/admins
+ * List all active admin accounts (admin-only)
+ */
+app.get('/api/system/admins', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const admins = await db.getAll(`
+            SELECT
+                a.id,
+                a."userId",
+                a.role,
+                a."grantedAt",
+                a."grantedBy",
+                a."revokedAt",
+                a."revokedBy",
+                u.email,
+                u.role as "userRole"
+            FROM admins a
+            JOIN users u ON u.id = a."userId"
+            ORDER BY a."grantedAt" DESC
+        `);
+
+        res.json({ admins });
+    } catch (error) {
+        logger.error('Failed to list admins', { error: error.message });
+        res.status(500).json({ error: 'Failed to list admins' });
+    }
+});
+
+/**
+ * POST /api/system/admins
+ * Create new admin account (requires existing admin)
+ * Body: { userId: uuid }
+ */
+app.post('/api/system/admins', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const { userId } = req.body;
+
+        if (!userId) {
+            return res.status(400).json({ error: 'userId required' });
+        }
+
+        // Validate UUID format (basic check)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(userId)) {
+            return res.status(400).json({ error: 'Invalid userId format - must be a valid UUID' });
+        }
+
+        // 1. Verify target user exists
+        const user = await db.getOne('SELECT id, email FROM users WHERE id = $1', [userId]);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // 2. Check if user is already admin
+        const existingAdmin = await db.getOne(
+            'SELECT id FROM admins WHERE "userId" = $1 AND "revokedAt" IS NULL',
+            [userId]
+        );
+        if (existingAdmin) {
+            return res.status(400).json({ error: 'User is already an admin' });
+        }
+
+        // 3. Create or reactivate admin record
+        const adminId = crypto.randomUUID();
+        await db.run(
+            `INSERT INTO admins (id, "userId", role, "grantedBy")
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT ("userId") DO UPDATE
+             SET "revokedAt" = NULL, "revokedBy" = NULL, "grantedBy" = EXCLUDED."grantedBy"`,
+            [adminId, userId, 'admin', req.session.userId]
+        );
+
+        // 4. Update user role to admin
+        await db.run(
+            'UPDATE users SET role = $1 WHERE id = $2',
+            ['admin', userId]
+        );
+
+        // 5. Log audit event
+        await auth.logAuditEvent(db, req.session.userId, 'create_admin', req, {
+            resourceType: 'admin',
+            resourceId: userId,
+            targetEmail: user.email
+        });
+
+        res.json({
+            success: true,
+            message: `${user.email} is now an admin`,
+            admin: { userId, email: user.email, role: 'admin' }
+        });
+    } catch (error) {
+        logger.error('Failed to create admin', { error: error.message });
+        res.status(500).json({ error: 'Failed to create admin' });
+    }
+});
+
+/**
+ * DELETE /api/system/admins/:userId
+ * Revoke admin status (requires existing admin)
+ */
+app.delete('/api/system/admins/:userId', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(userId)) {
+            return res.status(400).json({ error: 'Invalid userId format - must be a valid UUID' });
+        }
+
+        // 1. Verify user exists
+        const user = await db.getOne('SELECT id, email FROM users WHERE id = $1', [userId]);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // 2. Prevent admin from revoking themselves
+        if (userId === req.session.userId) {
+            return res.status(400).json({ error: 'Cannot revoke your own admin access' });
+        }
+
+        // 3. Mark admin record as revoked
+        await db.run(
+            'UPDATE admins SET "revokedAt" = CURRENT_TIMESTAMP, "revokedBy" = $1 WHERE "userId" = $2',
+            [req.session.userId, userId]
+        );
+
+        // 4. Revert user role to member
+        await db.run(
+            'UPDATE users SET role = $1 WHERE id = $2',
+            ['member', userId]
+        );
+
+        // 5. Log audit event
+        await auth.logAuditEvent(db, req.session.userId, 'revoke_admin', req, {
+            resourceType: 'admin',
+            resourceId: userId,
+            targetEmail: user.email
+        });
+
+        res.json({
+            success: true,
+            message: `Admin access revoked for ${user.email}`
+        });
+    } catch (error) {
+        logger.error('Failed to revoke admin', { error: error.message });
+        res.status(500).json({ error: 'Failed to revoke admin' });
+    }
+});
+
+/**
+ * GET /api/system/stats
+ * System monitoring statistics
+ */
+app.get('/api/system/stats', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const stats = {
+            system: {
+                uptime: os.uptime(),
+                loadAvg: os.loadavg(),
+                totalMem: os.totalmem(),
+                freeMem: os.freemem(),
+                platform: os.platform(),
+                arch: os.arch(),
+                cpus: os.cpus().length
+            },
+            process: {
+                uptime: process.uptime(),
+                memory: process.memoryUsage(),
+                version: process.version
+            },
+            database: {
+                connected: (await db.testConnection()),
+                poolSize: pool.totalCount,
+                idleCount: pool.idleCount,
+                waitingCount: pool.waitingCount
+            },
+            redis: {
+                connected: redisClient.isOpen
+            }
+        };
+        res.json(stats);
+    } catch (error) {
+        logger.error('Error getting system stats', { error: error.message });
+        res.status(500).json({ error: 'Failed to get system stats' });
+    }
+});
+
+/**
+ * GET /api/system/settings
+ * Retrieve system settings
+ */
+app.get('/api/system/settings', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const settings = await db.getAll('SELECT * FROM system_settings ORDER BY key');
+        const settingsMap = {};
+        settings.forEach(s => {
+            settingsMap[s.key] = s.value;
+        });
+        res.json({ settings: settingsMap, metadata: settings });
+    } catch (error) {
+        logger.error('Error getting settings', { error: error.message });
+        res.status(500).json({ error: 'Failed to get settings' });
+    }
+});
+
+/**
+ * POST /api/system/settings
+ * Update system settings
+ */
+app.post('/api/system/settings', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    const { settings } = req.body;
+    if (!settings || typeof settings !== 'object') {
+        return res.status(400).json({ error: 'Invalid settings format' });
+    }
+
+    try {
+        await db.transaction(async (client) => {
+            for (const [key, value] of Object.entries(settings)) {
+                await client.query(`
+                    INSERT INTO system_settings (key, value, "updatedAt", "updatedBy")
+                    VALUES ($1, $2, NOW(), $3)
+                    ON CONFLICT (key) DO UPDATE SET
+                        value = EXCLUDED.value,
+                        "updatedAt" = NOW(),
+                        "updatedBy" = EXCLUDED."updatedBy"
+                `, [key, value, req.session.userId]);
+            }
+        });
+        
+        await auth.logAuditEvent(db, req.session.userId, 'update_system_settings', req, { keys: Object.keys(settings) });
+        res.json({ success: true, message: 'Settings updated' });
+    } catch (error) {
+        logger.error('Error updating settings', { error: error.message });
+        res.status(500).json({ error: 'Failed to update settings' });
+    }
+});
+
+/**
+ * GET /api/system/sessions
+ * List active sessions
+ */
+app.get('/api/system/sessions', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const keys = await redisClient.keys('sess:*');
+        const sessions = [];
+        for (const key of keys) {
+            const sessData = await redisClient.get(key);
+            if (sessData) {
+                try {
+                    const sess = JSON.parse(sessData);
+                    let userEmail = 'Guest';
+                    if (sess.userId) {
+                        const user = await db.getOne('SELECT email FROM users WHERE id = $1', [sess.userId]);
+                        if (user) userEmail = user.email;
+                    }
+                    
+                    sessions.push({
+                        id: key.replace('sess:', ''),
+                        userId: sess.userId,
+                        userEmail,
+                        cookie: sess.cookie,
+                        ip: sess.ip // Assuming we stored IP in session at login, if not it will be undefined
+                    });
+                } catch (e) {
+                    // Ignore parse errors
+                }
+            }
+        }
+        res.json({ sessions });
+    } catch (error) {
+        logger.error('Error listing sessions', { error: error.message });
+        res.status(500).json({ error: 'Failed to list sessions' });
+    }
+});
+
+/**
+ * DELETE /api/system/sessions/:id
+ * Revoke a session
+ */
+app.delete('/api/system/sessions/:id', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const sessionId = req.params.id;
+        await redisClient.del(`sess:${sessionId}`);
+        
+        await auth.logAuditEvent(db, req.session.userId, 'revoke_session', req, { sessionId });
+        res.json({ success: true });
+    } catch (error) {
+        logger.error('Error revoking session', { error: error.message });
+        res.status(500).json({ error: 'Failed to revoke session' });
+    }
+});
+
+/**
+ * GET /api/system/backup
+ * Download database backup
+ */
+app.get('/api/system/backup', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    const { DB_HOST, DB_USER, DB_NAME, DB_PASSWORD, DB_PORT } = process.env;
+    
+    if (!DB_HOST) return res.status(500).json({ error: 'Database configuration missing' });
+
+    const filename = `backup-${new Date().toISOString().replace(/:/g, '-')}.sql`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/sql');
+
+    const env = { ...process.env, PGPASSWORD: DB_PASSWORD };
+    const dumpCommand = `pg_dump -h ${DB_HOST} -p ${DB_PORT || 5432} -U ${DB_USER} ${DB_NAME}`;
+    
+    const child = exec(dumpCommand, { env });
+    
+    child.stdout.pipe(res);
+    
+    child.stderr.on('data', (data) => {
+        // Ignore verbose output, only log errors if process fails
+        // logger.debug('Backup stderr', { data });
+    });
+    
+    child.on('error', (error) => {
+         logger.error('Backup process error', { error: error.message });
+         if (!res.headersSent) res.status(500).json({ error: 'Backup failed' });
+    });
+});
+
+/**
+ * POST /api/system/anonymize/:userId
+ * Anonymize user data (COPPA compliance)
+ */
+app.post('/api/system/anonymize/:userId', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    const { userId } = req.params;
+    
+    // Validate UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(userId)) {
+        return res.status(400).json({ error: 'Invalid userId format' });
+    }
+
+    try {
+        const user = await db.getOne('SELECT id, role FROM users WHERE id = $1', [userId]);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Prevent anonymizing admins or self
+        if (userId === req.session.userId) {
+            return res.status(400).json({ error: 'Cannot anonymize your own account' });
+        }
+        
+        const adminCheck = await db.getOne('SELECT * FROM admins WHERE "userId" = $1 AND "revokedAt" IS NULL', [userId]);
+        if (adminCheck) {
+            return res.status(400).json({ error: 'Cannot anonymize an active admin. Revoke admin access first.' });
+        }
+
+        const anonymizedEmail = `deleted-${userId.substring(0,8)}@anonymized.local`;
+
+        await db.run(`
+            UPDATE users SET 
+                email = $1,
+                "firstName" = 'Deleted',
+                "lastName" = 'User',
+                "photoUrl" = NULL,
+                "googleId" = NULL,
+                "parentEmail" = NULL,
+                "isActive" = FALSE
+            WHERE id = $2
+        `, [anonymizedEmail, userId]);
+
+        // Also clean up sessions
+        await db.run('DELETE FROM sessions WHERE "userId" = $1', [userId]);
+
+        await auth.logAuditEvent(db, req.session.userId, 'anonymize_user', req, { targetUserId: userId });
+        
+        res.json({ success: true, message: 'User data anonymized successfully' });
+    } catch (error) {
+        logger.error('Anonymization failed', { error: error.message });
+        res.status(500).json({ error: 'Failed to anonymize user' });
+    }
+});
+
+/**
+ * GET /api/system/roles
+ * Get role definitions and privileges
+ */
+app.get('/api/system/roles', auth.isAuthenticated, auth.requireAdmin, (req, res) => {
+    res.json({
+        privileges: PRIVILEGE_DEFINITIONS,
+        roles: ROLE_PRIVILEGE_DEFAULTS
+    });
+});
+
+/**
+ * GET /api/system/organizations
+ * List all organizations (admin view - includes inactive)
+ */
+app.get('/api/system/organizations', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const organizations = await db.getAll('SELECT * FROM scout_organizations ORDER BY "orgName"');
+        
+        // Get stats for each organization
+        const orgsWithStats = await Promise.all(organizations.map(async (org) => {
+            const troopCount = await db.getOne(
+                'SELECT COUNT(*)::int as count FROM troops WHERE "organizationId" = $1',
+                [org.id]
+            );
+            const memberCount = await db.getOne(
+                'SELECT COUNT(*)::int as count FROM scout_profiles WHERE "organizationId" = $1',
+                [org.id]
+            );
+            return {
+                ...org,
+                troopCount: troopCount ? troopCount.count : 0,
+                memberCount: memberCount ? memberCount.count : 0
+            };
+        }));
+
+        res.json({ organizations: orgsWithStats });
+    } catch (error) {
+        logger.error('Failed to list system organizations', { error: error.message });
+        res.status(500).json({ error: 'Failed to list organizations' });
+    }
+});
+
+/**
+ * POST /api/system/organizations
+ * Create new organization
+ */
+app.post('/api/system/organizations', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const { orgCode, orgName, orgType, description, websiteUrl } = req.body;
+
+        // Validation
+        if (!orgCode || !orgName || !orgType) {
+            return res.status(400).json({ error: 'orgCode, orgName, and orgType are required' });
+        }
+
+        const validTypes = ['girl_scouts', 'scouting_america', 'other'];
+        if (!validTypes.includes(orgType)) {
+            return res.status(400).json({ error: 'Invalid orgType' });
+        }
+
+        // Check for duplicate code
+        const existing = await db.getOne('SELECT id FROM scout_organizations WHERE "orgCode" = $1', [orgCode]);
+        if (existing) {
+            return res.status(409).json({ error: 'Organization code already exists' });
+        }
+
+        const id = crypto.randomUUID();
+        await db.run(
+            `INSERT INTO scout_organizations (id, "orgCode", "orgName", "orgType", description, "websiteUrl")
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [id, orgCode, orgName, orgType, description, websiteUrl]
+        );
+
+        await auth.logAuditEvent(db, req.session.userId, 'create_organization', req, {
+            resourceType: 'organization',
+            resourceId: id,
+            details: { orgCode, orgName }
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Organization created successfully',
+            organization: { id, orgCode, orgName, orgType }
+        });
+    } catch (error) {
+        logger.error('Failed to create organization', { error: error.message });
+        res.status(500).json({ error: 'Failed to create organization' });
+    }
+});
+
+/**
+ * PUT /api/system/organizations/:id
+ * Update organization
+ */
+app.put('/api/system/organizations/:id', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { orgName, orgType, description, websiteUrl, isActive } = req.body;
+
+        // Verify exists
+        const org = await db.getOne('SELECT * FROM scout_organizations WHERE id = $1', [id]);
+        if (!org) {
+            return res.status(404).json({ error: 'Organization not found' });
+        }
+
+        const validTypes = ['girl_scouts', 'scouting_america', 'other'];
+        if (orgType && !validTypes.includes(orgType)) {
+            return res.status(400).json({ error: 'Invalid orgType' });
+        }
+
+        await db.run(
+            `UPDATE scout_organizations 
+             SET "orgName" = COALESCE($1, "orgName"),
+                 "orgType" = COALESCE($2, "orgType"),
+                 description = COALESCE($3, description),
+                 "websiteUrl" = COALESCE($4, "websiteUrl"),
+                 "isActive" = COALESCE($5, "isActive"),
+                 "updatedAt" = CURRENT_TIMESTAMP
+             WHERE id = $6`,
+            [orgName, orgType, description, websiteUrl, isActive, id]
+        );
+
+        await auth.logAuditEvent(db, req.session.userId, 'update_organization', req, {
+            resourceType: 'organization',
+            resourceId: id,
+            details: { orgName, orgType, isActive }
+        });
+
+        res.json({ success: true, message: 'Organization updated successfully' });
+    } catch (error) {
+        logger.error('Failed to update organization', { error: error.message });
+        res.status(500).json({ error: 'Failed to update organization' });
+    }
+});
+
+/**
+ * DELETE /api/system/organizations/:id
+ * Delete organization (protected against cascade)
+ */
+app.delete('/api/system/organizations/:id', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const org = await db.getOne('SELECT "orgName" FROM scout_organizations WHERE id = $1', [id]);
+        if (!org) {
+            return res.status(404).json({ error: 'Organization not found' });
+        }
+
+        // Check for dependencies
+        const troopCount = await db.getOne('SELECT COUNT(*)::int as count FROM troops WHERE "organizationId" = $1', [id]);
+        if (troopCount.count > 0) {
+            return res.status(409).json({ 
+                error: `Cannot delete organization: It has ${troopCount.count} associated troops. Archive it instead.` 
+            });
+        }
+
+        await db.run('DELETE FROM scout_organizations WHERE id = $1', [id]);
+
+        await auth.logAuditEvent(db, req.session.userId, 'delete_organization', req, {
+            resourceType: 'organization',
+            resourceId: id,
+            details: { orgName: org.orgName }
+        });
+
+        res.json({ success: true, message: 'Organization deleted successfully' });
+    } catch (error) {
+        logger.error('Failed to delete organization', { error: error.message });
+        res.status(500).json({ error: 'Failed to delete organization' });
+    }
+});
+
+// ============================================================================
+// System CRUD Endpoints (Troops & Members)
+// ============================================================================
+
+/**
+ * GET /api/system/troops
+ * List all troops (admin view)
+ */
+app.get('/api/system/troops', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const troops = await db.getAll(`
+            SELECT 
+                t.*,
+                so."orgName",
+                u."firstName" || ' ' || u."lastName" as "leaderName",
+                (SELECT COUNT(*)::int FROM troop_members tm WHERE tm."troopId" = t.id AND tm.status = 'active') as "memberCount"
+            FROM troops t
+            LEFT JOIN scout_organizations so ON t."organizationId" = so.id
+            LEFT JOIN users u ON t."leaderId" = u.id
+            ORDER BY t."troopName", t."troopNumber"
+        `);
+        res.json({ troops });
+    } catch (error) {
+        logger.error('Failed to list system troops', { error: error.message });
+        res.status(500).json({ error: 'Failed to list troops' });
+    }
+});
+
+/**
+ * POST /api/system/troops
+ * Create new troop
+ */
+app.post('/api/system/troops', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const { troopNumber, troopName, troopType, organizationId, isActive } = req.body;
+
+        if (!troopNumber || !troopType || !organizationId) {
+            return res.status(400).json({ error: 'Troop Number, Type, and Organization are required' });
+        }
+
+        const id = crypto.randomUUID();
+        await db.run(
+            `INSERT INTO troops (id, "troopNumber", "troopName", "troopType", "organizationId", "isActive")
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [id, troopNumber, troopName || `Troop ${troopNumber}`, troopType, organizationId, isActive !== false]
+        );
+
+        await auth.logAuditEvent(db, req.session.userId, 'create_troop', req, {
+            resourceType: 'troop',
+            resourceId: id,
+            details: { troopNumber, organizationId }
+        });
+
+        res.status(201).json({ success: true, message: 'Troop created successfully', troopId: id });
+    } catch (error) {
+        logger.error('Failed to create troop', { error: error.message });
+        res.status(500).json({ error: 'Failed to create troop' });
+    }
+});
+
+/**
+ * PUT /api/system/troops/:id
+ * Update troop
+ */
+app.put('/api/system/troops/:id', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { troopNumber, troopName, troopType, organizationId, isActive } = req.body;
+
+        await db.run(
+            `UPDATE troops 
+             SET "troopNumber" = COALESCE($1, "troopNumber"),
+                 "troopName" = COALESCE($2, "troopName"),
+                 "troopType" = COALESCE($3, "troopType"),
+                 "organizationId" = COALESCE($4, "organizationId"),
+                 "isActive" = COALESCE($5, "isActive"),
+                 "updatedAt" = CURRENT_TIMESTAMP
+             WHERE id = $6`,
+            [troopNumber, troopName, troopType, organizationId, isActive, id]
+        );
+
+        await auth.logAuditEvent(db, req.session.userId, 'update_troop', req, {
+            resourceType: 'troop',
+            resourceId: id,
+            details: { troopNumber, isActive }
+        });
+
+        res.json({ success: true, message: 'Troop updated successfully' });
+    } catch (error) {
+        logger.error('Failed to update troop', { error: error.message });
+        res.status(500).json({ error: 'Failed to update troop' });
+    }
+});
+
+/**
+ * DELETE /api/system/troops/:id
+ * Delete troop (protected)
+ */
+app.delete('/api/system/troops/:id', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Check for members
+        const memberCount = await db.getOne(
+            'SELECT COUNT(*)::int as count FROM troop_members WHERE "troopId" = $1',
+            [id]
+        );
+
+        if (memberCount.count > 0) {
+            return res.status(409).json({ 
+                error: `Cannot delete troop: It has ${memberCount.count} members. Remove members first or archive the troop.` 
+            });
+        }
+
+        await db.run('DELETE FROM troops WHERE id = $1', [id]);
+
+        await auth.logAuditEvent(db, req.session.userId, 'delete_troop', req, {
+            resourceType: 'troop',
+            resourceId: id
+        });
+
+        res.json({ success: true, message: 'Troop deleted successfully' });
+    } catch (error) {
+        logger.error('Failed to delete troop', { error: error.message });
+        res.status(500).json({ error: 'Failed to delete troop' });
+    }
+});
+
+/**
+ * GET /api/system/members
+ * List all members (admin view)
+ */
+app.get('/api/system/members', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const search = req.query.search ? `%${req.query.search}%` : null;
+        let query = `
+            SELECT id, email, "firstName", "lastName", role, "isActive", "createdAt", "lastLogin",
+            (SELECT COUNT(*)::int FROM troop_members tm WHERE tm."userId" = users.id AND tm.status = 'active') as "troopCount"
+            FROM users
+        `;
+        let params = [];
+
+        if (search) {
+            query += ' WHERE email ILIKE $1 OR "firstName" ILIKE $1 OR "lastName" ILIKE $1';
+            params = [search];
+        }
+
+        query += ' ORDER BY "firstName", "lastName" LIMIT 200';
+
+        const members = await db.getAll(query, params);
+        res.json({ members });
+    } catch (error) {
+        logger.error('Failed to list members', { error: error.message });
+        res.status(500).json({ error: 'Failed to list members' });
+    }
+});
+
+/**
+ * POST /api/system/members
+ * Create new member
+ */
+app.post('/api/system/members', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const { email, password, firstName, lastName, role } = req.body;
+
+        if (!email || !password || !firstName || !lastName) {
+            return res.status(400).json({ error: 'Email, password, first name, and last name are required' });
+        }
+
+        if (!auth.isValidEmail(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+
+        const existing = await db.getOne('SELECT id FROM users WHERE email = $1', [email]);
+        if (existing) {
+            return res.status(409).json({ error: 'Email already registered' });
+        }
+
+        const hashedPassword = await auth.hashPassword(password);
+        const id = crypto.randomUUID();
+
+        await db.run(
+            `INSERT INTO users (id, email, password, "firstName", "lastName", role, "isActive", "createdAt")
+             VALUES ($1, $2, $3, $4, $5, $6, true, CURRENT_TIMESTAMP)`,
+            [id, email, hashedPassword, firstName, lastName, role || 'member']
+        );
+
+        await auth.logAuditEvent(db, req.session.userId, 'create_user', req, {
+            resourceType: 'user',
+            resourceId: id,
+            targetEmail: email
+        });
+
+        res.status(201).json({ success: true, message: 'Member created successfully', userId: id });
+    } catch (error) {
+        logger.error('Failed to create member', { error: error.message });
+        res.status(500).json({ error: 'Failed to create member' });
+    }
+});
+
+/**
+ * PUT /api/system/members/:id
+ * Update member
+ */
+app.put('/api/system/members/:id', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { email, firstName, lastName, role, isActive, password } = req.body;
+
+        // If password provided, hash it
+        if (password) {
+            const hashedPassword = await auth.hashPassword(password);
+            await db.run('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, id]);
+        }
+
+        await db.run(
+            `UPDATE users 
+             SET email = COALESCE($1, email),
+                 "firstName" = COALESCE($2, "firstName"),
+                 "lastName" = COALESCE($3, "lastName"),
+                 role = COALESCE($4, role),
+                 "isActive" = COALESCE($5, "isActive")
+             WHERE id = $6`,
+            [email, firstName, lastName, role, isActive, id]
+        );
+
+        await auth.logAuditEvent(db, req.session.userId, 'update_user', req, {
+            resourceType: 'user',
+            resourceId: id,
+            details: { email, role, isActive }
+        });
+
+        res.json({ success: true, message: 'Member updated successfully' });
+    } catch (error) {
+        logger.error('Failed to update member', { error: error.message });
+        res.status(500).json({ error: 'Failed to update member' });
+    }
+});
+
+/**
+ * DELETE /api/system/members/:id
+ * Soft delete member
+ */
+app.delete('/api/system/members/:id', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Prevent deleting self
+        if (id === req.session.userId) {
+            return res.status(400).json({ error: 'Cannot delete your own account' });
+        }
+
+        // Soft delete
+        await db.run('UPDATE users SET "isActive" = false WHERE id = $1', [id]);
+
+        await auth.logAuditEvent(db, req.session.userId, 'deactivate_user', req, {
+            resourceType: 'user',
+            resourceId: id
+        });
+
+        res.json({ success: true, message: 'Member deactivated successfully' });
+    } catch (error) {
+        logger.error('Failed to deactivate member', { error: error.message });
+        res.status(500).json({ error: 'Failed to deactivate member' });
+    }
+});
+
+/**
+ * GET /api/system/export
+ * Bulk export system data
+ */
+app.get('/api/system/export', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `asm_export_${timestamp}.json`;
+
+        const [organizations, troops, users, auditLog] = await Promise.all([
+            db.getAll('SELECT * FROM scout_organizations'),
+            db.getAll('SELECT * FROM troops'),
+            db.getAll('SELECT id, email, "firstName", "lastName", role, "isActive", "createdAt" FROM users'),
+            db.getAll('SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT 1000')
+        ]);
+
+        const exportData = {
+            metadata: {
+                version: '1.0',
+                exportedAt: new Date().toISOString(),
+                exportedBy: req.session.userId
+            },
+            organizations,
+            troops,
+            users,
+            auditLog
+        };
+
+        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+        res.setHeader('Content-Type', 'application/json');
+        res.json(exportData);
+    } catch (error) {
+        logger.error('Export failed', { error: error.message });
+        res.status(500).json({ error: 'Export failed' });
+    }
+});
+
+/**
+ * GET /api/audit-log
+ * View system audit log (admin panel) - Phase 5
+ */
+app.get('/api/audit-log', auth.isAuthenticated, auth.requireAdmin, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit) || 50, 1000);
+        const search = req.query.search ? `%${req.query.search}%` : null;
+
+        let query = `
+            SELECT 
+                al.id, 
+                al."userId", 
+                u."firstName" || ' ' || u."lastName" as "userName",
+                u.email as "userEmail",
+                al.action, 
+                al."resourceType", 
+                al."resourceId", 
+                al.details, 
+                al.timestamp 
+            FROM audit_log al
+            LEFT JOIN users u ON al."userId" = u.id
+        `;
+        let params = [];
+
+        if (search) {
+            query += ' WHERE al.action ILIKE $1 OR al."resourceType" ILIKE $1 OR al."resourceId"::text ILIKE $1 OR u.email ILIKE $1 OR u."firstName" ILIKE $1 OR u."lastName" ILIKE $1';
+            params = [search];
+        }
+
+        query += ' ORDER BY al.timestamp DESC LIMIT $' + (params.length + 1);
+        params.push(limit);
+
+        const events = await db.getAll(query, params).catch(() => []);
+
+        res.json({ events: events || [] });
+    } catch (error) {
+        logger.error('Error loading audit log', { error: error.message });
+        res.status(500).json({ error: 'Failed to load audit log', events: [] });
     }
 });
 

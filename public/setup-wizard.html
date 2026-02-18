@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Setup - Apex Scout Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .wizard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 1.5rem;
+            text-align: center;
+        }
+
+        .wizard-header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .wizard-header p {
+            font-size: 0.95rem;
+            opacity: 0.9;
+            margin-bottom: 1rem;
+        }
+
+        .wizard-progress {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-top: 1rem;
+        }
+
+        .progress-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transition: background 0.3s;
+        }
+
+        .progress-dot.active {
+            background: white;
+        }
+
+        .wizard-body {
+            padding: 2rem 1.5rem;
+        }
+
+        .step {
+            display: none;
+        }
+
+        .step.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .step h2 {
+            color: #2c3e50;
+            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .step p {
+            color: #666;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #ecf0f1;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group.error input {
+            border-color: #e74c3c;
+        }
+
+        .form-error {
+            color: #e74c3c;
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+            display: none;
+        }
+
+        .form-group.error .form-error {
+            display: block;
+        }
+
+        .form-help {
+            font-size: 0.85rem;
+            color: #95a5a6;
+            margin-top: 0.5rem;
+        }
+
+        .password-strength {
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .strength-bar {
+            height: 4px;
+            background: #ecf0f1;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 0.25rem;
+        }
+
+        .strength-fill {
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s, background-color 0.3s;
+        }
+
+        .strength-fill.weak {
+            width: 25%;
+            background-color: #e74c3c;
+        }
+
+        .strength-fill.fair {
+            width: 50%;
+            background-color: #f39c12;
+        }
+
+        .strength-fill.good {
+            width: 75%;
+            background-color: #3498db;
+        }
+
+        .strength-fill.strong {
+            width: 100%;
+            background-color: #27ae60;
+        }
+
+        .strength-text {
+            color: #666;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1.5rem;
+            display: none;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .alert.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            display: block;
+        }
+
+        .checklist {
+            list-style: none;
+            margin: 1rem 0;
+        }
+
+        .checklist li {
+            padding: 0.75rem 0;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .checklist li::before {
+            content: '✓';
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            background: #27ae60;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 24px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .wizard-footer {
+            padding: 1.5rem;
+            border-top: 1px solid #ecf0f1;
+            display: flex;
+            gap: 1rem;
+            justify-content: space-between;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex: 1;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #ecf0f1;
+            color: #2c3e50;
+        }
+
+        .btn-secondary:hover {
+            background: #bdc3c7;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .completion-icon {
+            font-size: 3rem;
+            text-align: center;
+            margin: 1rem 0;
+        }
+
+        .info-box {
+            background: #f0f4ff;
+            border-left: 4px solid #667eea;
+            padding: 1rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+            color: #2c3e50;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 480px) {
+            .wizard-body {
+                padding: 1.5rem 1rem;
+            }
+
+            .wizard-footer {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            .wizard-header h1 {
+                font-size: 1.4rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="wizard-header">
+            <h1>System Setup</h1>
+            <p>Apex Scout Manager</p>
+            <div class="wizard-progress">
+                <div class="progress-dot active" id="dot-1"></div>
+                <div class="progress-dot" id="dot-2"></div>
+                <div class="progress-dot" id="dot-3"></div>
+            </div>
+        </div>
+
+        <div class="wizard-body">
+            <!-- Step 1: Welcome -->
+            <div class="step active" id="step-1">
+                <h2>Welcome to Apex Scout Manager</h2>
+                <p>This is your first time setting up the system. Let's create your admin account and get started!</p>
+
+                <div class="info-box">
+                    <strong>What you'll do:</strong>
+                    <ul class="checklist">
+                        <li>Create your admin account</li>
+                        <li>Verify your information</li>
+                        <li>Start managing your scouts</li>
+                    </ul>
+                </div>
+
+                <p>This process takes less than 2 minutes and can only be done once.</p>
+            </div>
+
+            <!-- Step 2: Create Admin Account -->
+            <div class="step" id="step-2">
+                <h2>Create Admin Account</h2>
+                <p>This will be your system administrator account.</p>
+
+                <div id="formAlert" class="alert"></div>
+
+                <form id="adminForm" onsubmit="return false;">
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" name="email" placeholder="admin@example.com" required>
+                        <div class="form-error" id="emailError"></div>
+                        <div class="form-help">This will be your login email</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" placeholder="Min 8 characters" required>
+                        <div class="form-error" id="passwordError"></div>
+                        <div class="password-strength">
+                            <div class="strength-bar">
+                                <div class="strength-fill" id="strengthFill"></div>
+                            </div>
+                            <div class="strength-text" id="strengthText">Password strength: Weak</div>
+                        </div>
+                        <div class="form-help">Must contain uppercase, lowercase, and numbers</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm Password</label>
+                        <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Re-enter password" required>
+                        <div class="form-error" id="confirmError"></div>
+                    </div>
+                </form>
+
+                <div class="info-box">
+                    <strong>Password Requirements:</strong>
+                    <ul style="margin-left: 1rem; margin-top: 0.5rem;">
+                        <li>At least 8 characters</li>
+                        <li>One uppercase letter (A-Z)</li>
+                        <li>One lowercase letter (a-z)</li>
+                        <li>One number (0-9)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Step 3: Confirmation -->
+            <div class="step" id="step-3">
+                <h2>Setup Complete!</h2>
+                <div class="completion-icon">🎉</div>
+
+                <p>Your admin account has been created successfully.</p>
+
+                <div class="info-box">
+                    <strong>You're all set!</strong>
+                    <ul style="margin-left: 1rem; margin-top: 0.5rem;">
+                        <li>Admin Email: <strong id="confirmEmail"></strong></li>
+                        <li>You can now access the admin panel at <strong>/admin</strong></li>
+                        <li>Create additional admins from the Admin Panel</li>
+                    </ul>
+                </div>
+
+                <p>You'll be redirected to the admin panel in a moment...</p>
+            </div>
+        </div>
+
+        <div class="wizard-footer">
+            <button class="btn btn-secondary" id="btnPrev" onclick="previousStep()" style="display: none;">Back</button>
+            <button class="btn btn-primary" id="btnNext" onclick="nextStep()">Next</button>
+        </div>
+    </div>
+
+    <script src="setup-wizard.js?v=1"></script>
+</body>
+</html>

@@ -111,6 +111,7 @@ Girl Scouts uses grade-based levels instead of ranks:
 
 
 ### Badges and awards
+For a detailed breakdown of badges,  placement on uniforms, how they are achieved and at what levels.  See the [infographic here](https://infographi.ac/girl-scout-badges-ranks-explained-infographic/)
 
 **Historical**
 https://girlscoutsmakehistory.wordpress.com/archives-collection/badges/

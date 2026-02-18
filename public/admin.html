@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Admin Panel - Apex Scout Manager</title>
+    <link rel="stylesheet" href="styles.css?v=13">
+    <style>
+        /* Admin Panel Specific Styles */
+        .admin-header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .admin-header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .admin-badge {
+            display: inline-block;
+            background-color: #e74c3c;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #3498db;
+        }
+
+        .stat-card .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        .admin-table thead {
+            background-color: #ecf0f1;
+            border-bottom: 2px solid #bdc3c7;
+        }
+
+        .admin-table th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .admin-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .admin-table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .action-btn {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            margin-right: 0.5rem;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+        }
+
+        .action-btn.edit {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .action-btn.edit:hover {
+            background-color: #2980b9;
+        }
+
+        .action-btn.delete {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        .action-btn.delete:hover {
+            background-color: #c0392b;
+        }
+
+        .action-btn.add {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        .action-btn.add:hover {
+            background-color: #229954;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        .search-box button {
+            padding: 0.75rem 1.5rem;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .search-box button:hover {
+            background-color: #2980b9;
+        }
+
+        .admin-form {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 600px;
+            margin-bottom: 2rem;
+        }
+
+        .admin-form .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .admin-form label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .admin-form input,
+        .admin-form select,
+        .admin-form textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+
+        .admin-form textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .form-buttons button {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .form-buttons .btn-submit {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        .form-buttons .btn-submit:hover {
+            background-color: #229954;
+        }
+
+        .form-buttons .btn-cancel {
+            background-color: #95a5a6;
+            color: white;
+        }
+
+        .form-buttons .btn-cancel:hover {
+            background-color: #7f8c8d;
+        }
+
+        .alert {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .alert.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .alert.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 2rem;
+            color: #999;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .admin-table {
+                font-size: 0.9rem;
+            }
+
+            .admin-table th,
+            .admin-table td {
+                padding: 0.75rem;
+            }
+
+            .search-box {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="admin-header">
+            <h1>Admin Panel <span class="admin-badge">ADMIN</span></h1>
+        </header>
+
+        <nav class="tab-nav">
+            <button class="tab-btn active" data-view="dashboard">
+                <span class="tab-icon">📊</span>
+                <span class="tab-label">Dashboard</span>
+            </button>
+            <button class="tab-btn" data-view="admins">
+                <span class="tab-icon">👨‍💼</span>
+                <span class="tab-label">Admins</span>
+            </button>
+            <button class="tab-btn" data-view="organizations">
+                <span class="tab-icon">🏢</span>
+                <span class="tab-label">Organizations</span>
+            </button>
+            <button class="tab-btn" data-view="troops">
+                <span class="tab-icon">👥</span>
+                <span class="tab-label">Troops</span>
+            </button>
+            <button class="tab-btn" data-view="members">
+                <span class="tab-icon">👤</span>
+                <span class="tab-label">Members</span>
+            </button>
+            <button class="tab-btn" data-view="roles">
+                <span class="tab-icon">🔑</span>
+                <span class="tab-label">Roles</span>
+            </button>
+            <button class="tab-btn" data-view="audit">
+                <span class="tab-icon">📋</span>
+                <span class="tab-label">Audit Log</span>
+            </button>
+            <button class="tab-btn" data-view="settings">
+                <span class="tab-icon">⚙️</span>
+                <span class="tab-label">Settings</span>
+            </button>
+            <div class="sidebar-divider"></div>
+            <button id="logoutBtn" class="tab-btn logout-btn-sidebar">
+                <span class="tab-icon">↪</span>
+                <span class="tab-label">Logout</span>
+            </button>
+        </nav>
+
+        <main>
+            <!-- Dashboard View -->
+            <div id="view-dashboard" class="view-section">
+                <h2>Dashboard</h2>
+                <div id="dashboardAlert" class="alert"></div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="statAdmins">0</div>
+                        <div class="stat-label">Active Admins</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statOrganizations">0</div>
+                        <div class="stat-label">Organizations</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statTroops">0</div>
+                        <div class="stat-label">Troops</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statMembers">0</div>
+                        <div class="stat-label">Total Members</div>
+                    </div>
+                </div>
+
+                <h3>System Status</h3>
+                <div style="margin-bottom: 1rem;">
+                    <a href="/api/system/export" class="action-btn" target="_blank" style="background-color: #9b59b6; text-decoration: none;">📥 Export System Data</a>
+                </div>
+                <table class="admin-table">
+                    <tr>
+                        <td>Server Status</td>
+                        <td><span id="serverStatus" style="color: #27ae60;">✓ Online</span></td>
+                    </tr>
+                    <tr>
+                        <td>Database Connection</td>
+                        <td><span id="dbStatus" style="color: #27ae60;">✓ Connected</span></td>
+                    </tr>
+                    <tr>
+                        <td>Bootstrap Status</td>
+                        <td><span id="bootstrapStatus">Checking...</span></td>
+                    </tr>
+                </table>
+
+                <h3>Recent Activities</h3>
+                <div id="recentActivities" class="no-data">Loading...</div>
+            </div>
+
+            <!-- Admins View -->
+            <div id="view-admins" class="view-section hidden">
+                <h2>Admin Accounts</h2>
+                <div id="adminsAlert" class="alert"></div>
+
+                <button class="action-btn add" onclick="showCreateAdminForm()">+ Add New Admin</button>
+
+                <div id="createAdminForm" class="admin-form" style="display: none;">
+                    <h3>Create New Admin</h3>
+                    <div class="form-group">
+                        <label>User Email:</label>
+                        <input type="email" id="newAdminEmail" placeholder="admin@example.com">
+                        <small id="userSearchResults" style="display: none; margin-top: 0.5rem; color: #666;"></small>
+                    </div>
+                    <div id="userSuggestions" style="display: none; margin: 1rem 0; border: 1px solid #ddd; border-radius: 4px;">
+                        <div id="userList"></div>
+                    </div>
+                    <div class="form-buttons">
+                        <button class="btn-submit" onclick="createAdmin()">Create Admin</button>
+                        <button class="btn-cancel" onclick="hideCreateAdminForm()">Cancel</button>
+                    </div>
+                </div>
+
+                <h3>Current Admins</h3>
+                <div id="adminsList">
+                    <div class="loading">Loading admin accounts...</div>
+                </div>
+            </div>
+
+            <!-- Organizations View -->
+            <div id="view-organizations" class="view-section hidden">
+                <h2>Scout Organizations</h2>
+                <div id="organizationsAlert" class="alert"></div>
+
+                <button class="action-btn add" onclick="showCreateOrgForm()">+ Add New Organization</button>
+
+                <div id="createOrgForm" class="admin-form" style="display: none;">
+                    <h3 id="orgFormTitle">Create New Organization</h3>
+                    <input type="hidden" id="editOrgId">
+                    <div class="form-group">
+                        <label>Organization Code (Unique):</label>
+                        <input type="text" id="orgCode" placeholder="e.g. gsusa">
+                    </div>
+                    <div class="form-group">
+                        <label>Organization Name:</label>
+                        <input type="text" id="orgName" placeholder="e.g. Girl Scouts USA">
+                    </div>
+                    <div class="form-group">
+                        <label>Type:</label>
+                        <select id="orgType">
+                            <option value="girl_scouts">Girl Scouts</option>
+                            <option value="scouting_america">Scouting America</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Website URL:</label>
+                        <input type="url" id="orgWebsite" placeholder="https://example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Description:</label>
+                        <textarea id="orgDescription" placeholder="Description..."></textarea>
+                    </div>
+                    <div class="form-group" id="orgActiveGroup" style="display: none;">
+                        <label>
+                            <input type="checkbox" id="orgActive" checked> Active
+                        </label>
+                    </div>
+                    <div class="form-buttons">
+                        <button class="btn-submit" onclick="submitOrganization()">Save Organization</button>
+                        <button class="btn-cancel" onclick="hideCreateOrgForm()">Cancel</button>
+                    </div>
+                </div>
+
+                <div id="organizationsList">
+                    <div class="loading">Loading organizations...</div>
+                </div>
+            </div>
+
+            <!-- Troops View -->
+            <div id="view-troops" class="view-section hidden">
+                <h2>Troops</h2>
+                <div id="troopsAlert" class="alert"></div>
+
+                <button class="action-btn add" onclick="showCreateTroopForm()">+ Add New Troop</button>
+
+                <div id="createTroopForm" class="admin-form" style="display: none;">
+                    <h3 id="troopFormTitle">Create New Troop</h3>
+                    <input type="hidden" id="editTroopId">
+                    <div class="form-group">
+                        <label>Troop Number:</label>
+                        <input type="text" id="troopNumber" placeholder="e.g. 105">
+                    </div>
+                    <div class="form-group">
+                        <label>Troop Name:</label>
+                        <input type="text" id="troopName" placeholder="e.g. Troop 105">
+                    </div>
+                    <div class="form-group">
+                        <label>Troop Type:</label>
+                        <select id="troopType">
+                            <option value="daisy">Daisy</option>
+                            <option value="brownie">Brownie</option>
+                            <option value="junior">Junior</option>
+                            <option value="cadette">Cadette</option>
+                            <option value="senior">Senior</option>
+                            <option value="ambassador">Ambassador</option>
+                            <option value="multi-level">Multi-Level</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Organization:</label>
+                        <select id="troopOrgId">
+                            <option value="">Select Organization...</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="troopActiveGroup" style="display: none;">
+                        <label>
+                            <input type="checkbox" id="troopActive" checked> Active
+                        </label>
+                    </div>
+                    <div class="form-buttons">
+                        <button class="btn-submit" onclick="submitTroop()">Save Troop</button>
+                        <button class="btn-cancel" onclick="hideCreateTroopForm()">Cancel</button>
+                    </div>
+                </div>
+
+                <div class="search-box">
+                    <input type="text" id="troopSearch" placeholder="Search troops by name...">
+                    <button onclick="searchTroops()">Search</button>
+                </div>
+
+                <div id="troopsList">
+                    <div class="loading">Loading troops...</div>
+                </div>
+            </div>
+
+            <!-- Members View -->
+            <div id="view-members" class="view-section hidden">
+                <h2>Members</h2>
+                <div id="membersAlert" class="alert"></div>
+
+                <button class="action-btn add" onclick="showCreateMemberForm()">+ Add New Member</button>
+
+                <div id="createMemberForm" class="admin-form" style="display: none;">
+                    <h3 id="memberFormTitle">Create New Member</h3>
+                    <input type="hidden" id="editMemberId">
+                    <div class="form-group">
+                        <label>Email:</label>
+                        <input type="email" id="memberEmail" placeholder="user@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>First Name:</label>
+                        <input type="text" id="memberFirstName" placeholder="Jane">
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name:</label>
+                        <input type="text" id="memberLastName" placeholder="Doe">
+                    </div>
+                    <div class="form-group">
+                        <label>Role:</label>
+                        <select id="memberRole">
+                            <option value="member">Member</option>
+                            <option value="parent">Parent</option>
+                            <option value="scout">Scout</option>
+                            <option value="troop_leader">Troop Leader</option>
+                            <option value="volunteer">Volunteer</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Password:</label>
+                        <input type="password" id="memberPassword" placeholder="New Password">
+                        <small id="passwordHelp" style="display: none;">Leave blank to keep existing password</small>
+                    </div>
+                    <div class="form-group" id="memberActiveGroup" style="display: none;">
+                        <label>
+                            <input type="checkbox" id="memberActive" checked> Active
+                        </label>
+                    </div>
+                    <div class="form-buttons">
+                        <button class="btn-submit" onclick="submitMember()">Save Member</button>
+                        <button class="btn-cancel" onclick="hideCreateMemberForm()">Cancel</button>
+                    </div>
+                </div>
+
+                <div class="search-box">
+                    <input type="text" id="memberSearch" placeholder="Search members by name or email...">
+                    <button onclick="searchMembers()">Search</button>
+                </div>
+
+                <div id="membersList">
+                    <div class="loading">Loading members...</div>
+                </div>
+            </div>
+
+            <!-- Roles View -->
+            <div id="view-roles" class="view-section hidden">
+                <h2>Roles & Permissions Reference</h2>
+                <div id="rolesAlert" class="alert"></div>
+
+                <p style="margin-bottom: 1rem; color: #666;">
+                    This view displays the system-defined roles and their default privilege scopes.
+                    Roles are currently defined in code configuration.
+                </p>
+
+                <div id="rolesList">
+                    <div class="loading">Loading role definitions...</div>
+                </div>
+            </div>
+
+            <!-- Audit Log View -->
+            <div id="view-audit" class="view-section hidden">
+                <h2>Audit Log</h2>
+                <div id="auditAlert" class="alert"></div>
+
+                <div class="search-box">
+                    <input type="text" id="auditSearch" placeholder="Search by action, user, or resource...">
+                    <button onclick="searchAuditLog()">Search</button>
+                </div>
+
+                <h3>System Actions</h3>
+                <div id="auditLogList">
+                    <div class="loading">Loading audit log...</div>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div id="view-settings" class="view-section hidden">
+                <h2>System Settings</h2>
+                <div id="settingsAlert" class="alert"></div>
+
+                <div class="settings-grid" style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
+                    
+                    <!-- General Settings -->
+                    <div class="admin-form" style="max-width: 100%;">
+                        <h3>General Configuration</h3>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="setting_site_maintenance_mode"> Maintenance Mode (Block non-admins)
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="setting_allow_registration"> Allow New User Registration
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label>Session Timeout (Minutes):</label>
+                            <input type="number" id="setting_session_timeout_minutes" min="5" max="10080">
+                        </div>
+                        <div class="form-group">
+                            <label>Max Login Attempts:</label>
+                            <input type="number" id="setting_max_login_attempts" min="1" max="20">
+                        </div>
+                        <div class="form-group">
+                            <label>Email Sender Address:</label>
+                            <input type="text" id="setting_email_sender_address">
+                        </div>
+                        <button class="btn-submit" onclick="saveSettings()">Save Configuration</button>
+                    </div>
+
+                    <!-- Session Management -->
+                    <div class="admin-form" style="max-width: 100%;">
+                        <h3>Active Sessions</h3>
+                        <button class="action-btn" onclick="loadSessions()">Refresh Sessions</button>
+                        <div id="sessionsList" style="margin-top: 1rem;">
+                            <div class="loading">Loading sessions...</div>
+                        </div>
+                    </div>
+
+                    <!-- Database & Backup -->
+                    <div class="admin-form" style="max-width: 100%;">
+                        <h3>Database Maintenance</h3>
+                        <p>Perform database backups regularly.</p>
+                        <div style="margin-top: 1rem;">
+                            <a href="/api/system/backup" class="action-btn" target="_blank" style="text-decoration: none; background-color: #9b59b6;">📥 Download SQL Backup</a>
+                        </div>
+                    </div>
+
+                    <!-- System Info -->
+                    <div class="admin-form" style="max-width: 100%;">
+                        <h3>System Information</h3>
+                        <div id="systemStatsDetails">Loading stats...</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="admin.js?v=1"></script>
+</body>
+</html>

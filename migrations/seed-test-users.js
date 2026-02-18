@@ -23,48 +23,6 @@ async function seedTestUsers() {
     logger.info('Starting test user account seeding');
 
     try {
-        // 1. Upgrade existing welefort@gmail.com to SuperUser/Council Admin
-        logger.info('Upgrading welefort@gmail.com to SuperUser...');
-
-        const existingUser = await db.getOne(`
-            SELECT id FROM users WHERE email = $1
-        `, ['welefort@gmail.com']);
-
-        if (existingUser) {
-            await db.run(`
-                UPDATE users
-                SET role = $1
-                WHERE email = $2
-            `, ['council_admin', 'welefort@gmail.com']);
-            logger.info('✅ Upgraded welefort@gmail.com to council_admin role');
-        } else {
-            logger.warn('welefort@gmail.com not found - creating with council_admin role');
-            const hashedPassword = await bcrypt.hash('Admin123!', 12);
-            try {
-                await db.run(`
-                    INSERT INTO users (
-                        email, "password_hash", "firstName", "lastName", role, "isActive"
-                    ) VALUES ($1, $2, $3, $4, $5, $6)
-                `, [
-                    'welefort@gmail.com',
-                    hashedPassword,
-                    'Welefort',
-                    'Admin',
-                    'council_admin',
-                    true
-                ]);
-                logger.info('✅ Created welefort@gmail.com as council_admin');
-            } catch (err) {
-                if (err.code === '23505') { // Unique constraint violation
-                    await db.run(`UPDATE users SET role = $1 WHERE email = $2`,
-                        ['council_admin', 'welefort@gmail.com']);
-                    logger.info('✅ Updated welefort@gmail.com to council_admin role');
-                } else {
-                    throw err;
-                }
-            }
-        }
-
         // 2. Get all organizations
         const orgs = await db.getAll(`
             SELECT id, "orgCode", "orgName" FROM scout_organizations ORDER BY "orgCode"

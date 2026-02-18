@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <title>Apex Scout Manager</title>
-    <link rel="stylesheet" href="styles.css?v=13">
+    <link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body>
     <div class="container">
@@ -77,6 +77,16 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Badge Achievement Dashboard (Phase 3.2 Step 6) -->
+                    <div id="badgeAchievementSection" class="badge-achievement-section" style="display:none;">
+                        <div class="badge-achievement-header">
+                            <h3>My Badges</h3>
+                            <span id="badgeEarnedCount" class="badge-count-pill">0 earned</span>
+                        </div>
+                        <div id="earnedBadgesStrip" class="earned-badges-strip"></div>
+                        <button class="btn btn-ghost btn-sm" onclick="openBadgeGalleryModal()">Browse Available Badges</button>
                     </div>
 
                     <div class="qr-codes-display">
@@ -1428,6 +1438,70 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Badge Gallery Modal (Phase 3.2 Step 4) -->
+            <div id="badgeGalleryModal" class="modal" style="display:none;">
+                <div class="modal-content modal-lg">
+                    <div class="modal-header">
+                        <h3>Badge Gallery</h3>
+                        <button class="modal-close" onclick="closeBadgeGalleryModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="badge-filter-bar">
+                            <button class="badge-filter-btn active" data-filter="available" onclick="filterBadges('available')">Available</button>
+                            <button class="badge-filter-btn" data-filter="earned" onclick="filterBadges('earned')">Earned</button>
+                            <button class="badge-filter-btn" data-filter="all" onclick="filterBadges('all')">All</button>
+                            <input type="search" id="badgeSearchInput" class="badge-search-input" placeholder="Search badges..." oninput="filterBadgesBySearch(this.value)">
+                        </div>
+                        <div id="badgeGalleryGrid" class="badge-gallery-grid">
+                            <p class="empty-state">Loading badges...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Badge Detail Modal (Phase 3.2 Step 4) -->
+            <div id="badgeDetailModal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="badgeDetailName">Badge Details</h3>
+                        <button class="modal-close" onclick="closeBadgeDetailModal()">&times;</button>
+                    </div>
+                    <div class="modal-body" id="badgeDetailBody"></div>
+                </div>
+            </div>
+
+            <!-- Award Badge Modal (Phase 3.2 Step 5) -->
+            <div id="awardBadgeModal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Award Badge</h3>
+                        <button class="modal-close" onclick="closeAwardBadgeModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <p id="awardBadgeScoutName" class="award-scout-name"></p>
+                        <div class="form-group">
+                            <label for="awardBadgeSelect">Badge</label>
+                            <select id="awardBadgeSelect" class="form-control">
+                                <option value="">Select a badge...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="awardEarnedDate">Date Earned *</label>
+                            <input type="date" id="awardEarnedDate" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="awardNotes">Notes (optional)</label>
+                            <textarea id="awardNotes" class="form-control" rows="3" placeholder="e.g., completed at troop meeting..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="closeAwardBadgeModal()">Cancel</button>
+                        <button class="btn btn-primary" onclick="submitAwardBadge()">Award Badge</button>
+                    </div>
+                </div>
+            </div>
+
         </main>
 
         <footer>
@@ -1435,6 +1509,6 @@
         </footer>
     </div>
 
-    <script src="script.js?v=13"></script>
+    <script src="script.js?v=14"></script>
 </body>
 </html>

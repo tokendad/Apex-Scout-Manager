@@ -62,6 +62,13 @@ let profile = null;
 // Track which event is being edited (null = adding new)
 let editingEventId = null;
 
+// Badge state (Phase 3.2)
+let earnedBadges = [];
+let availableBadges = [];
+let badgeGalleryFilter = 'available';
+let awardingToUserId = null;
+let awardingBadgeOptions = [];
+
 // Privilege system constants (must match server-side definitions)
 const PRIVILEGE_DEFINITIONS = [
     { code: 'view_roster', name: 'View troop roster', category: 'Troop & Member Management' },
@@ -106,7 +113,7 @@ const ROLE_PRIVILEGE_DEFAULTS = {
     'co-leader':   { view_roster:'T', manage_members:'T', manage_troop_settings:'T', send_invitations:'T', import_roster:'T', manage_member_roles:'none', manage_privileges:'none', view_scout_profiles:'T', edit_scout_level:'T', edit_scout_status:'T', award_badges:'T', view_badge_progress:'T', edit_personal_info:'T', view_events:'T', manage_events:'T', export_calendar:'T', view_sales:'T', record_sales:'S', manage_fundraisers:'T', view_troop_sales:'T', view_financials:'T', manage_financials:'none', view_donations:'T', record_donations:'S', delete_donations:'S', view_goals:'T', manage_goals:'T', view_leaderboard:'T', manage_payment_methods:'S', import_data:'none', export_data:'T', delete_own_data:'S' },
     cookie_leader: { view_roster:'T', manage_members:'none', manage_troop_settings:'none', send_invitations:'none', import_roster:'none', manage_member_roles:'none', manage_privileges:'none', view_scout_profiles:'none', edit_scout_level:'none', edit_scout_status:'none', award_badges:'none', view_badge_progress:'none', edit_personal_info:'none', view_events:'T', manage_events:'none', export_calendar:'T', view_sales:'T', record_sales:'T', manage_fundraisers:'T', view_troop_sales:'T', view_financials:'T', manage_financials:'T', view_donations:'T', record_donations:'S', delete_donations:'none', view_goals:'T', manage_goals:'none', view_leaderboard:'T', manage_payment_methods:'S', import_data:'T', export_data:'T', delete_own_data:'S' },
     troop_leader:  { view_roster:'T', manage_members:'T', manage_troop_settings:'T', send_invitations:'T', import_roster:'T', manage_member_roles:'T', manage_privileges:'T', view_scout_profiles:'T', edit_scout_level:'T', edit_scout_status:'T', award_badges:'T', view_badge_progress:'T', edit_personal_info:'T', view_events:'T', manage_events:'T', export_calendar:'T', view_sales:'T', record_sales:'T', manage_fundraisers:'T', view_troop_sales:'T', view_financials:'T', manage_financials:'T', view_donations:'T', record_donations:'T', delete_donations:'T', view_goals:'T', manage_goals:'T', view_leaderboard:'T', manage_payment_methods:'S', import_data:'T', export_data:'T', delete_own_data:'S' },
-    council_admin: { view_roster:'T', manage_members:'T', manage_troop_settings:'T', send_invitations:'T', import_roster:'T', manage_member_roles:'T', manage_privileges:'T', view_scout_profiles:'T', edit_scout_level:'T', edit_scout_status:'T', award_badges:'T', view_badge_progress:'T', edit_personal_info:'T', view_events:'T', manage_events:'T', export_calendar:'T', view_sales:'T', record_sales:'T', manage_fundraisers:'T', view_troop_sales:'T', view_financials:'T', manage_financials:'T', view_donations:'T', record_donations:'T', delete_donations:'T', view_goals:'T', manage_goals:'T', view_leaderboard:'T', manage_payment_methods:'S', import_data:'T', export_data:'T', delete_own_data:'S' },
+    admin:         { view_roster:'T', manage_members:'T', manage_troop_settings:'T', send_invitations:'T', import_roster:'T', manage_member_roles:'T', manage_privileges:'T', view_scout_profiles:'T', edit_scout_level:'T', edit_scout_status:'T', award_badges:'T', view_badge_progress:'T', edit_personal_info:'T', view_events:'T', manage_events:'T', export_calendar:'T', view_sales:'T', record_sales:'T', manage_fundraisers:'T', view_troop_sales:'T', view_financials:'T', manage_financials:'T', view_donations:'T', record_donations:'T', delete_donations:'T', view_goals:'T', manage_goals:'T', view_leaderboard:'T', manage_payment_methods:'S', import_data:'T', export_data:'T', delete_own_data:'S' },
     cookie_manager:{ view_roster:'T', manage_members:'none', manage_troop_settings:'none', send_invitations:'none', import_roster:'none', manage_member_roles:'none', manage_privileges:'none', view_scout_profiles:'T', edit_scout_level:'none', edit_scout_status:'none', award_badges:'none', view_badge_progress:'T', edit_personal_info:'none', view_events:'T', manage_events:'none', export_calendar:'T', view_sales:'T', record_sales:'T', manage_fundraisers:'T', view_troop_sales:'T', view_financials:'T', manage_financials:'T', view_donations:'T', record_donations:'T', delete_donations:'none', view_goals:'T', manage_goals:'T', view_leaderboard:'T', manage_payment_methods:'S', import_data:'T', export_data:'T', delete_own_data:'S' },
 };
 
@@ -164,7 +171,7 @@ async function init() {
     // Display user info in the header (if user info element exists)
     displayUserInfo();
 
-    await Promise.all([loadDonations(), loadEvents(), loadProfile(), loadPaymentMethods(), loadScoutProfile()]);
+    await Promise.all([loadDonations(), loadEvents(), loadProfile(), loadPaymentMethods(), loadScoutProfile(), loadEarnedBadges()]);
     renderDonations();
     renderCalendar();
     renderPaymentMethodsSettings();
@@ -188,6 +195,14 @@ function displayUserInfo() {
 
 // Setup event listeners
 function setupEventListeners() {
+    // Badge award buttons (delegated — buttons are rendered dynamically)
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.badge-award-btn');
+        if (btn) {
+            openAwardBadgeModal(btn.dataset.userid, btn.dataset.name);
+        }
+    });
+
     // Profile listeners
     if (uploadPhotoBtn && photoInput) {
         uploadPhotoBtn.addEventListener('click', () => photoInput.click());
@@ -305,6 +320,273 @@ async function loadScoutProfile() {
         console.debug('Error loading scout profile:', error.message);
         // Non-critical error, don't break page
     }
+}
+
+// ============================================================================
+// BADGE SYSTEM (Phase 3.2) - Steps 4, 5, 6
+// ============================================================================
+
+// Load earned badges and available badges for the current user
+async function loadEarnedBadges() {
+    try {
+        if (!currentUser || !currentUser.id) return;
+
+        const response = await fetch(`${API_BASE_URL}/scouts/${currentUser.id}/badges`, { credentials: 'include' });
+        if (response.status === 404 || response.status === 403) return;
+        if (!response.ok) return;
+        earnedBadges = await response.json();
+
+        const availRes = await fetch(`${API_BASE_URL}/scouts/${currentUser.id}/available-badges`, { credentials: 'include' });
+        if (availRes.ok) {
+            availableBadges = await availRes.json();
+        }
+
+        renderBadgeAchievementSection();
+    } catch (error) {
+        if (error.message === 'Authentication required') return;
+        console.debug('Badge loading skipped:', error.message);
+    }
+}
+
+// Step 6: Render achievement dashboard strip on Profile tab
+function renderBadgeAchievementSection() {
+    const section = document.getElementById('badgeAchievementSection');
+    const strip = document.getElementById('earnedBadgesStrip');
+    const countPill = document.getElementById('badgeEarnedCount');
+    if (!section || !strip || !countPill) return;
+
+    const total = earnedBadges.length;
+    countPill.textContent = `${total} earned`;
+
+    if (total === 0) {
+        strip.innerHTML = '<p class="empty-state" style="font-size:0.85rem;margin:0;">No badges earned yet. Browse available badges!</p>';
+    } else {
+        const display = earnedBadges.slice(0, 6);
+        strip.innerHTML = display.map(b => `
+            <div class="earned-badge-chip" title="${escapeHtml(b.badgeName)}" onclick="showBadgeDetail('${escapeHtml(b.badgeId)}', true)">
+                <span class="earned-badge-icon">${getBadgeIcon(b.badgeType)}</span>
+                <span class="earned-badge-name">${escapeHtml(b.badgeName)}</span>
+                <span class="earned-badge-date">${escapeHtml(formatBadgeDate(b.earnedDate))}</span>
+            </div>
+        `).join('');
+        if (total > 6) {
+            strip.innerHTML += `<button class="btn btn-text btn-sm" onclick="openBadgeGalleryModal('earned')">+${total - 6} more</button>`;
+        }
+    }
+
+    section.style.display = 'block';
+}
+
+/// Helper: escape HTML to prevent XSS in innerHTML contexts
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+// Helper: emoji icon for badge type
+function getBadgeIcon(badgeType) {
+    const icons = {
+        petal: '🌸', journey: '🗺️', merit: '⭐',
+        adventure: '🏕️', rank: '🏅', eagle: '🦅',
+        activity: '🎯', honor: '🏆', special: '✨'
+    };
+    return icons[badgeType] || '🎖️';
+}
+
+// Helper: short date string for earned date
+function formatBadgeDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+/// Step 4: Open badge gallery modal
+function openBadgeGalleryModal(initialFilter) {
+    badgeGalleryFilter = initialFilter || 'available';
+    document.getElementById('badgeGalleryModal').style.display = 'flex';
+    document.getElementById('badgeSearchInput').value = '';
+    updateBadgeFilterButtons();
+    renderBadgeGallery();
+}
+
+function closeBadgeGalleryModal() {
+    document.getElementById('badgeGalleryModal').style.display = 'none';
+}
+
+function filterBadges(filter) {
+    badgeGalleryFilter = filter;
+    updateBadgeFilterButtons();
+    renderBadgeGallery();
+}
+
+function updateBadgeFilterButtons() {
+    document.querySelectorAll('.badge-filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === badgeGalleryFilter);
+    });
+}
+
+function filterBadgesBySearch(query) {
+    renderBadgeGallery(query.trim().toLowerCase());
+}
+
+// Render badge grid inside gallery modal
+function renderBadgeGallery(searchQuery) {
+    const grid = document.getElementById('badgeGalleryGrid');
+    if (!grid) return;
+    searchQuery = searchQuery || '';
+
+    let badges;
+    if (badgeGalleryFilter === 'earned') {
+        badges = earnedBadges.map(eb => ({
+            id: eb.badgeId, badgeName: eb.badgeName, badgeType: eb.badgeType,
+            isEarned: true, earnedDate: eb.earnedDate
+        }));
+    } else if (badgeGalleryFilter === 'available') {
+        badges = availableBadges.map(b => ({ ...b, isEarned: false }));
+    } else {
+        const earnedIds = new Set(earnedBadges.map(e => e.badgeId));
+        badges = [
+            ...earnedBadges.map(eb => ({ id: eb.badgeId, badgeName: eb.badgeName, badgeType: eb.badgeType, isEarned: true, earnedDate: eb.earnedDate })),
+            ...availableBadges.filter(b => !earnedIds.has(b.id)).map(b => ({ ...b, isEarned: false }))
+        ];
+    }
+
+    if (searchQuery) {
+        badges = badges.filter(b =>
+            (b.badgeName || '').toLowerCase().includes(searchQuery) ||
+            (b.badgeType || '').toLowerCase().includes(searchQuery)
+        );
+    }
+
+    if (badges.length === 0) {
+        grid.innerHTML = '<p class="empty-state">No badges found.</p>';
+        return;
+    }
+
+    grid.innerHTML = badges.map(b => `
+        <div class="badge-card ${b.isEarned ? 'badge-card-earned' : ''}" onclick="showBadgeDetail('${escapeHtml(b.id)}', ${b.isEarned})">
+            <div class="badge-card-icon">${getBadgeIcon(b.badgeType)}</div>
+            <div class="badge-card-name">${escapeHtml(b.badgeName)}</div>
+            <div class="badge-card-type">${escapeHtml(b.badgeType || '')}</div>
+            ${b.isEarned ? `<div class="badge-card-earned-label">Earned ${escapeHtml(formatBadgeDate(b.earnedDate))}</div>` : ''}
+        </div>
+    `).join('');
+}
+
+// Show badge detail modal (read-only)
+function showBadgeDetail(badgeId, isEarned) {
+    let badge = null;
+    if (isEarned) {
+        const eb = earnedBadges.find(e => e.badgeId === badgeId);
+        if (eb) badge = { id: eb.badgeId, badgeName: eb.badgeName, badgeType: eb.badgeType, description: eb.description, earnedDate: eb.earnedDate, verifiedByName: eb.verifiedByName };
+    } else {
+        badge = availableBadges.find(b => b.id === badgeId);
+    }
+    if (!badge) return;
+
+    document.getElementById('badgeDetailName').textContent = badge.badgeName;
+    document.getElementById('badgeDetailBody').innerHTML = `
+        <div class="badge-detail-icon">${getBadgeIcon(badge.badgeType)}</div>
+        <p class="badge-detail-type">${escapeHtml(badge.badgeType || 'Badge')}</p>
+        <p class="badge-detail-description">${escapeHtml(badge.description || 'No description available.')}</p>
+        ${isEarned ? `
+            <div class="badge-detail-earned-info">
+                <p>Earned: <strong>${escapeHtml(formatBadgeDate(badge.earnedDate))}</strong></p>
+                ${badge.verifiedByName ? `<p>Awarded by: <strong>${escapeHtml(badge.verifiedByName)}</strong></p>` : ''}
+            </div>
+        ` : ''}
+    `;
+    document.getElementById('badgeDetailModal').style.display = 'flex';
+}
+
+function closeBadgeDetailModal() {
+    document.getElementById('badgeDetailModal').style.display = 'none';
+}
+
+/// Step 5: Award badge workflow (Troop Leader context)
+async function openAwardBadgeModal(scoutUserId, scoutName) {
+    if (!selectedTroopId) {
+        showFeedback('Please select a troop first');
+        return;
+    }
+
+    awardingToUserId = scoutUserId;
+    document.getElementById('awardBadgeScoutName').textContent = `Awarding badge to: ${scoutName}`;
+    document.getElementById('awardEarnedDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('awardNotes').value = '';
+    document.getElementById('awardBadgeSelect').innerHTML = '<option value="">Loading...</option>';
+    document.getElementById('awardBadgeModal').style.display = 'flex';
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/scouts/${scoutUserId}/available-badges`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to load badges');
+        awardingBadgeOptions = await res.json();
+
+        const select = document.getElementById('awardBadgeSelect');
+        if (awardingBadgeOptions.length === 0) {
+            select.innerHTML = '<option value="">No available badges for this scout\'s level</option>';
+        } else {
+            select.innerHTML = '<option value="">Select a badge...</option>' +
+                awardingBadgeOptions.map(b =>
+                    `<option value="${b.id}">${b.badgeName} (${b.badgeType || 'badge'})</option>`
+                ).join('');
+        }
+    } catch (error) {
+        console.error('Error loading badge options:', error);
+        document.getElementById('awardBadgeSelect').innerHTML = '<option value="">Error loading badges</option>';
+    }
+}
+
+function closeAwardBadgeModal() {
+    document.getElementById('awardBadgeModal').style.display = 'none';
+    awardingToUserId = null;
+    awardingBadgeOptions = [];
+}
+
+async function submitAwardBadge() {
+    const badgeId = document.getElementById('awardBadgeSelect').value;
+    const earnedDate = document.getElementById('awardEarnedDate').value;
+    const notes = document.getElementById('awardNotes').value.trim();
+
+    if (!badgeId) { showFeedback('Please select a badge'); return; }
+    if (!earnedDate) { showFeedback('Please enter the date earned'); return; }
+    if (!awardingToUserId) { showFeedback('No scout selected'); return; }
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/scouts/${awardingToUserId}/badges`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ badgeId, earnedDate, notes: notes || null })
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Failed to award badge');
+        }
+
+        showFeedback('Badge awarded successfully!');
+        // Refresh own badge strip if leader awarded to themselves
+        const wasOwnProfile = (awardingToUserId === currentUser.id);
+        closeAwardBadgeModal();
+        if (wasOwnProfile) {
+            loadEarnedBadges();
+        }
+    } catch (error) {
+        console.error('Award badge error:', error);
+        showFeedback(error.message || 'Failed to award badge');
+    }
+}
+
+// Check if current user can award badges (client hint; server enforces actual check)
+function canAwardBadges() {
+    if (!currentUser) return false;
+    return ['troop_leader', 'co-leader', 'cookie_leader', 'admin'].includes(currentUser.role);
 }
 
 // Render scout level badge with official colors
@@ -1398,7 +1680,7 @@ function setupRoleBasedUI() {
     const councilTab = document.getElementById('councilTab');
 
     if (troopLeaderTab && currentUser) {
-        if (currentUser.role === 'troop_leader' || currentUser.role === 'council_admin') {
+        if (currentUser.role === 'troop_leader' || currentUser.role === 'admin') {
             troopLeaderTab.style.display = '';
         } else {
             troopLeaderTab.style.display = 'none';
@@ -1406,7 +1688,7 @@ function setupRoleBasedUI() {
     }
 
     if (councilTab && currentUser) {
-        if (currentUser.role === 'council_admin') {
+        if (currentUser.role === 'admin') {
             councilTab.style.display = '';
         } else {
             councilTab.style.display = 'none';
@@ -1682,7 +1964,10 @@ function renderMembershipTab() {
                         <td>${m.troopRole || 'Scout'}</td>
                         <td>${level}</td>
                         <td>${status}</td>
-                        <td><button class="btn" onclick="viewMember('${m.id}')">Edit</button></td>
+                        <td class="member-actions-cell">
+                            <button class="btn btn-sm" onclick="viewMember('${m.id}')">Edit</button>
+                            ${canAwardBadges() ? `<button class="btn btn-sm btn-secondary badge-award-btn" data-userid="${escapeHtml(m.id)}" data-name="${escapeHtml(name)}">+ Badge</button>` : ''}
+                        </td>
                     </tr>
                 `;
             }).join('');

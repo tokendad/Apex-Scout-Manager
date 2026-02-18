@@ -8,9 +8,13 @@
 | parent | 1 | Parent/guardian of a scout (COPPA compliance). Primary login for minors under 18. |
 | volunteer | 1 | Troop volunteer with no default access to personal data. |
 | troop_leader | 2 | Adult leader managing a troop. Highest operational role (scoped to own troop). |
-| council_admin | 3 | Regional council administrator with system-wide access across all troops. |
+| council_admin | 3 | **DEPRECATED** - Regional council administrator. Being replaced by admin role in Phase 6. |
+| admin | 4 | **NEW (Phase 1)** - System administrator with full access. Stored in `admins` table, not `users.role`. |
 
-*Plus a hardcoded superuser bypass for `welefort@gmail.com` that skips all role checks during development.*
+**Notes:**
+- The `admin` role is system-level and separate from troop roles
+- `council_admin` will be removed in Phase 6 after admin panel is complete
+- Hardcoded superuser bypass for `welefort@gmail.com` will also be removed in Phase 6
 
 ---
 
@@ -30,13 +34,77 @@ When a user joins a troop they receive a secondary context role within that troo
 
 ---
 
+## System Administrator Role (New in Phase 1)
+
+### Overview
+
+The `admin` role is a **system-level** role that exists separately from troop membership roles. Admins have full access to manage all aspects of the system, including:
+
+- All organizations, troops, and members
+- System configuration and settings
+- User account management
+- Badge catalogs and definitions
+- Audit logs and system monitoring
+
+### Admin Storage
+
+Unlike troop roles, admin status is stored in the `admins` table, not in `users.role` or `troop_members.role`:
+
+```sql
+CREATE TABLE admins (
+    id UUID PRIMARY KEY,
+    userId UUID REFERENCES users(id),
+    role VARCHAR(50) DEFAULT 'admin',
+    grantedAt TIMESTAMP,
+    grantedBy UUID REFERENCES users(id),
+    revokedAt TIMESTAMP,
+    revokedBy UUID REFERENCES users(id)
+);
+```
+
+### Admin Privileges
+
+Admins automatically receive **all 33 privileges at Troop (T) scope**:
+
+| Privilege Category | Scope |
+| :--- | :---: |
+| Troop & Member Management (7 privileges) | T |
+| Scout Profiles & Advancement (6 privileges) | T |
+| Calendar & Events (3 privileges) | T |
+| Fundraising & Sales (6 privileges) | T |
+| Donations (3 privileges) | T |
+| Troop Goals & Reporting (3 privileges) | T |
+| Data & Settings (4 privileges) | T |
+
+See [Admin Endpoints Documentation](/docs/API/ADMIN_ENDPOINTS.md) for complete admin privilege list.
+
+### Admin Management
+
+**Creating Admins:**
+- Bootstrap endpoint: `POST /api/system/bootstrap` (first admin only)
+- Admin creation: `POST /api/system/admins` (requires existing admin)
+
+**Revoking Admins:**
+- Admin revocation: `DELETE /api/system/admins/:userId` (requires existing admin)
+- Soft delete: Sets `revokedAt` timestamp, preserves audit trail
+
+**Protections:**
+- Admins cannot revoke their own access
+- Cannot revoke the last remaining admin
+- All grants/revocations tracked with timestamp and granting/revoking admin
+
+**See Also:** [Admin Endpoints API Documentation](/docs/API/ADMIN_ENDPOINTS.md)
+
+---
+
 ## Frontend Tab Visibility
 
 | Tab | Visible To |
 | :--- | :--- |
 | Profile, Calendar, Settings | All authenticated users |
-| Troop | `troop_leader` + `council_admin` |
-| Council | `council_admin` only |
+| Troop | `troop_leader` + `council_admin` + `admin` |
+| Council | `council_admin` only (deprecated) |
+| Admin Panel | `admin` only (Phase 2 - UI not yet implemented) |
 
 ---
 
@@ -129,7 +197,7 @@ Privileges are grouped by the current program features they control.
 | Export data | `export_data` | Export personal or troop data |
 | Delete own data | `delete_own_data` | Permanently delete own sales, donations, and profile data |
 
-#### Council Administration *(council_admin only)*
+#### Council Administration *(council_admin only - DEPRECATED)*
 
 | Privilege | Code | Description |
 | :--- | :--- | :--- |
@@ -138,13 +206,17 @@ Privileges are grouped by the current program features they control.
 | View all troops | `view_all_troops` | View all troops across the council |
 | Manage all troops | `manage_all_troops` | Full administrative access to any troop's data |
 
+**Note:** These council-specific privileges will be removed in Phase 6 when `council_admin` role is deprecated. Admin role provides equivalent access.
+
 ---
 
 ### Default Privileges by Role
 
-The following matrix defines which privileges each role receives **by default**. Troop leaders and council admins can override individual privileges for specific users.
+The following matrix defines which privileges each role receives **by default**. Troop leaders, council admins, and system admins can override individual privileges for specific users.
 
 **Scope key:** T = Troop, D = Den/Patrol, H = Household, S = Self, — = None
+
+**Note:** The `admin` role (system administrator) receives all privileges at T scope. See [System Administrator Role](#system-administrator-role-new-in-phase-1) section above.
 
 #### Troop & Member Management
 

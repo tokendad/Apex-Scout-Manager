@@ -1,6 +1,6 @@
 # Apex Scout Manager Database Schema (PostgreSQL)
 
-**Last Updated:** February 8, 2026
+**Last Updated:** February 13, 2026
 **Database System:** PostgreSQL
 **Key Feature:** Uses `uuid-ossp` extension for UUID primary keys.
 
@@ -27,7 +27,7 @@ Core user accounts. Supports scouts, parents, troop leaders, and admins.
 | `password_hash` | VARCHAR(255) | | Bcrypt hash |
 | `firstName` | VARCHAR(100) | Not Null | |
 | `lastName` | VARCHAR(100) | Not Null | |
-| `role` | VARCHAR(20) | Default: 'scout' | Enum: `scout`, `troop_leader`, `council_admin`, `parent` |
+| `role` | VARCHAR(20) | Default: 'scout' | Enum: `scout`, `troop_leader`, `council_admin` (deprecated), `parent`, `volunteer`, `assistant`, `co-leader`, `cookie_leader`, `member`, `admin` |
 | `isActive` | BOOLEAN | Default: `true` | Account status |
 | `emailVerified` | BOOLEAN | Default: `false` | Email verification status |
 | `dateOfBirth` | DATE | | Used for age verification |
@@ -53,6 +53,31 @@ Active user sessions.
 | `ipAddress` | VARCHAR(45) | | |
 | `userAgent` | TEXT | | Client device info |
 | `createdAt` | TIMESTAMP | Default: `now()` | |
+
+### `admins`
+System administrator access management (Phase 1).
+*Tracks which users have admin privileges, with full audit trail.*
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | UUID | **PK** | Unique admin record ID |
+| `userId` | UUID | **FK** -> `users.id`, Unique | User with admin access |
+| `role` | VARCHAR(50) | Default: 'admin' | Enum: `admin`, `super_admin` |
+| `grantedAt` | TIMESTAMP WITH TIME ZONE | Default: `now()` | When admin access granted |
+| `grantedBy` | UUID | **FK** -> `users.id` | Admin who granted access (NULL for bootstrap) |
+| `revokedAt` | TIMESTAMP WITH TIME ZONE | | When admin access revoked (NULL if active) |
+| `revokedBy` | UUID | **FK** -> `users.id` | Admin who revoked access |
+
+**Indexes:**
+- `idx_admins_user_id` on `userId`
+- `idx_admins_active` WHERE `revokedAt IS NULL`
+
+**Notes:**
+- Admins have system-wide access across all troops
+- Separate from troop-level roles (troop_leader, etc.)
+- Soft delete pattern: revoked admins remain in table for audit trail
+- Bootstrap admin has `grantedBy: NULL`
+- Admin role grants all 33 privileges at 'T' (Troop) scope
 
 ### `audit_log`
 Security and compliance audit trail.

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Phase 3.2 - Badge System, 2026-02-18)
+- **Badge Gallery UI:** Modal on Profile tab with Available / Earned / All filter tabs and live search by name or type
+- **Badge Detail Modal:** Shows badge description, earned date, and awarding user
+- **Badge Award Workflow:** "+ Badge" button on scout rows in Membership tab, visible only to users with `award_badges` privilege (troop_leader, co-leader, cookie_leader, admin); award modal selects from available badges, earned date, and optional notes
+- **Scout Achievement Dashboard:** Badge achievement strip on Profile tab showing up to 6 earned badges as chip cards with earned month/year; count pill for total earned; "Browse Available Badges" button opens gallery
+- `escapeHtml()` helper added to frontend for XSS prevention across all badge-rendered innerHTML
+- `description` field added to `GET /api/scouts/:userId/badges` server query
+- `credentials: 'include'` added to all badge-related fetch calls for consistent session handling
+
 ### Added
 - **Multiple Payment Methods:** Users can now add multiple payment options (e.g., Venmo, PayPal, CashApp) in Settings.
 - **Dynamic Profile QR Codes:** Profile screen now displays a QR code for each added payment method with its provider name.

@@ -75,27 +75,6 @@ try {
     console.log('\n👥 Creating users...');
 
     // ========================================================================
-    // Level 1: Council Admin (1 user)
-    // ========================================================================
-
-    const councilAdminStmt = db.prepare(`
-        INSERT INTO users (email, password_hash, firstName, lastName, role, isActive, emailVerified, createdAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const councilAdminId = councilAdminStmt.run(
-        'welefort@gmail.com',
-        hashPassword('DemoPassword123!'),
-        'Council',
-        'Admin',
-        'council_admin',
-        1,
-        1,
-        now()
-    ).lastInsertRowid;
-    console.log(`  ✅ Council Admin: welefort@gmail.com (ID: ${councilAdminId})`);
-
-    // ========================================================================
     // Level 2: Troop Leaders (2 users)
     // ========================================================================
 

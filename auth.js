@@ -40,17 +40,6 @@ function generateSessionToken() {
 }
 
 /**
- * Check if the current user is a superuser (hardcoded override)
- * @param {Object} req - Express request object
- * @returns {boolean} - True if superuser
- */
-function isSuperUser(req) {
-    const superUserEmail = 'welefort@gmail.com';
-    return (req.session && req.session.userEmail === superUserEmail) ||
-           (req.user && req.user.email === superUserEmail);
-}
-
-/**
  * Middleware to check if user is authenticated
  */
 function isAuthenticated(req, res, next) {
@@ -84,11 +73,6 @@ function hasRole(...roles) {
             }
         }
 
-        // Superuser bypass
-        if (isSuperUser(req)) {
-            return next();
-        }
-
         if (!req.session.userRole) {
             return res.status(403).json({ error: 'Access denied' });
         }
@@ -108,16 +92,11 @@ function hasRole(...roles) {
  * For admins: can access all data
  */
 function canAccessResource(req, res, next) {
-    // Superuser bypass
-    if (isSuperUser(req)) {
-        return next();
-    }
-
     const userId = req.session.userId;
     const userRole = req.session.userRole;
 
     // Admins can access everything
-    if (userRole === 'council_admin') {
+    if (userRole === 'admin') {
         return next();
     }
 
@@ -154,17 +133,10 @@ function canAccessResource(req, res, next) {
 function requirePrivilege(privilegeCode) {
     return async (req, res, next) => {
         try {
-            // 1. Superuser bypass
-            if (isSuperUser(req)) {
+            // 2. Admin bypass
+            if (req.session.userRole === 'admin') {
                 req.effectiveScope = 'T';
-                req.troopRole = 'council_admin';
-                return next();
-            }
-
-            // 2. Council admin bypass
-            if (req.session.userRole === 'council_admin') {
-                req.effectiveScope = 'T';
-                req.troopRole = 'council_admin';
+                req.troopRole = 'admin';
                 return next();
             }
 
@@ -232,17 +204,10 @@ function requirePrivilegeForUser(privilegeCode) {
         try {
             const targetUserId = req.params.userId;
 
-            // 1. Superuser bypass
-            if (isSuperUser(req)) {
+            // 2. Admin bypass
+            if (req.session.userRole === 'admin') {
                 req.effectiveScope = 'T';
-                req.troopRole = 'council_admin';
-                return next();
-            }
-
-            // 2. Council admin bypass
-            if (req.session.userRole === 'council_admin') {
-                req.effectiveScope = 'T';
-                req.troopRole = 'council_admin';
+                req.troopRole = 'admin';
                 return next();
             }
 
@@ -335,14 +300,8 @@ function requirePrivilegeForUser(privilegeCode) {
 function requirePrivilegeAnyTroop(privilegeCode) {
     return async (req, res, next) => {
         try {
-            // 1. Superuser bypass
-            if (isSuperUser(req)) {
-                req.effectiveScope = 'T';
-                return next();
-            }
-
-            // 2. Council admin bypass
-            if (req.session.userRole === 'council_admin') {
+            // 2. Admin bypass
+            if (req.session.userRole === 'admin') {
                 req.effectiveScope = 'T';
                 return next();
             }
@@ -609,13 +568,46 @@ async function cleanupExpiredSessions(dbInstance) {
 }
 
 /**
+ * Middleware to require system admin access
+ * Checks if user has an active admin record in the admins table
+ */
+function requireAdmin(req, res, next) {
+    return (async () => {
+        try {
+            // 1. Check authentication
+            if (!req.session || !req.session.userId) {
+                return res.status(401).json({ error: 'Authentication required' });
+            }
+
+            // 2. Check if user has admin status
+            const adminRecord = await db.getOne(
+                'SELECT * FROM admins WHERE "userId" = $1 AND "revokedAt" IS NULL',
+                [req.session.userId]
+            );
+
+            if (!adminRecord) {
+                return res.status(403).json({ error: 'Admin access required' });
+            }
+
+            // 3. Store admin role in request for logging/auditing
+            req.adminRole = adminRecord.role;
+            req.adminId = adminRecord.id;
+
+            next();
+        } catch (error) {
+            logger.error('Admin access check failed', { error: error.message, userId: req.session.userId });
+            res.status(500).json({ error: 'Authorization check failed' });
+        }
+    })();
+}
+
+/**
  * Role permission levels for comparison
  */
 const ROLE_LEVELS = {
     'scout': 1,
     'parent': 1,
-    'troop_leader': 2,
-    'council_admin': 3
+    'troop_leader': 2
 };
 
 /**
@@ -626,6 +618,25 @@ const ROLE_LEVELS = {
  */
 function hasPermissionLevel(userRole, requiredRole) {
     return ROLE_LEVELS[userRole] >= ROLE_LEVELS[requiredRole];
+}
+
+/**
+ * Check if user is an active system admin
+ * @param {Object} dbInstance - Database query helpers
+ * @param {string} userId - User ID to check
+ * @returns {Promise<boolean>} True if active admin
+ */
+async function isAdmin(dbInstance, userId) {
+    try {
+        const adminRecord = await dbInstance.getOne(
+            'SELECT 1 FROM admins WHERE "userId" = $1 AND "revokedAt" IS NULL',
+            [userId]
+        );
+        return !!adminRecord;
+    } catch (error) {
+        logger.error('isAdmin check failed', { error: error.message, userId });
+        return false;
+    }
 }
 
 module.exports = {
@@ -651,5 +662,7 @@ module.exports = {
     getHouseholdUserIds,
     isTargetInScope,
     buildScopeFilter,
-    isSuperUser
+    // Admin access
+    requireAdmin,
+    isAdmin
 };

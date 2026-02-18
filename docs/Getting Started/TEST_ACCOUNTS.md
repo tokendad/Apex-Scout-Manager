@@ -1,27 +1,77 @@
 # Apex Scout Manager - Test Account Credentials
 
 **Date Created:** 2026-02-10
+**Last Updated:** 2026-02-13
 **Status:** Active in Development Environment
 **Server:** http://localhost:5252
 
 ---
 
-## Superuser / Council Admin Account
+## System Administrator Account (Phase 1)
 
-**Role:** `council_admin` (Full access to all data)
+**Role:** `admin` (System-level administrator with full access)
+
+```
+Email: admin@test.local
+Password: AdminTest123!
+```
+
+### Admin Features Available
+- ✅ System-level admin access (via `admins` table)
+- ✅ Create/revoke other admin accounts
+- ✅ Access to all organizations, troops, and members
+- ✅ Award badges to any scout
+- ✅ Full system configuration access
+- ✅ Admin API endpoints (Phase 1 complete)
+- ✅ Admin UI Panel (Phase 2 complete - `/admin` route)
+
+### How to Access Admin Panel
+1. Log in as admin user (`admin@test.local`)
+2. Navigate to `http://localhost:5252/admin`
+3. Admin panel loads with 6 tabs:
+   - Dashboard (system statistics)
+   - Admins (create/revoke admins)
+   - Organizations (view organizations)
+   - Troops (view/search troops)
+   - Members (view/search members)
+   - Audit Log (view system activity)
+
+**How to Create:**
+```bash
+# Bootstrap the first admin (only works if no admins exist)
+curl -X POST http://localhost:5252/api/system/bootstrap \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@test.local",
+    "password": "AdminTest123!",
+    "firstName": "System",
+    "lastName": "Admin"
+  }'
+```
+
+See [Bootstrap Setup Guide](/docs/Getting%20Started/BOOTSTRAP_SETUP.md) for detailed instructions.
+
+---
+
+## Legacy Superuser Account (DEPRECATED - Phase 6 Removal)
+
+**Role:** `council_admin` (Legacy role - hardcoded bypass)
 
 ```
 Email: welefort@gmail.com
 Password: Admin123!
 ```
 
+**Status:** Will be removed in Phase 6 after admin panel UI is complete
+
 ### Features Available
+- ✅ Hardcoded superuser bypass (skips privilege checks)
 - ✅ Access to all organizations
 - ✅ View all scouts, parents, and leaders
 - ✅ Award badges to any scout
 - ✅ Create and manage troops
-- ✅ Administrative dashboard
-- ✅ System settings and configuration
+
+**Note:** This account uses the legacy `isSuperUser()` bypass and will be removed in Phase 6.
 
 ---
 
@@ -130,20 +180,38 @@ Organization: Scouting America - Cub Scouts (sa_cub)
 4. View recent badge awards
 5. Manage troop members
 
-### Test Admin Experience
+### Test Admin Experience (New Admin System - Phase 2 Complete)
+1. Bootstrap admin account (if not already done)
+2. Log in as `admin@test.local`
+3. Navigate to `/admin` to access admin panel
+4. Test admin UI features:
+   - View Dashboard (statistics and system status)
+   - Create/revoke admin accounts in Admins tab
+   - View organizations in Organizations tab
+   - Search troops in Troops tab
+   - Search members in Members tab
+   - View audit log in Audit Log tab
+5. Test admin API endpoints (via API or UI):
+   - GET /api/system/admins (list all admins)
+   - POST /api/system/admins (create new admin)
+   - DELETE /api/system/admins/:userId (revoke admin)
+6. Access all organizations and troops
+7. Award badges across all scouts (via main app)
+
+### Test Legacy Admin Experience (DEPRECATED)
 1. Log in as `welefort@gmail.com`
 2. Access all organizations
 3. View all troops and scouts
-4. Create new accounts
-5. Award badges across all scouts
+4. Note: Will be removed in Phase 6
 
 ---
 
 ## Account Status
 
-| Email | Role | Organization | Created | Active |
-|-------|------|--------------|---------|--------|
-| welefort@gmail.com | council_admin | All | 2026-02-10 | ✅ |
+| Email | Role | Organization | Created | Active | Notes |
+|-------|------|--------------|---------|--------|-------|
+| admin@test.local | admin | All | Bootstrap | ✅ | New admin system (Phase 1) |
+| welefort@gmail.com | council_admin | All | 2026-02-10 | ✅ | Legacy - Will be removed Phase 6 |
 | scout.gsusa@test.local | scout | Girl Scouts | 2026-02-10 | ✅ |
 | parent.gsusa@test.local | parent | Girl Scouts | 2026-02-10 | ✅ |
 | leader.gsusa@test.local | troop_leader | Girl Scouts | 2026-02-10 | ✅ |
@@ -179,11 +247,13 @@ docker exec asm-dev node migrations/seed-test-users.js
 ## Important Notes
 
 - ⚠️ **Development Only:** These accounts are for testing purposes in development environments only
-- 🔒 **Change Passwords:** In production, change all test passwords
+- 🔒 **Change Passwords:** In production, change all test passwords and use bootstrap flow
 - 🗑️ **Clean Up:** Delete test accounts before deploying to production
 - 📝 **Idempotent:** The seed script can be run multiple times safely
 - ✅ **All Organizations:** Test accounts represent all supported scouting organizations
 - 🎯 **Complete Coverage:** Includes all major user roles for comprehensive testing
+- 🆕 **Bootstrap Required:** Use bootstrap endpoint to create first admin in fresh environments
+- 🔐 **Admin System:** New admin role (Phase 1) replaces legacy council_admin (Phase 6)
 
 ---
 
@@ -206,9 +276,30 @@ docker exec asm-dev node migrations/seed-test-users.js
 - [x] Scout view (limited to own data)
 - [x] Parent view (limited to child scouts)
 - [x] Leader view (troop data)
-- [x] Admin view (all data)
+- [x] Admin view (all data via new admin system)
+- [x] Legacy council_admin view (all data via hardcoded bypass)
+
+### Admin System (Phases 1-2 Complete)
+- [x] Bootstrap flow for first admin
+- [x] Admin role with all privileges at T scope
+- [x] Admin management API endpoints
+- [x] Admin audit trail (grants/revocations)
+- [x] Admin UI panel (Phase 2 - `/admin` route)
+- [x] Dashboard with system statistics
+- [x] Admin CRUD operations (create/revoke)
+- [x] Search functionality (troops, members, audit log)
+- [ ] Full CRUD for organizations, troops, members (Phase 4)
 
 ---
 
-**Last Updated:** 2026-02-10
-**Status:** Ready for Testing
+## Admin System Resources
+
+- [Bootstrap Setup Guide](/docs/Getting%20Started/BOOTSTRAP_SETUP.md) - How to create first admin
+- [Admin Endpoints API](/docs/API/ADMIN_ENDPOINTS.md) - Complete admin API reference
+- [Admin Panel Plan](/docs/Roadmap/ADMIN_PANEL_PLAN.md) - Implementation roadmap
+- [Account Access Schema](/docs/Architecture/Account%20Access%20Schema.md) - Admin role documentation
+
+---
+
+**Last Updated:** 2026-02-13
+**Status:** Ready for Testing (Phases 1-2 Admin System Complete - UI + API)

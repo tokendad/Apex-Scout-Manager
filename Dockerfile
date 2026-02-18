@@ -1,7 +1,7 @@
 FROM node:18-alpine
 
-# Install shadow package for usermod/groupmod support, su-exec, and tzdata
-RUN apk add --no-cache shadow su-exec tzdata
+# Install shadow package for usermod/groupmod support, su-exec, tzdata, and postgresql-client
+RUN apk add --no-cache shadow su-exec tzdata postgresql-client
 
 # Create app directory
 WORKDIR /app
