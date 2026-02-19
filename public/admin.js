@@ -146,6 +146,7 @@ async function loadDashboard() {
             bootstrapBadge.innerHTML = '<span style="color: #27ae60;">✓ Complete</span>';
         }
 
+        if (window.lucide) lucide.createIcons();
         showAlert('dashboardAlert', 'Dashboard loaded successfully', 'success', 3000);
     } catch (error) {
         console.error('Error loading dashboard:', error);
@@ -1469,6 +1470,8 @@ async function initAdminPanel() {
     // Load initial view
     const lastView = localStorage.getItem('adminLastView') || 'dashboard';
     switchView(lastView);
+
+    if (window.lucide) lucide.createIcons();
 }
 
 // Initialize when DOM is ready

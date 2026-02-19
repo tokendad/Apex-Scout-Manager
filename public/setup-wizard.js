@@ -327,6 +327,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Check bootstrap status on load
     checkBootstrapStatus();
+
+    if (window.lucide) lucide.createIcons();
 });
 
 // ============================================================================

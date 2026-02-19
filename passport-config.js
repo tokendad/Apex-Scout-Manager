@@ -51,6 +51,9 @@ function configurePassport(db) {
 
             // Check if account is active
             if (!user.isActive) {
+                if (user.isMinor && !user.parentConsentDate) {
+                    return done(null, false, { message: 'Parental consent required. Please check your parent\'s email.' });
+                }
                 return done(null, false, { message: 'Account is disabled' });
             }
 

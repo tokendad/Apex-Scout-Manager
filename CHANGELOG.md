@@ -2,6 +2,57 @@
 
 All notable changes to Apex Scout Manager will be documented in this file.
 
+## [2.1.0] - 2026-02-19
+
+### Phase 4.5: Field-Ready UX & Fulfillment System
+
+This release introduces significant UI/UX improvements focused on field operations and closes the inventory loop with a new fulfillment system.
+
+### Added
+
+**Visual Dashboard Enhancements:**
+- Implemented a primary **Visual Goal Progress Ring** (SVG) on the cookie dashboard.
+- Applied **Glassmorphism** styling to dashboard cards for a modern SaaS aesthetic.
+- Migrated from emoji-based icons to **Lucide Icons** across the entire application.
+
+**Booth Field Mode:**
+- Added a dedicated, full-screen **Booth Mode** for mobile devices.
+- Features large touch targets and simplified +/- controls for rapid inventory counting in active environments.
+
+**Fulfillment System:**
+- New **Fulfillment Orders** system to track council-level orders.
+- Automated inventory updates: Delivered fulfillment orders now automatically increase troop shared inventory.
+- Added **Troop Shared Inventory** tracking to the leadership view.
+
+**Parent & Compliance Improvements:**
+- New **Parent Dashboard** section showing all linked scouts and their status.
+- Implemented **Digital COPPA Consent** flow: parents can now approve minor accounts directly from their dashboard.
+- Enhanced login security with specific messaging for accounts requiring parental consent.
+
+**Troop Leader Analytics:**
+- Added visual **Cookie Popularity** bars to the troop leader dashboard.
+- Improved visual hierarchy for troop performance metrics.
+
+### Technical Details
+
+**Database Schema (v4.5):**
+- Added `fulfillment_orders` and `fulfillment_order_items` tables.
+- Added `inventory_balances` table with multi-level tracking (Troop, Scout, Booth).
+- Refined unique constraints to support both user-linked and troop-shared inventory.
+
+**API Endpoints:**
+- `GET /api/troop/:troopId/fulfillment` - List council orders.
+- `POST /api/troop/:troopId/fulfillment` - Create a new order.
+- `PUT /api/troop/:troopId/fulfillment/:orderId` - Update order status and trigger inventory loop.
+- `GET /api/parents/scouts` - Retrieve linked minor accounts.
+- `POST /api/parents/approve-scout/:scoutId` - Digital consent processing.
+- `GET /api/troop/:troopId/shared-inventory` - View troop shared stock.
+
+**Frontend Modernization:**
+- Integrated Lucide Icons via CDN.
+- Implemented dynamic icon refreshing for AJAX-rendered content.
+- Standardized UI components with glassmorphism tokens.
+
 ## [2.0.1] - 2026-02-07
 
 ### Major Infrastructure Upgrade: PostgreSQL Migration

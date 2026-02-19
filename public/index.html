@@ -7,16 +7,17 @@
     <meta name="mobile-web-app-capable" content="yes">
     <title>Apex Scout Manager</title>
     <link rel="stylesheet" href="styles.css?v=14">
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
     <div class="container">
         <header>
             <button id="mobileMenuBtn" class="mobile-menu-btn" title="Menu">
-                <span class="hamburger-icon">☰</span>
+                <span class="hamburger-icon"><i data-lucide="menu"></i></span>
             </button>
             <h1>Apex Scout Manager</h1>
             <button id="invitationsBtn" class="invitations-btn" title="Pending Invitations" onclick="openInvitationsModal()" style="display: none;">
-                <span class="invite-icon">📬</span>
+                <span class="invite-icon"><i data-lucide="mail"></i></span>
                 <span id="invitationBadge" class="notification-badge">0</span>
             </button>
         </header>
@@ -25,32 +26,32 @@
 
         <nav class="tab-nav">
             <button class="tab-btn active" data-view="profile">
-                <span class="tab-icon">👤</span>
+                <span class="tab-icon"><i data-lucide="user"></i></span>
                 <span class="tab-label">Profile</span>
             </button>
             <button class="tab-btn" data-view="cookies" id="cookiesTab">
-                <span class="tab-icon">🍪</span>
+                <span class="tab-icon"><i data-lucide="cookie"></i></span>
                 <span class="tab-label" id="cookiesTabLabel">Cookies</span>
             </button>
             <button class="tab-btn" data-view="events">
-                <span class="tab-icon">📅</span>
+                <span class="tab-icon"><i data-lucide="calendar"></i></span>
                 <span class="tab-label">Calendar</span>
             </button>
             <button class="tab-btn" data-view="settings">
-                <span class="tab-icon">⚙️</span>
+                <span class="tab-icon"><i data-lucide="settings"></i></span>
                 <span class="tab-label">Settings</span>
             </button>
             <button class="tab-btn" data-view="troopLeader" id="troopLeaderTab" style="display: none;">
-                <span class="tab-icon">👥</span>
+                <span class="tab-icon"><i data-lucide="users"></i></span>
                 <span class="tab-label">Troop</span>
             </button>
             <button class="tab-btn" data-view="council" id="councilTab" style="display: none;">
-                <span class="tab-icon">🏛️</span>
+                <span class="tab-icon"><i data-lucide="landmark"></i></span>
                 <span class="tab-label">Council</span>
             </button>
             <div class="sidebar-divider"></div>
             <button id="logoutBtn" class="tab-btn logout-btn-sidebar">
-                <span class="tab-icon">↪</span>
+                <span class="tab-icon"><i data-lucide="log-out"></i></span>
                 <span class="tab-label">Logout</span>
             </button>
         </nav>
@@ -65,7 +66,7 @@
                     <div class="profile-card">
                         <div class="profile-photo-display">
                             <img id="profilePhotoDisplay" src="" alt="Profile Photo" class="profile-photo-large" style="display:none;">
-                            <div id="profilePhotoPlaceholderDisplay" class="profile-photo-placeholder-large">👤</div>
+                            <div id="profilePhotoPlaceholderDisplay" class="profile-photo-placeholder-large"><i data-lucide="user"></i></div>
                         </div>
 
                         <!-- Scout Level Badge (Phase 3.1) -->
@@ -87,6 +88,14 @@
                         </div>
                         <div id="earnedBadgesStrip" class="earned-badges-strip"></div>
                         <button class="btn btn-ghost btn-sm" onclick="openBadgeGalleryModal()">Browse Available Badges</button>
+                    </div>
+
+                    <!-- Parent Dashboard (Phase 5.5) -->
+                    <div id="parentDashboardSection" class="parent-dashboard-section glass-card" style="display:none; margin-top: var(--space-xl); padding: var(--space-lg); border-radius: 16px;">
+                        <h3>My Scouts</h3>
+                        <div id="linkedScoutsList" class="linked-scouts-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-md); margin-top: var(--space-md);">
+                            <p class="empty-state">No scouts linked to your account.</p>
+                        </div>
                     </div>
 
                     <div class="qr-codes-display">
@@ -263,32 +272,31 @@
                     <h2 id="cookieDashTitle">Cookie Dashboard</h2>
                 </div>
 
-                <div class="cookie-summary-cards">
-                    <div class="summary-card">
-                        <span class="summary-icon">📦</span>
-                        <div class="summary-data">
-                            <span class="summary-value" id="myTotalBoxes">0</span>
-                            <span class="summary-label">Boxes Sold</span>
+                <div class="cookie-hero-section">
+                    <div class="goal-ring-container">
+                        <svg class="goal-ring" viewBox="0 0 100 100">
+                            <circle class="goal-ring-bg" cx="50" cy="50" r="45"></circle>
+                            <circle id="goalRingProgress" class="goal-ring-fill" cx="50" cy="50" r="45"></circle>
+                        </svg>
+                        <div class="goal-ring-text">
+                            <span id="myGoalProgress" class="goal-percent">0%</span>
+                            <span class="goal-label">of Goal</span>
                         </div>
                     </div>
-                    <div class="summary-card">
-                        <span class="summary-icon">💵</span>
-                        <div class="summary-data">
-                            <span class="summary-value" id="myTotalCollected">$0</span>
-                            <span class="summary-label">Collected</span>
+                    <div class="hero-stats">
+                        <div class="hero-stat-item">
+                            <span class="hero-stat-value" id="myTotalBoxes">0</span>
+                            <span class="hero-stat-label">Boxes Sold</span>
                         </div>
-                    </div>
-                    <div class="summary-card">
-                        <span class="summary-icon">🎯</span>
-                        <div class="summary-data">
-                            <span class="summary-value" id="myGoalProgress">0%</span>
-                            <span class="summary-label">Goal</span>
+                        <div class="hero-stat-item">
+                            <span class="hero-stat-value" id="myTotalCollected">$0</span>
+                            <span class="hero-stat-label">Collected</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Quick Sale Entry -->
-                <section class="cookie-quick-sale">
+                <section class="cookie-quick-sale glass-card">
                     <h3>Quick Sale</h3>
                     <form id="quickSaleForm" class="quick-sale-form">
                         <div class="form-row">
@@ -323,7 +331,7 @@
                 </section>
 
                 <!-- Product Breakdown -->
-                <section class="cookie-product-breakdown">
+                <section class="cookie-product-breakdown glass-card">
                     <h3>Sales by Product</h3>
                     <div id="cookieProductBreakdown" class="cookie-product-grid">
                         <p class="empty-state">No sales recorded yet</p>
@@ -331,7 +339,7 @@
                 </section>
 
                 <!-- My Inventory -->
-                <section class="cookie-inventory-section">
+                <section class="cookie-inventory-section glass-card">
                     <h3>My Inventory</h3>
                     <div id="cookieInventoryGrid" class="cookie-inventory-grid">
                         <p class="empty-state">No inventory tracked yet</p>
@@ -339,7 +347,7 @@
                 </section>
 
                 <!-- Recent Sales -->
-                <section class="cookie-recent-sales">
+                <section class="cookie-recent-sales glass-card">
                     <h3>Recent Sales</h3>
                     <div id="cookieRecentSales" class="recent-sales-list">
                         <p class="empty-state">No recent sales</p>
@@ -347,7 +355,7 @@
                 </section>
 
                 <!-- Goal Getter Order Card -->
-                <section class="cookie-order-card">
+                <section class="cookie-order-card glass-card">
                     <div class="section-header">
                         <h3>Goal Getter Order Card</h3>
                         <button class="btn btn-secondary btn-sm" onclick="toggleOrderCard()">Open Order Card</button>
@@ -381,25 +389,25 @@
                 </section>
 
                 <!-- Troop Summary (shown with view_troop_sales privilege) -->
-                <section id="cookieTroopSection" class="cookie-troop-section" style="display:none;">
+                <section id="cookieTroopSection" class="cookie-troop-section glass-card" style="display:none;">
                     <h3>Troop Overview</h3>
                     <div class="cookie-troop-cards">
                         <div class="summary-card">
-                            <span class="summary-icon">📦</span>
+                            <span class="summary-icon"><i data-lucide="package"></i></span>
                             <div class="summary-data">
                                 <span class="summary-value" id="cookieTroopBoxes">0</span>
                                 <span class="summary-label">Troop Boxes</span>
                             </div>
                         </div>
                         <div class="summary-card">
-                            <span class="summary-icon">💵</span>
+                            <span class="summary-icon"><i data-lucide="dollar-sign"></i></span>
                             <div class="summary-data">
                                 <span class="summary-value" id="cookieTroopCollected">$0</span>
                                 <span class="summary-label">Troop Collected</span>
                             </div>
                         </div>
                         <div class="summary-card">
-                            <span class="summary-icon">💰</span>
+                            <span class="summary-icon"><i data-lucide="wallet"></i></span>
                             <div class="summary-data">
                                 <span class="summary-value" id="cookieTroopProceeds">$0</span>
                                 <span class="summary-label">Est. Proceeds</span>
@@ -417,7 +425,7 @@
                 </section>
 
                 <!-- Booth Events (shown with view_events privilege) -->
-                <section id="cookieBoothSection" class="cookie-booth-section" style="display:none;">
+                <section id="cookieBoothSection" class="cookie-booth-section glass-card" style="display:none;">
                     <div class="section-header">
                         <h3>Booth Events</h3>
                         <button class="btn btn-primary btn-sm" onclick="openCreateBoothModal()">+ New Booth</button>
@@ -480,6 +488,29 @@
                     <div class="modal-footer">
                         <button class="btn btn-secondary" onclick="closeCreateBoothModal()">Cancel</button>
                         <button class="btn btn-primary" onclick="createBoothEvent()">Create Booth</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Create Fulfillment Order Modal -->
+            <div id="createFulfillmentModal" class="modal" style="display:none;">
+                <div class="modal-content modal-lg">
+                    <div class="modal-header">
+                        <h3>New Council Order</h3>
+                        <button class="modal-close" onclick="closeCreateFulfillmentModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="fulfillmentItemsList" class="booth-inventory-grid-field">
+                            <!-- Items injected by JS -->
+                        </div>
+                        <div class="form-group" style="margin-top: var(--space-lg);">
+                            <label for="fulfillmentNotes">Notes</label>
+                            <textarea id="fulfillmentNotes" rows="2" placeholder="Optional notes"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="closeCreateFulfillmentModal()">Cancel</button>
+                        <button class="btn btn-primary" onclick="submitFulfillmentOrder()">Place Order</button>
                     </div>
                 </div>
             </div>
@@ -775,6 +806,7 @@
                     <div class="troop-top-nav" role="tablist">
                         <button class="troop-tab active" data-tab="membership">Membership</button>
                         <button class="troop-tab" data-tab="dashboard">Cookies</button>
+                        <button class="troop-tab" data-tab="fulfillment">Fulfillment</button>
                         <button class="troop-tab" data-tab="financials">Financials</button>
                         <button class="troop-tab" data-tab="equipment">Equipment</button>
                         <button class="troop-tab" data-tab="events">Events</button>
@@ -852,21 +884,21 @@
                         <div id="troop-tab-dashboard" class="troop-tab-panel hidden">
                         <div class="summary-cards">
                             <div class="summary-card">
-                                <span class="summary-icon">📦</span>
+                                <span class="summary-icon"><i data-lucide="package"></i></span>
                                 <div class="summary-data">
                                     <span class="summary-value" id="troopTotalBoxes">0</span>
                                     <span class="summary-label">Total Boxes</span>
                                 </div>
                             </div>
                             <div class="summary-card">
-                                <span class="summary-icon">💵</span>
+                                <span class="summary-icon"><i data-lucide="dollar-sign"></i></span>
                                 <div class="summary-data">
                                     <span class="summary-value" id="troopTotalCollected">$0</span>
                                     <span class="summary-label">Collected</span>
                                 </div>
                             </div>
                             <div class="summary-card">
-                                <span class="summary-icon">👥</span>
+                                <span class="summary-icon"><i data-lucide="users"></i></span>
                                 <div class="summary-data">
                                     <span class="summary-value" id="troopMemberCount">0</span>
                                     <span class="summary-label">Members</span>
@@ -935,6 +967,24 @@
                             </div>
                         </div>
                         </div><!-- end troop-tab-dashboard -->
+
+                        <!-- Fulfillment Tab -->
+                        <div id="troop-tab-fulfillment" class="troop-tab-panel hidden">
+                            <div class="section-header">
+                                <h2>Council Orders</h2>
+                                <button class="btn btn-primary btn-sm" onclick="openCreateFulfillmentModal()">+ New Order</button>
+                            </div>
+                            <div id="fulfillmentOrdersList" class="fulfillment-orders-list" style="margin-bottom: var(--space-xl);">
+                                <p class="empty-state">No fulfillment orders placed yet.</p>
+                            </div>
+
+                            <div class="section-header">
+                                <h2>Troop Shared Inventory</h2>
+                            </div>
+                            <div id="troopSharedInventoryList" class="cookie-inventory-grid">
+                                <p class="empty-state">No shared inventory tracked yet.</p>
+                            </div>
+                        </div>
 
                         <!-- Financials placeholder -->
                         <div id="troop-tab-financials" class="troop-tab-panel hidden">
@@ -1018,7 +1068,7 @@
                     <!-- Empty State (no troop selected) -->
                     <div id="troopEmptyState" class="troop-empty-state">
                         <div class="empty-state-content">
-                            <span class="empty-icon">👥</span>
+                            <span class="empty-icon"><i data-lucide="users"></i></span>
                             <h3>Welcome, Troop Leader!</h3>
                             <p>Select a troop from the dropdown above or create a new one to get started.</p>
                         </div>
@@ -1509,6 +1559,27 @@
         </footer>
     </div>
 
-    <script src="script.js?v=14"></script>
+    <div id="boothFieldMode" class="view-section hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; background: var(--gray-50); overflow-y: auto; padding: 0;">
+        <div class="booth-mode-header">
+            <button class="btn btn-icon" onclick="exitBoothFieldMode()">
+                <i data-lucide="arrow-left"></i>
+            </button>
+            <h3 id="boothModeTitle" class="booth-mode-title">Booth Inventory</h3>
+            <button class="btn btn-primary btn-sm" onclick="saveBoothFieldMode()">
+                Save
+            </button>
+        </div>
+        <div id="boothFieldInventoryList" class="booth-inventory-grid-field">
+            <!-- Items injected by JS -->
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+    <script>
+        // Initialize Lucide icons
+        window.addEventListener('load', () => {
+            if (window.lucide) lucide.createIcons();
+        });
+    </script>
 </body>
 </html>

@@ -7,6 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <title>Admin Panel - Apex Scout Manager</title>
     <link rel="stylesheet" href="styles.css?v=13">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         /* Admin Panel Specific Styles */
         .admin-header {
@@ -287,40 +288,40 @@
 
         <nav class="tab-nav">
             <button class="tab-btn active" data-view="dashboard">
-                <span class="tab-icon">📊</span>
+                <span class="tab-icon"><i data-lucide="bar-chart-3"></i></span>
                 <span class="tab-label">Dashboard</span>
             </button>
             <button class="tab-btn" data-view="admins">
-                <span class="tab-icon">👨‍💼</span>
+                <span class="tab-icon"><i data-lucide="user-cog"></i></span>
                 <span class="tab-label">Admins</span>
             </button>
             <button class="tab-btn" data-view="organizations">
-                <span class="tab-icon">🏢</span>
+                <span class="tab-icon"><i data-lucide="building-2"></i></span>
                 <span class="tab-label">Organizations</span>
             </button>
             <button class="tab-btn" data-view="troops">
-                <span class="tab-icon">👥</span>
+                <span class="tab-icon"><i data-lucide="users"></i></span>
                 <span class="tab-label">Troops</span>
             </button>
             <button class="tab-btn" data-view="members">
-                <span class="tab-icon">👤</span>
+                <span class="tab-icon"><i data-lucide="user"></i></span>
                 <span class="tab-label">Members</span>
             </button>
             <button class="tab-btn" data-view="roles">
-                <span class="tab-icon">🔑</span>
+                <span class="tab-icon"><i data-lucide="key"></i></span>
                 <span class="tab-label">Roles</span>
             </button>
             <button class="tab-btn" data-view="audit">
-                <span class="tab-icon">📋</span>
+                <span class="tab-icon"><i data-lucide="clipboard-list"></i></span>
                 <span class="tab-label">Audit Log</span>
             </button>
             <button class="tab-btn" data-view="settings">
-                <span class="tab-icon">⚙️</span>
+                <span class="tab-icon"><i data-lucide="settings"></i></span>
                 <span class="tab-label">Settings</span>
             </button>
             <div class="sidebar-divider"></div>
             <button id="logoutBtn" class="tab-btn logout-btn-sidebar">
-                <span class="tab-icon">↪</span>
+                <span class="tab-icon"><i data-lucide="log-out"></i></span>
                 <span class="tab-label">Logout</span>
             </button>
         </nav>

@@ -357,6 +357,54 @@ const PORT = process.env.PORT || 3000;
         `).catch(() => {});
         await db.query(`CREATE INDEX IF NOT EXISTS idx_season_milestones_troop ON season_milestones("troopId", season)`).catch(() => {});
 
+        // ---- Phase 4.5: Fulfillment System ----
+
+        // Fulfillment orders table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS fulfillment_orders (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "troopId" UUID NOT NULL REFERENCES troops(id) ON DELETE CASCADE,
+                "orderedBy" UUID NOT NULL REFERENCES users(id),
+                "orderDate" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                "deliveryDate" TIMESTAMPTZ,
+                status VARCHAR(20) DEFAULT 'pending',
+                "totalBoxes" INTEGER DEFAULT 0,
+                "totalAmount" NUMERIC(10,2) DEFAULT 0,
+                notes TEXT,
+                "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                "updatedAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT fulfillment_status_check CHECK (status IN ('pending', 'confirmed', 'shipped', 'delivered', 'cancelled'))
+            )
+        `).catch(() => {});
+
+        // Fulfillment order items table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS fulfillment_order_items (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "orderId" UUID NOT NULL REFERENCES fulfillment_orders(id) ON DELETE CASCADE,
+                "productId" UUID NOT NULL REFERENCES cookie_products(id),
+                quantity INTEGER NOT NULL,
+                "unitPrice" NUMERIC(10,2),
+                UNIQUE("orderId", "productId")
+            )
+        `).catch(() => {});
+
+        // Inventory balances table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS inventory_balances (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "troopId" UUID NOT NULL REFERENCES troops(id) ON DELETE CASCADE,
+                "userId" UUID REFERENCES users(id) ON DELETE CASCADE,
+                "productId" UUID NOT NULL REFERENCES cookie_products(id),
+                "inventoryType" VARCHAR(20) NOT NULL,
+                quantity INTEGER DEFAULT 0,
+                "lastUpdated" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT inv_type_check CHECK ("inventoryType" IN ('troop', 'scout_personal', 'booth'))
+            )
+        `).catch(() => {});
+        await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_inv_balances_troop_product ON inventory_balances ("troopId", "productId", "inventoryType") WHERE "userId" IS NULL`).catch(() => {});
+        await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_inv_balances_user_product ON inventory_balances ("troopId", "userId", "productId", "inventoryType") WHERE "userId" IS NOT NULL`).catch(() => {});
+
         // Create admins table for system administrator management (Phase 1)
         await db.query(`
             CREATE TABLE IF NOT EXISTS admins (
@@ -3468,6 +3516,197 @@ app.get('/api/troop/:troopId/inventory', auth.isAuthenticated, auth.requirePrivi
     }
 });
 
+// Get troop shared inventory (stock held by the troop, not individual scouts)
+app.get('/api/troop/:troopId/shared-inventory', auth.isAuthenticated, auth.requirePrivilege('view_troop_sales'), async (req, res) => {
+    try {
+        const { troopId } = req.params;
+        const inventory = await db.getAll(`
+            SELECT ib.*, cp."cookieName", cp."shortName", cp."pricePerBox"
+            FROM inventory_balances ib
+            JOIN cookie_products cp ON ib."productId" = cp.id
+            WHERE ib."troopId" = $1 AND ib."inventoryType" = 'troop' AND ib."userId" IS NULL
+            ORDER BY cp."sortOrder"
+        `, [troopId]);
+        res.json(inventory);
+    } catch (error) {
+        logger.error('Error fetching shared inventory', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch shared inventory' });
+    }
+});
+
+// --- Fulfillment Orders ---
+
+// List fulfillment orders for a troop
+app.get('/api/troop/:troopId/fulfillment', auth.isAuthenticated, auth.requirePrivilege('view_troop_sales'), async (req, res) => {
+    try {
+        const { troopId } = req.params;
+        const orders = await db.getAll(`
+            SELECT fo.*, u."firstName" || ' ' || u."lastName" as "orderedByName"
+            FROM fulfillment_orders fo
+            JOIN users u ON fo."orderedBy" = u.id
+            WHERE fo."troopId" = $1
+            ORDER BY fo."orderDate" DESC
+        `, [troopId]);
+        res.json(orders);
+    } catch (error) {
+        logger.error('Error fetching fulfillment orders', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch fulfillment orders' });
+    }
+});
+
+// Create new fulfillment order
+app.post('/api/troop/:troopId/fulfillment', auth.isAuthenticated, auth.requirePrivilege('manage_fundraisers'), async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { troopId } = req.params;
+        const { items, notes, deliveryDate } = req.body;
+
+        if (!items || !items.length) {
+            return res.status(400).json({ error: 'Order must contain at least one item' });
+        }
+
+        await client.query('BEGIN');
+
+        const orderId = crypto.randomUUID();
+        let totalBoxes = 0;
+        let totalAmount = 0;
+
+        // Create order record first
+        await client.query(`
+            INSERT INTO fulfillment_orders (id, "troopId", "orderedBy", notes, "deliveryDate")
+            VALUES ($1, $2, $3, $4, $5)
+        `, [orderId, troopId, req.session.userId, notes, deliveryDate]);
+
+        // Add items
+        for (const item of items) {
+            const product = await db.getOne('SELECT "pricePerBox" FROM cookie_products WHERE id = $1', [item.productId]);
+            if (!product) throw new Error(`Product not found: ${item.productId}`);
+
+            const unitPrice = product.pricePerBox;
+            const itemTotal = unitPrice * item.quantity;
+
+            await client.query(`
+                INSERT INTO fulfillment_order_items ("orderId", "productId", quantity, "unitPrice")
+                VALUES ($1, $2, $3, $4)
+            `, [orderId, item.productId, item.quantity, unitPrice]);
+
+            totalBoxes += item.quantity;
+            totalAmount += itemTotal;
+        }
+
+        // Update order totals
+        await client.query(`
+            UPDATE fulfillment_orders 
+            SET "totalBoxes" = $1, "totalAmount" = $2
+            WHERE id = $3
+        `, [totalBoxes, totalAmount, orderId]);
+
+        await auth.logAuditEvent(db, req.session.userId, 'create_fulfillment_order', req, {
+            resourceType: 'fulfillment_order',
+            resourceId: orderId,
+            details: { troopId, totalBoxes, totalAmount }
+        });
+
+        await client.query('COMMIT');
+        res.status(201).json({ success: true, orderId });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        logger.error('Error creating fulfillment order', { error: error.message });
+        res.status(500).json({ error: 'Failed to create fulfillment order' });
+    } finally {
+        client.release();
+    }
+});
+
+// Update order status
+app.put('/api/troop/:troopId/fulfillment/:orderId', auth.isAuthenticated, auth.requirePrivilege('manage_fundraisers'), async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const { status, deliveryDate, notes } = req.body;
+
+        const updates = [];
+        const values = [];
+        let paramCount = 1;
+
+        if (status) {
+            updates.push(`status = $${paramCount++}`);
+            values.push(status);
+        }
+        if (deliveryDate !== undefined) {
+            updates.push(`"deliveryDate" = $${paramCount++}`);
+            values.push(deliveryDate);
+        }
+        if (notes !== undefined) {
+            updates.push(`notes = $${paramCount++}`);
+            values.push(notes);
+        }
+
+        if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+        values.push(orderId);
+        await db.run(`
+            UPDATE fulfillment_orders 
+            SET ${updates.join(', ')}, "updatedAt" = CURRENT_TIMESTAMP
+            WHERE id = $${paramCount}
+        `, values);
+
+        // If order marked delivered, update troop inventory
+        if (status === 'delivered') {
+            const order = await db.getOne('SELECT "troopId" FROM fulfillment_orders WHERE id = $1', [orderId]);
+            const items = await db.getAll('SELECT "productId", quantity FROM fulfillment_order_items WHERE "orderId" = $1', [orderId]);
+            
+            for (const item of items) {
+                // For 'troop' type, userId is NULL
+                await db.run(`
+                    INSERT INTO inventory_balances ("troopId", "productId", "inventoryType", "userId", quantity)
+                    VALUES ($1, $2, 'troop', NULL, $3)
+                    ON CONFLICT ("troopId", "productId", "inventoryType") WHERE "userId" IS NULL
+                    DO UPDATE SET quantity = inventory_balances.quantity + EXCLUDED.quantity, "lastUpdated" = CURRENT_TIMESTAMP
+                `, [order.troopId, item.productId, item.quantity]);
+            }
+        }
+
+        await auth.logAuditEvent(db, req.session.userId, 'update_fulfillment_order', req, {
+            resourceType: 'fulfillment_order',
+            resourceId: orderId,
+            details: { status }
+        });
+
+        res.json({ success: true });
+    } catch (error) {
+        logger.error('Error updating fulfillment order', { error: error.message });
+        res.status(500).json({ error: 'Failed to update fulfillment order' });
+    }
+});
+
+// Get order details
+app.get('/api/troop/:troopId/fulfillment/:orderId', auth.isAuthenticated, auth.requirePrivilege('view_troop_sales'), async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const order = await db.getOne(`
+            SELECT fo.*, u."firstName" || ' ' || u."lastName" as "orderedByName"
+            FROM fulfillment_orders fo
+            JOIN users u ON fo."orderedBy" = u.id
+            WHERE fo.id = $1
+        `, [orderId]);
+
+        if (!order) return res.status(404).json({ error: 'Order not found' });
+
+        const items = await db.getAll(`
+            SELECT foi.*, cp."cookieName", cp."shortName"
+            FROM fulfillment_order_items foi
+            JOIN cookie_products cp ON foi."productId" = cp.id
+            WHERE foi."orderId" = $1
+            ORDER BY cp."sortOrder"
+        `, [orderId]);
+
+        res.json({ ...order, items });
+    } catch (error) {
+        logger.error('Error fetching order details', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch order details' });
+    }
+});
+
 // ============================================================================
 // Phase C: Booth Sales System
 // ============================================================================
@@ -6269,6 +6508,59 @@ app.get('/api/audit-log', auth.isAuthenticated, auth.requireAdmin, async (req, r
     } catch (error) {
         logger.error('Error loading audit log', { error: error.message });
         res.status(500).json({ error: 'Failed to load audit log', events: [] });
+    }
+});
+
+// Get linked scouts for a parent
+app.get('/api/parents/scouts', auth.isAuthenticated, async (req, res) => {
+    try {
+        const scouts = await db.getAll(`
+            SELECT u.id, u."firstName", u."lastName", u."photoUrl", u."isActive", tm."scoutLevel", t."troopNumber"
+            FROM users u
+            JOIN troop_members tm ON u.id = tm."userId"
+            JOIN troops t ON tm."troopId" = t.id
+            WHERE tm."linkedParentId" = $1 AND tm.status = 'active'
+        `, [req.session.userId]);
+        res.json(scouts);
+    } catch (error) {
+        logger.error('Error fetching linked scouts', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch linked scouts' });
+    }
+});
+
+// Approve a minor scout account (COPPA consent)
+app.post('/api/parents/approve-scout/:scoutId', auth.isAuthenticated, async (req, res) => {
+    try {
+        const { scoutId } = req.params;
+        const parentId = req.session.userId;
+
+        // Verify this parent is actually linked to this scout
+        const linkage = await db.getOne(`
+            SELECT id FROM troop_members 
+            WHERE "userId" = $1 AND "linkedParentId" = $2
+        `, [scoutId, parentId]);
+
+        if (!linkage) {
+            return res.status(403).json({ error: 'You are not authorized to approve this account' });
+        }
+
+        await db.run(`
+            UPDATE users 
+            SET "isActive" = true, 
+                "parentConsentDate" = NOW(), 
+                "parentConsentIP" = $1 
+            WHERE id = $2
+        `, [req.ip, scoutId]);
+
+        await auth.logAuditEvent(db, parentId, 'parent_consent_provided', req, {
+            resourceType: 'user',
+            resourceId: scoutId
+        });
+
+        res.json({ success: true, message: 'Scout account approved' });
+    } catch (error) {
+        logger.error('Error approving scout', { error: error.message });
+        res.status(500).json({ error: 'Failed to approve scout' });
     }
 });
 
