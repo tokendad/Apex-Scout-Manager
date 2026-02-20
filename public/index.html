@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <title>Apex Scout Manager</title>
-    <link rel="stylesheet" href="styles.css?v=14">
+    <link rel="stylesheet" href="styles.css?v=15">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -1521,6 +1521,43 @@
                 </div>
             </div>
 
+            <!-- COPPA Parental Consent Modal (Phase 5.5) -->
+            <div id="coppaConsentModal" class="modal" style="display:none;">
+                <div class="modal-content coppa-modal-content">
+                    <div class="modal-header">
+                        <h3>Parental Consent Required</h3>
+                        <button class="modal-close" onclick="closeCoppaConsentModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="coppa-consent-text">
+                            <p><strong>Children's Online Privacy Protection Act (COPPA) Notice</strong></p>
+                            <p>Apex Scout Manager collects the following information for minors under 13 years of age:</p>
+                            <ul>
+                                <li>First and last name</li>
+                                <li>Email address (if provided)</li>
+                                <li>Scout level and organization membership</li>
+                                <li>Badge and achievement records</li>
+                                <li>Cookie/product sales activity</li>
+                                <li>Profile photo (if uploaded)</li>
+                            </ul>
+                            <p>This information is used solely to manage troop activities and is not shared with third parties for commercial purposes. You may request deletion of your child's data at any time by contacting your troop leader.</p>
+                            <p>By providing consent below, you confirm that you are the parent or legal guardian of the minor scout, and you authorize Apex Scout Manager to collect and use the information described above on their behalf.</p>
+                            <p class="coppa-ip-notice"><em>Your consent, timestamp, and IP address will be recorded for compliance purposes.</em></p>
+                        </div>
+                        <div class="coppa-consent-checkbox">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="coppaConsentCheckbox" onchange="handleCoppaCheckboxChange()">
+                                <span>I am the parent or legal guardian and I consent to the collection of my child's information as described above.</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="closeCoppaConsentModal()">Cancel</button>
+                        <button id="coppaConsentSubmitBtn" class="btn btn-primary" onclick="submitCoppaConsent()" disabled>I Consent &amp; Activate Account</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Award Badge Modal (Phase 3.2 Step 5) -->
             <div id="awardBadgeModal" class="modal" style="display:none;">
                 <div class="modal-content">
@@ -1574,7 +1611,7 @@
         </div>
     </div>
 
-    <script type="module" src="js/main.js"></script>
+    <script src="script.js"></script>
     <script>
         // Initialize Lucide icons
         window.addEventListener('load', () => {

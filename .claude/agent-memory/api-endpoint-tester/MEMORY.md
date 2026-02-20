@@ -1,8 +1,10 @@
 # API Endpoint Tester - Memory
 
-## Last Test Session: 2026-02-12
+## Last Test Session: 2026-02-13
 
-Tested 10 member editing endpoints in Apex Scout Manager with 40+ comprehensive test cases. All tests passed.
+Tested Admin Panel Phase 2 implementation - 25 tests, 23 passed (92%). Two bugs identified requiring fixes before Phase 3.
+
+**Detailed Report:** `admin-panel-phase2-testing.md`
 
 ## API Authentication & Access Patterns
 
@@ -180,6 +182,30 @@ leaveDate: NOW()  -- Timestamp of deletion
 - requestedBy: User who initiated deletion
 - reason: Text explanation
 - status: 'pending' (later processed to 'completed')
+
+## Admin Panel Routes (Phase 2)
+
+### Routes Tested 2026-02-13
+- `/admin` - Redirects to `/admin.html` (requires admin auth)
+- `/admin.html` - Main admin panel UI (requires admin auth)
+- Both routes use `auth.isAuthenticated` + `auth.requireAdmin` middleware
+- Anonymous access returns 401 (not 302 redirect)
+
+### Admin Panel API Endpoints
+**Implemented:**
+- `GET /api/system/admins` - Returns `{ "admins": [...] }` (object, not array)
+- `POST /api/system/admins` - Create admin (needs UUID validation fix)
+- `DELETE /api/system/admins/:userId` - Revoke admin (HAS TYPO - see bugs below)
+- `GET /api/system/bootstrap-status` - System status
+
+**Phase 3 (Not Yet Implemented):**
+- `GET /api/troops` - Returns 404
+- `GET /api/members` - Returns 404
+- `GET /api/audit-log` - Returns 404
+
+### Bugs Found (2026-02-13)
+1. **CRITICAL:** Line 5375 server.js - Route typo: `'/api/system/admins:userId'` should be `'/api/system/admins/:userId'` (missing slash)
+2. **MEDIUM:** POST /api/system/admins returns 500 for invalid UUID instead of 400 (needs validation)
 
 ## Known Issues
 
