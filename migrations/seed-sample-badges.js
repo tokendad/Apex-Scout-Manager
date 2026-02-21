@@ -391,15 +391,24 @@ async function seedSampleBadges() {
         ];
 
         // 5. Insert Girl Scout badges
+        // TODO: Populate "imageUrl" with official badge images from GSUSA CDN once URLs are confirmed.
+        // The GSUSA badge explorer at https://www.girlscouts.org/en/members/for-girl-scouts/badges-journeys-awards/badge-explorer.html
+        // uses Angular with dynamic loading; badge images are served via CDN but URLs could not be
+        // reliably determined via static scraping. Update imageUrl values here and change
+        // ON CONFLICT ... DO UPDATE SET "imageUrl" = EXCLUDED."imageUrl" to push the new URLs.
         let gsCount = 0;
         for (const badge of girlScoutBadges) {
-            const levelCodes = badge.levels.join('|');
             await db.run(`
                 INSERT INTO badges (
                     "badgeCatalogId", "badgeCode", "badgeName", "badgeType",
                     description, requirements, "applicableLevels", "sortOrder", "isActive"
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                ON CONFLICT DO NOTHING
+                ON CONFLICT ("badgeCatalogId", "badgeCode") DO UPDATE SET
+                    "badgeName"       = EXCLUDED."badgeName",
+                    description       = EXCLUDED.description,
+                    requirements      = EXCLUDED.requirements,
+                    "applicableLevels"= EXCLUDED."applicableLevels",
+                    "sortOrder"       = EXCLUDED."sortOrder"
             `, [
                 orgMap.gsusa.catalog_id, badge.code, badge.name, badge.type,
                 badge.desc, badge.req, JSON.stringify(badge.levels), badge.order, true
@@ -416,7 +425,12 @@ async function seedSampleBadges() {
                     "badgeCatalogId", "badgeCode", "badgeName", "badgeType",
                     description, requirements, "applicableLevels", "sortOrder", "isActive"
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                ON CONFLICT DO NOTHING
+                ON CONFLICT ("badgeCatalogId", "badgeCode") DO UPDATE SET
+                    "badgeName"       = EXCLUDED."badgeName",
+                    description       = EXCLUDED.description,
+                    requirements      = EXCLUDED.requirements,
+                    "applicableLevels"= EXCLUDED."applicableLevels",
+                    "sortOrder"       = EXCLUDED."sortOrder"
             `, [
                 orgMap.sa_cub.catalog_id, badge.code, badge.name, badge.type,
                 badge.desc, badge.req, JSON.stringify(badge.levels), badge.order, true
@@ -433,7 +447,12 @@ async function seedSampleBadges() {
                     "badgeCatalogId", "badgeCode", "badgeName", "badgeType",
                     description, requirements, "applicableLevels", "sortOrder", "isActive"
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                ON CONFLICT DO NOTHING
+                ON CONFLICT ("badgeCatalogId", "badgeCode") DO UPDATE SET
+                    "badgeName"       = EXCLUDED."badgeName",
+                    description       = EXCLUDED.description,
+                    requirements      = EXCLUDED.requirements,
+                    "applicableLevels"= EXCLUDED."applicableLevels",
+                    "sortOrder"       = EXCLUDED."sortOrder"
             `, [
                 orgMap.sa_bsa.catalog_id, badge.code, badge.name, badge.type,
                 badge.desc, badge.req, JSON.stringify(badge.levels), badge.order, true

@@ -129,3 +129,72 @@ https://girlscoutsmakehistory.wordpress.com/archives-collection/badges/
 
 - Booth inventory sheet: [2025-26 Booth Inventory Sheet ENG.pdf](2025-26%20Booth%20Inventory%20Sheet%20ENG.pdf)
 - Goal getter order card (interactive): [2025-26 Goal Getter Order Card Color Interactive.pdf](2025-26%20Goal%20Getter%20Order%20Card%20Color%20Interactive.pdf)
+
+
+### Badge explorer
+
+Possible endpoints for badge images.  A few examples below with full descriptions
+
+
+
+**Be a Sister to Every Girl Scout**
+Daisy (Grades K-1)
+Life Skills
+
+Be a Sister to Every Girl Scout
+
+Discover how you can honor the Girl Scout sisterhood by celebrating your differences and supporting your fellow Girl Scouts!
+
+1. Celebrate your differences
+2. Learn about Girl Scouts from around the world 
+3. Support your Girl Scout sisters
+
+When you've earned this badge, you will know what it means to be a sister to every Girl Scout.
+
+<img src="/content/dam/gsusa/badge-explorer/Badges/Daisy/DaisyPetals/DaisyPetal_ViBeASister.png" alt=" " style="max-width: 255px;">
+
+https://www.girlscouts.org/content/dam/gsusa/badge-explorer/Badges/Daisy/DaisyPetals/DaisyPetal_ViBeASister.png
+
+
+**Uniquely Us**
+
+Junior (Grades 4-5)
+Health
+Life Skills
+Relationships
+Mental Wellness
+
+
+Discover how to appreciate what makes you one of a kind.
+
+Explore all the things your body can do
+Avoid the "comparison trap"
+Know that it's not all about your body
+Learn how to talk about it
+Celebrate differences—and find similarities
+When you've earned this badge, you'll understand that everyone is unique and we're all just right—including you!
+<img src="/content/dam/gsusa/badge-explorer/Badges/Junior/25_UniquelyUs_Badge_600x600_25-05-29.png" alt=" " style="max-width: 255px;">
+https://www.girlscouts.org/content/dam/gsusa/badge-explorer/Badges/Junior/25_UniquelyUs_Badge_600x600_25-05-29.png
+
+**Gold Torch Awards**
+
+Ambassador (Grades 11-12)
+Leadership Awards
+Life Skills
+Leadership
+Highest Award Prerequisite
+Relationships
+
+
+Lead with purpose and guide a team to make a difference.
+
+Explore your strengths
+Set your direction
+Lead your team
+Look ahead together
+Make your mark
+When you’ve earned this award, you’ll know how to lead a successful team.
+
+<img src="/content/dam/gsusa/badge-explorer/Badges/Ambassador/awards/Ambassador - 61708-Gold-Torch-Award.png" alt=" " style="max-width: 255px;">
+
+https://www.girlscouts.org/content/dam/gsusa/badge-explorer/Badges/Ambassador/awards/Ambassador%20-%2061708-Gold-Torch-Award.png

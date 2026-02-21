@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <title>Apex Scout Manager</title>
-    <link rel="stylesheet" href="styles.css?v=15">
+    <link rel="stylesheet" href="styles.css?v=18">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -83,11 +83,11 @@
                     <!-- Badge Achievement Dashboard (Phase 3.2 Step 6) -->
                     <div id="badgeAchievementSection" class="badge-achievement-section" style="display:none;">
                         <div class="badge-achievement-header">
-                            <h3>My Badges</h3>
+                            <h3 id="badgeSectionTitle">My Badges</h3>
                             <span id="badgeEarnedCount" class="badge-count-pill">0 earned</span>
                         </div>
                         <div id="earnedBadgesStrip" class="earned-badges-strip"></div>
-                        <button class="btn btn-ghost btn-sm" onclick="openBadgeGalleryModal()">Browse Available Badges</button>
+                        <button class="btn btn-ghost btn-sm" id="badgeBrowseBtn" onclick="openBadgeGalleryModal()">Browse Available Badges</button>
                     </div>
 
                     <!-- Parent Dashboard (Phase 5.5) -->
@@ -1497,12 +1497,18 @@
                         <button class="modal-close" onclick="closeBadgeGalleryModal()">&times;</button>
                     </div>
                     <div class="modal-body">
-                        <div class="badge-filter-bar">
+                        <!-- Scout filters (shown for scouts/members) -->
+                        <div id="badgeGalleryScoutFilters" class="badge-filter-bar">
                             <button class="badge-filter-btn active" data-filter="available" onclick="filterBadges('available')">Available</button>
                             <button class="badge-filter-btn" data-filter="earned" onclick="filterBadges('earned')">Earned</button>
                             <button class="badge-filter-btn" data-filter="all" onclick="filterBadges('all')">All</button>
-                            <input type="search" id="badgeSearchInput" class="badge-search-input" placeholder="Search badges..." oninput="filterBadgesBySearch(this.value)">
                         </div>
+                        <!-- Leader org label (shown for troop leaders/co-leaders — org is fixed to their troop's org) -->
+                        <div id="badgeGalleryLeaderFilters" class="badge-filter-bar badge-filter-bar-leader" style="display:none;">
+                            <span class="badge-catalog-org-label">Organization:</span>
+                            <span id="badgeCatalogOrgLabel" class="badge-catalog-org-name">All Organizations</span>
+                        </div>
+                        <input type="search" id="badgeSearchInput" class="badge-search-input" placeholder="Search badges..." oninput="filterBadgesBySearch(this.value)">
                         <div id="badgeGalleryGrid" class="badge-gallery-grid">
                             <p class="empty-state">Loading badges...</p>
                         </div>

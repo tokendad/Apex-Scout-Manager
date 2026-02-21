@@ -1954,13 +1954,25 @@ app.get('/api/troop/my-troops', auth.isAuthenticated, async (req, res) => {
                 ORDER BY t."troopNumber"
             `);
         } else {
-            // Troop leader sees only their troops
+            // Troop leader sees troops where they are the leaderId OR an active leader/co-leader member
             troops = await db.getAll(`
-                SELECT t.*, u."firstName" || ' ' || u."lastName" as "leaderName",
-                       (SELECT COUNT(*) FROM troop_members WHERE "troopId" = t.id AND status = 'active') as "memberCount"
+                SELECT DISTINCT t.*, u."firstName" || ' ' || u."lastName" as "leaderName",
+                       (SELECT COUNT(*) FROM troop_members WHERE "troopId" = t.id AND status = 'active') as "memberCount",
+                       so."orgCode", so."orgName"
                 FROM troops t
                 LEFT JOIN users u ON t."leaderId" = u.id
-                WHERE t."leaderId" = $1 AND t."isActive" = true
+                LEFT JOIN scout_organizations so ON so.id = t."organizationId"
+                WHERE t."isActive" = true
+                  AND (
+                    t."leaderId" = $1
+                    OR EXISTS (
+                        SELECT 1 FROM troop_members tm
+                        WHERE tm."troopId" = t.id
+                          AND tm."userId" = $1
+                          AND tm.role IN ('troop_leader', 'co-leader', 'cookie_leader')
+                          AND tm.status = 'active'
+                    )
+                  )
                 ORDER BY t."troopNumber"
             `, [req.session.userId]);
         }
@@ -5568,7 +5580,7 @@ app.post('/api/system/bootstrap', async (req, res) => {
         const userId = crypto.randomUUID();
 
         await db.run(
-            `INSERT INTO users (id, email, password, role, "createdAt")
+            `INSERT INTO users (id, email, password_hash, role, "createdAt")
              VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
             [userId, email, hashedPassword, 'admin']
         );
@@ -6347,7 +6359,7 @@ app.post('/api/system/members', auth.isAuthenticated, auth.requireAdmin, async (
         const id = crypto.randomUUID();
 
         await db.run(
-            `INSERT INTO users (id, email, password, "firstName", "lastName", role, "isActive", "createdAt")
+            `INSERT INTO users (id, email, password_hash, "firstName", "lastName", role, "isActive", "createdAt")
              VALUES ($1, $2, $3, $4, $5, $6, true, CURRENT_TIMESTAMP)`,
             [id, email, hashedPassword, firstName, lastName, role || 'member']
         );
@@ -6377,7 +6389,7 @@ app.put('/api/system/members/:id', auth.isAuthenticated, auth.requireAdmin, asyn
         // If password provided, hash it
         if (password) {
             const hashedPassword = await auth.hashPassword(password);
-            await db.run('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, id]);
+            await db.run('UPDATE users SET password_hash = $1 WHERE id = $2', [hashedPassword, id]);
         }
 
         await db.run(

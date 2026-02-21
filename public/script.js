@@ -69,6 +69,14 @@ let badgeGalleryFilter = 'available';
 let awardingToUserId = null;
 let awardingBadgeOptions = [];
 
+// Leader catalog state (populated when current user is a leader)
+let catalogBadges = [];          // Badges from the leader's troop org catalog(s)
+let catalogBadgesByOrg = {};     // { orgCode: [badges...] } (kept for internal use)
+let catalogOrgName = '';         // Display name of the leader's troop org (e.g. "Girl Scouts USA")
+
+// Global troop list — populated by loadMyTroops() so other functions can look up org info
+let myTroopsList = [];
+
 // Privilege system constants (must match server-side definitions)
 const PRIVILEGE_DEFINITIONS = [
     { code: 'view_roster', name: 'View troop roster', category: 'Troop & Member Management' },
@@ -332,6 +340,12 @@ async function loadEarnedBadges() {
     try {
         if (!currentUser || !currentUser.id) return;
 
+        // Leaders see the full badge catalog; scouts see their personal progress
+        if (canAwardBadges()) {
+            await loadBadgeCatalogForLeader();
+            return;
+        }
+
         const response = await fetch(`${API_BASE_URL}/scouts/${currentUser.id}/badges`, { credentials: 'include' });
         if (response.status === 404 || response.status === 403) return;
         if (!response.ok) return;
@@ -349,6 +363,74 @@ async function loadEarnedBadges() {
     }
 }
 
+// Load the badge catalog for leader/co-leader users, filtered to their troop's org
+async function loadBadgeCatalogForLeader() {
+    try {
+        const catalogsRes = await fetch(`${API_BASE_URL}/badge-catalogs`, { credentials: 'include' });
+        if (!catalogsRes.ok) return;
+        const allCatalogs = await catalogsRes.json();
+
+        catalogBadges = [];
+        catalogBadgesByOrg = {};
+        catalogOrgName = '';
+
+        // Determine the organization for the currently selected troop (or first troop)
+        let troopOrgId = null;
+        if (selectedTroopId && myTroopsList.length > 0) {
+            const troop = myTroopsList.find(t => t.id === selectedTroopId);
+            if (troop) troopOrgId = troop.organizationId || null;
+        } else if (myTroopsList.length > 0) {
+            troopOrgId = myTroopsList[0].organizationId || null;
+        }
+
+        // Filter catalogs to only those matching the troop's org; fall back to all if no match
+        let catalogs = allCatalogs;
+        if (troopOrgId) {
+            const filtered = allCatalogs.filter(c => c.organizationId === troopOrgId);
+            if (filtered.length > 0) {
+                catalogs = filtered;
+                catalogOrgName = filtered[0].orgName || '';
+            }
+        }
+
+        for (const catalog of catalogs) {
+            const badgesRes = await fetch(`${API_BASE_URL}/badge-catalogs/${catalog.id}/badges`, { credentials: 'include' });
+            if (!badgesRes.ok) continue;
+            const badges = await badgesRes.json();
+            // Attach orgCode and orgName so badge cards can display them
+            const enriched = badges.map(b => ({ ...b, orgCode: catalog.orgCode, orgName: catalog.orgName, catalogName: catalog.catalogName }));
+            catalogBadges = catalogBadges.concat(enriched);
+            catalogBadgesByOrg[catalog.orgCode] = (catalogBadgesByOrg[catalog.orgCode] || []).concat(enriched);
+        }
+
+        renderLeaderBadgeCatalogSection();
+    } catch (error) {
+        console.debug('Badge catalog loading skipped:', error.message);
+    }
+}
+
+// Render the badge achievement section for leaders (shows catalog count + browse button)
+function renderLeaderBadgeCatalogSection() {
+    const section = document.getElementById('badgeAchievementSection');
+    const strip = document.getElementById('earnedBadgesStrip');
+    const countPill = document.getElementById('badgeEarnedCount');
+    const title = document.getElementById('badgeSectionTitle');
+    const browseBtn = document.getElementById('badgeBrowseBtn');
+    if (!section || !strip || !countPill) return;
+
+    if (title) title.textContent = 'Badge Catalog';
+    if (browseBtn) browseBtn.textContent = 'Browse Badge Catalog';
+    const orgLabel = catalogOrgName ? ` \u2014 ${catalogOrgName}` : '';
+    countPill.textContent = `${catalogBadges.length} badges${orgLabel}`;
+
+    strip.innerHTML = `<p class="empty-state" style="font-size:0.85rem;margin:0;">
+        Browse the badge catalog to find and award badges to scouts.
+    </p>`;
+
+    section.style.display = 'block';
+    if (window.lucide) lucide.createIcons();
+}
+
 // Step 6: Render achievement dashboard strip on Profile tab
 function renderBadgeAchievementSection() {
     const section = document.getElementById('badgeAchievementSection');
@@ -364,7 +446,7 @@ function renderBadgeAchievementSection() {
     } else {
         const display = earnedBadges.slice(0, 6);
         strip.innerHTML = display.map(b => `
-            <div class="earned-badge-chip" title="${escapeHtml(b.badgeName)}" onclick="showBadgeDetail('${escapeHtml(b.badgeId)}', true)">
+            <div class="earned-badge-chip" title="${escapeHtml(b.badgeName)}" onclick="showBadgeDetail('${escapeHtml(b.badgeId)}', true, false)">
                 <span class="earned-badge-icon">${getBadgeIcon(b.badgeType)}</span>
                 <span class="earned-badge-name">${escapeHtml(b.badgeName)}</span>
                 <span class="earned-badge-date">${escapeHtml(formatBadgeDate(b.earnedDate))}</span>
@@ -408,29 +490,71 @@ function formatBadgeDate(dateStr) {
     return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
+// Helper: CSS class suffix for badge type color pill
+function getBadgeTypeClass(badgeType) {
+    const map = {
+        petal: 'petal', journey: 'journey', badge: 'badge',
+        merit: 'merit', adventure: 'adventure', rank: 'rank',
+        eagle: 'eagle', activity: 'activity', honor: 'honor', special: 'special'
+    };
+    return map[badgeType] || 'badge';
+}
+
+// Helper: format applicableLevels array for display (capitalize, join with slash)
+function formatBadgeLevels(levels) {
+    if (!Array.isArray(levels) || levels.length === 0) return '';
+    return levels.map(l => l.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())).join(' / ');
+}
+
 /// Step 4: Open badge gallery modal
 function openBadgeGalleryModal(initialFilter) {
-    badgeGalleryFilter = initialFilter || 'available';
-    document.getElementById('badgeGalleryModal').style.display = 'flex';
-    document.getElementById('badgeSearchInput').value = '';
-    updateBadgeFilterButtons();
-    renderBadgeGallery();
+    if (canAwardBadges()) {
+        // Leaders see their troop's org badge catalog (already filtered by org)
+        document.getElementById('badgeGalleryModal').style.display = 'flex';
+        document.getElementById('badgeSearchInput').value = '';
+        updateBadgeGalleryMode();
+        renderBadgeGallery();
+    } else {
+        // Scouts see their personal earned/available badges
+        badgeGalleryFilter = initialFilter || 'available';
+        document.getElementById('badgeGalleryModal').style.display = 'flex';
+        document.getElementById('badgeSearchInput').value = '';
+        updateBadgeGalleryMode();
+        renderBadgeGallery();
+    }
 }
 
 function closeBadgeGalleryModal() {
     document.getElementById('badgeGalleryModal').style.display = 'none';
 }
 
+// Switch filter for scout personal view
 function filterBadges(filter) {
     badgeGalleryFilter = filter;
-    updateBadgeFilterButtons();
+    updateBadgeGalleryMode();
     renderBadgeGallery();
 }
 
-function updateBadgeFilterButtons() {
-    document.querySelectorAll('.badge-filter-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.filter === badgeGalleryFilter);
-    });
+// Show the correct set of filter buttons based on whether user is a leader or scout
+function updateBadgeGalleryMode() {
+    const scoutFilters = document.getElementById('badgeGalleryScoutFilters');
+    const leaderFilters = document.getElementById('badgeGalleryLeaderFilters');
+
+    if (canAwardBadges()) {
+        if (scoutFilters) scoutFilters.style.display = 'none';
+        // Replace the leader filter area with just the org name label
+        if (leaderFilters) {
+            leaderFilters.style.display = 'flex';
+            const orgNameEl = document.getElementById('badgeCatalogOrgLabel');
+            if (orgNameEl) orgNameEl.textContent = catalogOrgName || 'All Organizations';
+        }
+    } else {
+        if (scoutFilters) scoutFilters.style.display = 'flex';
+        if (leaderFilters) leaderFilters.style.display = 'none';
+        document.querySelectorAll('.badge-filter-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.filter === badgeGalleryFilter);
+        });
+    }
 }
 
 function filterBadgesBySearch(query) {
@@ -444,25 +568,35 @@ function renderBadgeGallery(searchQuery) {
     searchQuery = searchQuery || '';
 
     let badges;
-    if (badgeGalleryFilter === 'earned') {
-        badges = earnedBadges.map(eb => ({
-            id: eb.badgeId, badgeName: eb.badgeName, badgeType: eb.badgeType,
-            isEarned: true, earnedDate: eb.earnedDate
-        }));
-    } else if (badgeGalleryFilter === 'available') {
-        badges = availableBadges.map(b => ({ ...b, isEarned: false }));
+
+    if (canAwardBadges()) {
+        // Leader: show all catalog badges (already filtered to troop's org)
+        badges = catalogBadges.slice();
     } else {
-        const earnedIds = new Set(earnedBadges.map(e => e.badgeId));
-        badges = [
-            ...earnedBadges.map(eb => ({ id: eb.badgeId, badgeName: eb.badgeName, badgeType: eb.badgeType, isEarned: true, earnedDate: eb.earnedDate })),
-            ...availableBadges.filter(b => !earnedIds.has(b.id)).map(b => ({ ...b, isEarned: false }))
-        ];
+        // Scout: show personal earned/available badges
+        if (badgeGalleryFilter === 'earned') {
+            badges = earnedBadges.map(eb => ({
+                id: eb.badgeId, badgeName: eb.badgeName, badgeType: eb.badgeType,
+                imageUrl: eb.imageUrl, isEarned: true, earnedDate: eb.earnedDate
+            }));
+        } else if (badgeGalleryFilter === 'available') {
+            badges = availableBadges.map(b => ({ ...b, isEarned: false }));
+        } else {
+            const earnedIds = new Set(earnedBadges.map(e => e.badgeId));
+            badges = [
+                ...earnedBadges.map(eb => ({ id: eb.badgeId, badgeName: eb.badgeName, badgeType: eb.badgeType, imageUrl: eb.imageUrl, isEarned: true, earnedDate: eb.earnedDate })),
+                ...availableBadges.filter(b => !earnedIds.has(b.id)).map(b => ({ ...b, isEarned: false }))
+            ];
+        }
     }
 
     if (searchQuery) {
         badges = badges.filter(b =>
             (b.badgeName || '').toLowerCase().includes(searchQuery) ||
-            (b.badgeType || '').toLowerCase().includes(searchQuery)
+            (b.badgeType || '').toLowerCase().includes(searchQuery) ||
+            (b.orgName || '').toLowerCase().includes(searchQuery) ||
+            (b.description || '').toLowerCase().includes(searchQuery) ||
+            (Array.isArray(b.applicableLevels) ? b.applicableLevels.join(' ') : '').toLowerCase().includes(searchQuery)
         );
     }
 
@@ -471,33 +605,69 @@ function renderBadgeGallery(searchQuery) {
         return;
     }
 
-    grid.innerHTML = badges.map(b => `
-        <div class="badge-card ${b.isEarned ? 'badge-card-earned' : ''}" onclick="showBadgeDetail('${escapeHtml(b.id)}', ${b.isEarned})">
-            <div class="badge-card-icon">${getBadgeIcon(b.badgeType)}</div>
-            <div class="badge-card-name">${escapeHtml(b.badgeName)}</div>
-            <div class="badge-card-type">${escapeHtml(b.badgeType || '')}</div>
-            ${b.isEarned ? `<div class="badge-card-earned-label">Earned ${escapeHtml(formatBadgeDate(b.earnedDate))}</div>` : ''}
-        </div>
-    `).join('');
+    if (canAwardBadges()) {
+        // Leader view: type pill, applicable levels, and truncated description
+        grid.innerHTML = badges.map(b => {
+            const desc = b.description ? (b.description.length > 100 ? escapeHtml(b.description.slice(0, 100)) + '&hellip;' : escapeHtml(b.description)) : '';
+            const levels = formatBadgeLevels(b.applicableLevels);
+            const visual = b.imageUrl
+                ? `<div class="badge-card-img"><img src="${escapeHtml(b.imageUrl)}" alt="${escapeHtml(b.badgeName)}" loading="lazy"></div>`
+                : `<div class="badge-card-icon">${getBadgeIcon(b.badgeType)}</div>`;
+            return `
+            <div class="badge-card" onclick="showBadgeDetail('${escapeHtml(b.id)}', false, true)">
+                ${visual}
+                <div class="badge-card-name">${escapeHtml(b.badgeName)}</div>
+                <span class="badge-type-pill badge-type-${escapeHtml(getBadgeTypeClass(b.badgeType))}">${escapeHtml(b.badgeType || 'badge')}</span>
+                ${levels ? `<div class="badge-card-levels">${escapeHtml(levels)}</div>` : ''}
+                ${desc ? `<div class="badge-card-desc">${desc}</div>` : ''}
+            </div>`;
+        }).join('');
+    } else {
+        grid.innerHTML = badges.map(b => {
+            const desc = b.description ? (b.description.length > 100 ? escapeHtml(b.description.slice(0, 100)) + '&hellip;' : escapeHtml(b.description)) : '';
+            const levels = formatBadgeLevels(b.applicableLevels);
+            const visual = b.imageUrl
+                ? `<div class="badge-card-img"><img src="${escapeHtml(b.imageUrl)}" alt="${escapeHtml(b.badgeName)}" loading="lazy"></div>`
+                : `<div class="badge-card-icon">${getBadgeIcon(b.badgeType)}</div>`;
+            return `
+            <div class="badge-card ${b.isEarned ? 'badge-card-earned' : ''}" onclick="showBadgeDetail('${escapeHtml(b.id)}', ${b.isEarned}, false)">
+                ${visual}
+                <div class="badge-card-name">${escapeHtml(b.badgeName)}</div>
+                <span class="badge-type-pill badge-type-${escapeHtml(getBadgeTypeClass(b.badgeType))}">${escapeHtml(b.badgeType || 'badge')}</span>
+                ${levels ? `<div class="badge-card-levels">${escapeHtml(levels)}</div>` : ''}
+                ${desc ? `<div class="badge-card-desc">${desc}</div>` : ''}
+                ${b.isEarned ? `<div class="badge-card-earned-label">Earned ${escapeHtml(formatBadgeDate(b.earnedDate))}</div>` : ''}
+            </div>`;
+        }).join('');
+    }
     if (window.lucide) lucide.createIcons();
 }
 
 // Show badge detail modal (read-only)
-function showBadgeDetail(badgeId, isEarned) {
+// isEarned: true if shown from earned list; isCatalog: true if shown from leader catalog view
+function showBadgeDetail(badgeId, isEarned, isCatalog) {
     let badge = null;
-    if (isEarned) {
+    if (isCatalog) {
+        // Leader catalog view: find in catalogBadges
+        badge = catalogBadges.find(b => b.id === badgeId);
+    } else if (isEarned) {
         const eb = earnedBadges.find(e => e.badgeId === badgeId);
-        if (eb) badge = { id: eb.badgeId, badgeName: eb.badgeName, badgeType: eb.badgeType, description: eb.description, earnedDate: eb.earnedDate, verifiedByName: eb.verifiedByName };
+        if (eb) badge = { id: eb.badgeId, badgeName: eb.badgeName, badgeType: eb.badgeType, description: eb.description, imageUrl: eb.imageUrl, earnedDate: eb.earnedDate, verifiedByName: eb.verifiedByName };
     } else {
         badge = availableBadges.find(b => b.id === badgeId);
     }
     if (!badge) return;
 
     document.getElementById('badgeDetailName').textContent = badge.badgeName;
+    const detailVisual = badge.imageUrl
+        ? `<img class="badge-detail-img" src="${escapeHtml(badge.imageUrl)}" alt="${escapeHtml(badge.badgeName)}" loading="lazy">`
+        : `<div class="badge-detail-icon">${getBadgeIcon(badge.badgeType)}</div>`;
     document.getElementById('badgeDetailBody').innerHTML = `
-        <div class="badge-detail-icon">${getBadgeIcon(badge.badgeType)}</div>
+        ${detailVisual}
         <p class="badge-detail-type">${escapeHtml(badge.badgeType || 'Badge')}</p>
+        ${badge.orgName ? `<p class="badge-detail-org">${escapeHtml(badge.orgName)}</p>` : ''}
         <p class="badge-detail-description">${escapeHtml(badge.description || 'No description available.')}</p>
+        ${badge.requirements ? `<p class="badge-detail-requirements"><strong>Requirements:</strong> ${escapeHtml(badge.requirements)}</p>` : ''}
         ${isEarned ? `
             <div class="badge-detail-earned-info">
                 <p>Earned: <strong>${escapeHtml(formatBadgeDate(badge.earnedDate))}</strong></p>
@@ -528,18 +698,35 @@ async function openAwardBadgeModal(scoutUserId, scoutName) {
     document.getElementById('awardBadgeModal').style.display = 'flex';
 
     try {
-        const res = await fetch(`${API_BASE_URL}/scouts/${scoutUserId}/available-badges`, { credentials: 'include' });
-        if (!res.ok) throw new Error('Failed to load badges');
-        awardingBadgeOptions = await res.json();
+        // Use the full badge catalog so leaders can award any badge, not just
+        // those matching the scout's current level. If catalog is already loaded
+        // (leader opened the gallery first), reuse it; otherwise fetch now.
+        if (catalogBadges.length === 0) {
+            await loadBadgeCatalogForLeader();
+        }
+
+        awardingBadgeOptions = catalogBadges;
 
         const select = document.getElementById('awardBadgeSelect');
         if (awardingBadgeOptions.length === 0) {
-            select.innerHTML = '<option value="">No available badges for this scout\'s level</option>';
+            select.innerHTML = '<option value="">No badges in catalog</option>';
         } else {
-            select.innerHTML = '<option value="">Select a badge...</option>' +
-                awardingBadgeOptions.map(b =>
-                    `<option value="${b.id}">${b.badgeName} (${b.badgeType || 'badge'})</option>`
+            // Group options by org for readability
+            const byOrg = {};
+            awardingBadgeOptions.forEach(b => {
+                const org = b.orgName || 'Other';
+                if (!byOrg[org]) byOrg[org] = [];
+                byOrg[org].push(b);
+            });
+            let optionsHtml = '<option value="">Select a badge...</option>';
+            for (const [orgName, badges] of Object.entries(byOrg)) {
+                optionsHtml += `<optgroup label="${escapeHtml(orgName)}">`;
+                optionsHtml += badges.map(b =>
+                    `<option value="${escapeHtml(b.id)}">${escapeHtml(b.badgeName)} (${escapeHtml(b.badgeType || 'badge')})</option>`
                 ).join('');
+                optionsHtml += '</optgroup>';
+            }
+            select.innerHTML = optionsHtml;
         }
     } catch (error) {
         console.error('Error loading badge options:', error);
@@ -1399,8 +1586,9 @@ function switchView(viewId) {
 function setupNavigation() {
     const tabButtons = document.querySelectorAll('.tab-btn');
 
-    // Add event listeners
+    // Add event listeners — skip buttons that have no data-view (e.g. logout)
     tabButtons.forEach(btn => {
+        if (!btn.dataset.view) return;
         btn.addEventListener('click', () => {
             switchView(btn.dataset.view);
             // Close mobile menu after selection
@@ -1773,6 +1961,7 @@ async function loadMyTroops() {
         if (!response.ok) throw new Error('Failed to load troops');
 
         const troops = await response.json();
+        myTroopsList = troops; // Store globally so badge catalog can filter by org
         const troopSelector = document.getElementById('troopSelector');
 
         if (troopSelector) {
@@ -1792,6 +1981,12 @@ async function loadMyTroops() {
             } else if (troops.length === 0) {
                 showTroopEmptyState();
             }
+        }
+
+        // Reload badge catalog now that myTroopsList and selectedTroopId are set,
+        // in case loadBadgeCatalogForLeader() ran earlier (from init) before troops loaded.
+        if (canAwardBadges() && myTroopsList.length > 0) {
+            loadBadgeCatalogForLeader();
         }
     } catch (error) {
         console.error('Error loading troops:', error);
@@ -4558,9 +4753,9 @@ async function saveBoothFieldMode() {
     });
     
     try {
-        const endpoint = boothFieldModeType === 'start' ? 
-            \`${API_BASE_URL}/troop/${cookieDashboardTroopId}/booths/${currentBoothId}/inventory\` :
-            \`${API_BASE_URL}/troop/${cookieDashboardTroopId}/booths/${currentBoothId}/inventory/count\`;
+        const endpoint = boothFieldModeType === 'start' ?
+            `${API_BASE_URL}/troop/${cookieDashboardTroopId}/booths/${currentBoothId}/inventory` :
+            `${API_BASE_URL}/troop/${cookieDashboardTroopId}/booths/${currentBoothId}/inventory/count`;
         
         const method = boothFieldModeType === 'start' ? 'PUT' : 'POST';
         
@@ -4626,7 +4821,7 @@ async function submitFulfillmentOrder() {
     const notes = document.getElementById('fulfillmentNotes').value;
 
     try {
-        const res = await fetch(\`${API_BASE_URL}/troop/${selectedTroopId}/fulfillment\`, {
+        const res = await fetch(`${API_BASE_URL}/troop/${selectedTroopId}/fulfillment`, {
             method: 'POST', credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ items, notes })
@@ -4642,7 +4837,7 @@ async function submitFulfillmentOrder() {
 
 async function loadFulfillmentOrders(troopId) {
     try {
-        const res = await fetch(\`${API_BASE_URL}/troop/${troopId}/fulfillment\`, { credentials: 'include' });
+        const res = await fetch(`${API_BASE_URL}/troop/${troopId}/fulfillment`, { credentials: 'include' });
         if (!res.ok) return;
         const orders = await res.json();
         renderFulfillmentOrders(orders);
@@ -4654,7 +4849,7 @@ async function loadFulfillmentOrders(troopId) {
 function renderFulfillmentOrders(orders) {
     const el = document.getElementById('fulfillmentOrdersList');
     if (!orders.length) {
-        el.innerHTML = '<p class='empty-state'>No fulfillment orders placed yet.</p>';
+        el.innerHTML = '<p class="empty-state">No fulfillment orders placed yet.</p>';
         return;
     }
 
@@ -4691,7 +4886,7 @@ function renderFulfillmentOrders(orders) {
 
 async function updateFulfillmentStatus(orderId, status) {
     try {
-        const res = await fetch(\`${API_BASE_URL}/troop/${selectedTroopId}/fulfillment/${orderId}\`, {
+        const res = await fetch(`${API_BASE_URL}/troop/${selectedTroopId}/fulfillment/${orderId}`, {
             method: 'PUT', credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status })
@@ -4705,7 +4900,7 @@ async function updateFulfillmentStatus(orderId, status) {
 
 async function loadTroopSharedInventory(troopId) {
     try {
-        const res = await fetch(\`${API_BASE_URL}/troop/${troopId}/shared-inventory\`, { credentials: 'include' });
+        const res = await fetch(`${API_BASE_URL}/troop/${troopId}/shared-inventory`, { credentials: 'include' });
         if (!res.ok) return;
         const inventory = await res.json();
         renderTroopSharedInventory(inventory);
@@ -4735,7 +4930,7 @@ function renderTroopSharedInventory(inventory) {
 async function loadLinkedScouts() {
     if (!currentUser || currentUser.role !== 'parent') return;
     try {
-        const response = await fetch(\`${API_BASE_URL}/parents/scouts\`);
+        const response = await fetch(`${API_BASE_URL}/parents/scouts`);
         await handleApiResponse(response);
         const scouts = await response.json();
         renderParentDashboard(scouts);
